@@ -109,7 +109,7 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - Upstream tracker: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r (artifact db: `groups/<A..L,Dp>` with
   commits, status, version, lore link, checks, notes; `log`; `meta/series`, `meta/prep`). Update it with
   ArtifactData (read first, pin if_version) whenever patches are regrouped, sent or reviewed.
-- Kernel: branch `a3y17lte` in src/linux, local commits = `git log v7.4-rc2..a3y17lte` (local master is older, rc1+879) (35 as of 2026-11-09; Wi-Fi/BT folded into the initial DTS)
+- Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master = v7.4-rc2) (35 as of 2026-11-09; Wi-Fi/BT folded into the initial DTS)
 
 ## Display (command-mode panel!)
 

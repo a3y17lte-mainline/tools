@@ -86,7 +86,15 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 
 ## Layout
 
-- The project folder is a git repo (branch main, local only, no remote) tracking CLAUDE.md, tools/,
+- GitHub org a3y17lte-mainline (ssh key ~/.ssh/id_ed25519, account Sap1k). Remote name `gh` in each
+  repo; `origin` stays the upstream (kernel.org / denx):
+  - tools: git@github.com:a3y17lte-mainline/tools.git (this folder, branch main)
+  - linux: git@github.com:a3y17lte-mainline/linux.git (fork of torvalds/linux, branch a3y17lte)
+  - u-boot: git@github.com:a3y17lte-mainline/u-boot.git (fork of u-boot/u-boot, branch a3y17lte)
+  A rebased series is a force push: use `git push --force-with-lease gh a3y17lte`.
+  src/ trees are blob:none partial clones: only push to repos that already have the upstream
+  history (the forks), never to an empty repo.
+- The project folder is a git repo (branch main, pushed to the tools repo above) tracking CLAUDE.md, tools/,
   work/notes/ and work/config-a3y17lte through an allowlist .gitignore. Commit changes to tools and notes
   there. New top-level paths stay untracked until they're added to the allowlist; never allowlist
   backups/, firmware/, work/firmware/, work/system/ or work/ssh/.

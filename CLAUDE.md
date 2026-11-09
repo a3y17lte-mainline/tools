@@ -42,17 +42,19 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
   ASV voltages, and cpuidle (core power-down; cluster power-down not done).
 
 Not done, roughly in planned order:
-- U-Boot paths not tested yet: the Volume Down menu, "Boot Previous Kernel" (no .prev set yet) and the
-  fallback to fastboot.
-- Real panel driver: DECON i80/TE + S6E3AA2 DRM panel, ported from vendor s6e3aa2_a3y17_lcd_ctrl.c.
+- U-Boot paths not tested yet: the Volume Down menu, "Boot Previous Kernel" and the fallback to
+  fastboot (the user considers the boot loop finished).
+- NEXT: real panel driver: DECON i80/TE + S6E3AA2 DRM panel, ported from vendor s6e3aa2_a3y17_lcd_ctrl.c.
+- Right after the panel: postmarketOS device package (testing) with a desktop (battery, Wi-Fi, BT,
+  touch, panel). Phase 2 is closed (2026-11-09).
 - Suspend: needs the PMU sleep sequences from the vendor kernel.
 - SPI port config + STM32 sensor hub → IIO (large).
 - PDMA, ADC (battery thermistor), PWM.
-- S2MU004 follow-ups: MUIC charger detection, higher input current (a charger write: needs the user's
-  approval), and the TCPM USB-C/PD driver at i2c0 0x3c for host/OTG.
 - Audio COD3026X (shared with every 7870 phone). GPU: Panfrost, Mali-T830.
 - Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.
 - Upstreaming: wave 1 is ready to prepare once the user wants to send.
+- Backlog (no phase, from the plan doc): S2MU004 "proper charging" (MUIC charger detection, higher input
+  current: a charger write, needs the user's approval) and the TCPM USB-C/PD driver at i2c0 0x3c.
 
 Working style (user preferences, also in memory): short single-step phone commands, no chained wait
 loops. Trust what the user reports seeing on the phone. For low-risk boot changes, build and flash BOOT

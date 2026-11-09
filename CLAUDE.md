@@ -37,16 +37,17 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
 - Boot: autoboot from eMMC through our U-Boot. Watchdog, reboot and poweroff work.
 - Connectivity: USB NCM + ssh, Wi-Fi (ath10k_sdio), BT (hci_qca).
 - Storage: eMMC, microSD.
-- Input and display: touch, keys, capacitive touch keys + LEDs, hall (lid), vibrator, simpledrm (U-Boot starts the DECON TE trigger).
+- Input: touch, keys, capacitive touch keys + LEDs, hall (lid), vibrator.
+- Display (2026-11-09): Exynos DRM (DECON command mode + DSIM) + our S6E3AA2 panel driver, fbcon,
+  256 calibrated brightness levels, blank/unblank. See the Display section.
 - Power: S2MU004 fuel gauge + charger (watchdog kick), thermal, cpufreq 343–1586 MHz with per-chip
   ASV voltages, and cpuidle (core power-down; cluster power-down not done).
 
 Not done, roughly in planned order:
 - U-Boot paths not tested yet: the Volume Down menu, "Boot Previous Kernel" and the fallback to
   fastboot (the user considers the boot loop finished).
-- NEXT: real panel driver: DECON i80/TE + S6E3AA2 DRM panel, ported from vendor s6e3aa2_a3y17_lcd_ctrl.c.
-- Right after the panel: postmarketOS device package (testing) with a desktop (battery, Wi-Fi, BT,
-  touch, panel). Phase 2 is closed (2026-11-09).
+- NEXT: postmarketOS device package (testing) with a desktop (battery, Wi-Fi, BT, touch, panel).
+  Phase 2 is closed (2026-11-09); the panel works (2026-11-09).
 - Then Phase 3, after the panel: the TCPM USB-C/PD driver at i2c0 0x3c (host/OTG, role switching) and
   S2MU004 "proper charging" (MUIC charger detection, higher input current: a charger write, needs the
   user's approval).
@@ -122,17 +123,28 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - Upstream tracker: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r (artifact db: `groups/<A..L,Dp>` with
   commits, status, version, lore link, checks, notes; `log`; `meta/series`, `meta/prep`). Update it with
   ArtifactData (read first, pin if_version) whenever patches are regrouped, sent or reviewed.
-- Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master = v7.4-rc2) (35 as of 2026-11-09; Wi-Fi/BT folded into the initial DTS)
+- Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master = v7.4-rc2) (46 as of 2026-11-09; Wi-Fi/BT folded into the initial DTS)
 
-## Display (command-mode panel!)
+## Display (command-mode panel, working 2026-11-09)
 
-- The A3's S6E3AA2 is a MIPI command-mode panel: after S-Boot it does NOT refresh by itself, so
-  writing the framebuffer (0x67000000, 720x1280 ARGB8888) shows nothing. Verified 2026-11-08 with
-  tools/probes/decon_probe.c.
-- Fix: enable DECON (0x14830000) hardware TE auto-trigger once: TRIGCON (0x6B0) |= HWTRIGEN(1<<3) |
-  HWTRIG_AUTO_MASK(1<<6) | TRIG_SAVE_DISABLE_SYNCMGR(1<<13) | HWTRIGMASK_DISPIF0(1<<4), clear
-  SWTRIGEN(1<<0); VIDCON0 |= ENVID|ENVID_F (bits 1,0); DECON_UPDATE (0x710) |= 1. Panel then refreshes
-  continuously. Software trigger (SWTRIGEN + SWTRIGCMD bit 1) also works.
+- Datasheet notes (written from the vendor driver, used as the reference for our clean-room driver):
+  work/notes/s6e3aa2.md. Read it before touching the panel or the DECON/DSIM command-mode code.
+- Pipeline: DECON (exynos7_drm_decon, i80 + hardware TE trigger, TE pin gpe0-2) -> DSIM (samsung-dsim)
+  -> S6E3AA2 AMS474MM01 (drivers/gpu/drm/panel/panel-samsung-s6e3aa2.c), 720x1280 command mode, 4 lanes
+  at 490 MHz. Exynos DRM removes simpledrm at bind. Needs CONFIG_EXYNOS_IOMMU (else DECON waits for its
+  sysmmu until the 13 s deferred-probe timeout).
+- What made it work (all in the series): DSIM CMD_TE_CTRL0/1 timers (zero = every frame ABNORMAL),
+  porches programmed in BOTH DSIM and DECON in command mode (they must match; DSIM-only = garbage),
+  DECON VCLK RUN_VDEN_DISABLE, panel mode vbp 10 / vfp 3 / vsa 1, backlight hooked into drm_panel.
+- Brightness: /sys/class/backlight/14800000.dsi.0 (0-255, non-linear like Samsung's UI scale). Gamma for
+  74 steps is computed from the panel's MTP at first prepare; per level a step + AOR + ELVSS is sent.
+- Panel safety: only volatile registers are written. Never send OTP/MTP program commands.
+- A "white" screen at AOR 0 is the panel's stale frame memory, NOT our data. To test whether pixels
+  arrive, fill the framebuffer black/with a pattern and see whether the screen changes.
+- Useful state: DCS 0x0A (0x9C ok), 0x0D bit 3 (all pixels off), 0x0E (0x80 TE on, bit 0 DSI error),
+  0x05 (error count); DSIM INTSRC 0x14800034 (healthy: 0x01080000, bit 22 = ABNORMAL).
+- Before any DRM driver (U-Boot/simpledrm): the panel only refreshes because U-Boot enables the DECON
+  hardware TE auto-trigger (TRIGCON 0x6B0 = 0x2058; VIDCON0 ENVID|ENVID_F; DECON_UPDATE 0x710 |= 1).
 - Code-execution probe without screen: write 0x12345671 to PMU INFORM3 (0x1048080c), 1 to PMU SWRESET
   (0x10480400) -> phone reboots into download mode (seen on USB as 04e8:685d).
 - S-Boot loads custom BOOT images fine; arm64 header layout matching stock (text_offset 0x80000,
@@ -182,7 +194,8 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - Kernel config: `tools/mkconfig-a3y17lte` regenerates it (pmOS config + our changes); add new options
   there. Never run kernel make/olddefconfig without ARCH=arm64: it silently converts the config to x86.
 - Kernel: `build-kernel-img` (ccache; builds Image, dtbs AND modules) then `fastboot boot out/images/linux-a3y17lte-fastboot.img`.
-  RAM only, nothing written. After a crash/reset the phone comes back to fastboot by itself.
+  RAM only, nothing written. Since eMMC autoboot, a crash/reset boots the INSTALLED kernel again, not
+  fastboot: for a RAM test the user picks "Enter Fastboot Mode" in the Volume Down menu.
 - The initramfs is a SEPARATE gzip ramdisk in the boot image (ramdisk at 0x49000000), not built into the
   kernel (INITRAMFS_SOURCE=""). With it embedded, a 38.9 MB Image (image_size 0x2510000) died before printing
   anything while 33.8 MB booted; cause unknown (2026-11-08). Keep an eye on Image size (now ~30 MB).
@@ -194,8 +207,9 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
   on 10.78.70.1 only); serial shell /dev/ttyACM0 as fallback; network 10.78.70.1 (host 10.78.70.2 via nmcli
   con "a3-usb"), `nc 10.78.70.1 2323` dumps dmesg. U-Boot fastboot is 04e8:6602, Linux gadget is 1d6b:0104.
 - Watchdog (CPUCL0, 0x10170000) runs from boot (`s3c2410_wdt.tmr_atboot=1` in the cmdline): a hang
-  or panic resets to U-Boot fastboot in ~13 s. `reboot -f` works via its restart handler (~4 s).
-  From a live shell, `/tmp/poke 0x10480400 1` (PMU SWRESET) also resets straight to fastboot.
+  or panic resets the phone in ~13 s (U-Boot then autoboots eMMC). `reboot -f` works via its restart
+  handler (~4 s). After `reboot`, wait for the USB link to drop before waiting for it to come back:
+  the old system answers pings for a few seconds while shutting down.
 - Thermal: one TMU sensor at 0x10130000 (zone soc-thermal, passive 76 C, critical 110 C). TRIMINFO
   25 C trim on this unit is 319 (9-bit), so mainline's Exynos7 efuse range would read ~274 C.
   Both CPU clusters are its cooling devices. Test trips with .../thermal_zone0/emul_temp.

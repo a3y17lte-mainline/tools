@@ -29,7 +29,7 @@ rm -f "$I/etc/a3-root"
 grep -q '^CONFIG_INITRAMFS_SOURCE=""' "$O/.config" || {
 	echo "kernel .config embeds an initramfs: rerun tools/mkconfig-a3y17lte" >&2; exit 1; }
 
-nice make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1 CC="ccache clang" -j"$(nproc)" Image dtbs \
+nice make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1 CC="ccache clang" -j"$(nproc)" Image dtbs modules \
 	> "$ROOT/out/kernel-build.log" 2>&1 || { tail -20 "$ROOT/out/kernel-build.log"; exit 1; }
 
 # Real load addresses in bank 0. With the AOSP default (0x10008000) U-Boot runs the

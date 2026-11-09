@@ -33,7 +33,7 @@ Read these first:
    - Its `rig` CLI does not exist; use the tools/ below.
 5. `work/notes/` holds detailed register notes (s2mu004-regs.md), and `work/firmware/README` lists the blobs.
 
-Working (all on 7.4-rc1 + branch a3y17lte):
+Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a3y17lte-pre-rc2):
 - Boot: autoboot from eMMC through our U-Boot. Watchdog, reboot and poweroff work.
 - Connectivity: USB NCM + ssh, Wi-Fi (ath10k_sdio), BT (hci_qca).
 - Storage: eMMC, microSD.
@@ -109,7 +109,7 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - Upstream tracker: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r (artifact db: `groups/<A..L,Dp>` with
   commits, status, version, lore link, checks, notes; `log`; `meta/series`, `meta/prep`). Update it with
   ArtifactData (read first, pin if_version) whenever patches are regrouped, sent or reviewed.
-- Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (35 as of 2026-11-09; Wi-Fi/BT folded into the initial DTS)
+- Kernel: branch `a3y17lte` in src/linux, local commits = `git log v7.4-rc2..a3y17lte` (local master is older, rc1+879) (35 as of 2026-11-09; Wi-Fi/BT folded into the initial DTS)
 
 ## Display (command-mode panel!)
 
@@ -130,6 +130,9 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - Touchscreen works: Imagis IST3038H at 0x50 on 13890000.i2c (normal I2C, not the secure gpc3 bank),
   mainline imagis driver. Also regulator-haptic and gpio-keys. Event and i2c bus numbers change between
   boots and kernels: find devices by name in /proc/bus/input/devices and /sys/bus/i2c/devices/*/name.
+- Intermittent: on 1 of 2 rc2 boots imagis read chip ID 0x0 and the touchscreen failed to probe
+  (never seen on rc1). Both supplies are already on from the bootloader, so the 60 ms delay in
+  imagis_power_on() is not a real power cycle: first suspect if it recurs.
 - Touch keys work (2026-11-09): ABOV A96T316 at 0x20 as a variant of mainline tm2-touchkey
   ("abov,a96t316-touchkey"), KEY_APPSELECT (left) / KEY_BACK (right), and an LED class device
   `tm2-touchkey` (backlights on by default). The bus is i2c-gpio on gpc8-0/1 like the vendor kernel:
@@ -153,6 +156,8 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
   needed (2026-11-09). If that fails it falls through to fastboot. Hold Volume Down at power-on for the
   menu (Boot Kernel / Boot Previous Kernel / Fastboot / Reboot / Power Off). U-Boot has no MMC/FAT/ext4
   write support. U-Boot shows the previous kernel's pstore console on screen before booting.
+- After a kernel release change (new rc), run `tools/a3-sync-modules` before rebooting into it,
+  or Wi-Fi/BT modules fail with "version magic" errors.
 - Kernel install: RAM-test with `fastboot boot` first, then `tools/a3-install-kernel` (ssh file copies into
   /boot, sha256-checked; old set kept as *.prev for extlinux-prev.conf). To RAM-test while the phone
   autoboots: Volume Down menu -> Enter Fastboot Mode.
@@ -163,7 +168,7 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
   7870 boards: a 1.5 GB fill-and-verify over the freed RAM was clean (2026-11-08).
 - Kernel config: `tools/mkconfig-a3y17lte` regenerates it (pmOS config + our changes); add new options
   there. Never run kernel make/olddefconfig without ARCH=arm64: it silently converts the config to x86.
-- Kernel: `build-kernel-img` (ccache) then `fastboot boot out/images/linux-a3y17lte-fastboot.img`.
+- Kernel: `build-kernel-img` (ccache; builds Image, dtbs AND modules) then `fastboot boot out/images/linux-a3y17lte-fastboot.img`.
   RAM only, nothing written. After a crash/reset the phone comes back to fastboot by itself.
 - The initramfs is a SEPARATE gzip ramdisk in the boot image (ramdisk at 0x49000000), not built into the
   kernel (INITRAMFS_SOURCE=""). With it embedded, a 38.9 MB Image (image_size 0x2510000) died before printing

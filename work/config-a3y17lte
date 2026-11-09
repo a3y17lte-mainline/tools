@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 7.4.0-rc1 Kernel Configuration
+# Linux/arm64 7.4.0-rc2 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="clang version 23.1.4 (Fedora 23.1.4-1.fc45)"
 CONFIG_GCC_VERSION=0

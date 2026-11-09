@@ -170,6 +170,8 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - `i2cdetect` is blocked by the guard hook (it probes with writes); `i2cget` reads are fine.
 - Kernel make calls by hand must use `LLVM=1` (as in build-kernel-img): a plain or GCC make
   silently converts out/linux/.config to GCC. If that happens, re-run tools/mkconfig-a3y17lte.
+- Building older commits (per-commit/bisect checks) makes syncconfig drop options whose Kconfig
+  entry doesn't exist yet (e.g. DRM_PANEL_SAMSUNG_S6E3AA2 -> black screen). Re-run mkconfig after.
 
 ## Boot loop (working as of 2026-11-08)
 

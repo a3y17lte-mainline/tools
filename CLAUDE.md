@@ -86,6 +86,11 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 
 ## Layout
 
+- The project folder is a git repo (branch main, local only, no remote) tracking CLAUDE.md, tools/,
+  work/notes/ and work/config-a3y17lte through an allowlist .gitignore. Commit changes to tools and notes
+  there. New top-level paths stay untracked until they're added to the allowlist; never allowlist
+  backups/, firmware/, work/firmware/, work/system/ or work/ssh/.
+
 - `src/` mainline linux, pmaports, pmbootstrap, vendor kernel (lineage-24.0), vendor device tree, u-boot
 - `backups/` eMMC backups (mode 700, contain IMEI/EFS: never upload anywhere). PIT: `backups/pit/a3y17lte.pit`
 - `firmware/twrp/` TWRP 3.7.0_9-0 a3y17lte (GPG-verified, TeamWin key 95707D42…891A43DF)

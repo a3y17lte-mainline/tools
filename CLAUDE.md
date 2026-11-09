@@ -47,14 +47,15 @@ Not done, roughly in planned order:
 - NEXT: real panel driver: DECON i80/TE + S6E3AA2 DRM panel, ported from vendor s6e3aa2_a3y17_lcd_ctrl.c.
 - Right after the panel: postmarketOS device package (testing) with a desktop (battery, Wi-Fi, BT,
   touch, panel). Phase 2 is closed (2026-11-09).
+- Then Phase 3, after the panel: the TCPM USB-C/PD driver at i2c0 0x3c (host/OTG, role switching) and
+  S2MU004 "proper charging" (MUIC charger detection, higher input current: a charger write, needs the
+  user's approval).
 - Suspend: needs the PMU sleep sequences from the vendor kernel.
 - SPI port config + STM32 sensor hub → IIO (large).
 - PDMA, ADC (battery thermistor), PWM.
 - Audio COD3026X (shared with every 7870 phone). GPU: Panfrost, Mali-T830.
 - Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.
 - Upstreaming: wave 1 is ready to prepare once the user wants to send.
-- Backlog (no phase, from the plan doc): S2MU004 "proper charging" (MUIC charger detection, higher input
-  current: a charger write, needs the user's approval) and the TCPM USB-C/PD driver at i2c0 0x3c.
 
 Working style (user preferences, also in memory): short single-step phone commands, no chained wait
 loops. Trust what the user reports seeing on the phone. For low-risk boot changes, build and flash BOOT

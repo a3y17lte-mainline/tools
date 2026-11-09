@@ -1,0 +1,47 @@
+#!/bin/bash
+# build-kernel-img: build the kernel and the debug initramfs and pack them as an
+# Android v2 boot image (kernel + DTB + separate gzip ramdisk) for `fastboot boot`
+# through our U-Boot. The initramfs is NOT built into the kernel: an Image of ~38.9 MB
+# (embedded initramfs) died before printing anything, while 33.8 MB booted (2026-11-08,
+# cause unknown), and the same initramfs as a separate ramdisk boots fine.
+#
+#   build-kernel-img [--root=system] [output.img]
+#
+# --root=system  the initramfs switches to the rootfs on SYSTEM (mmcblk0p19, see build-rootfs)
+#                instead of staying in the debug shell; default output linux-a3y17lte-system.img
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+SRC=$ROOT/src/linux
+O=$ROOT/out/linux
+I=$ROOT/work/initramfs
+ROOTFS=""
+if [[ "${1:-}" == --root=system ]]; then ROOTFS=system; shift; fi
+CPIO=$ROOT/out/images/initramfs-debug${ROOTFS:+-$ROOTFS}.cpio.gz
+OUT=${1:-$ROOT/out/images/linux-a3y17lte-${ROOTFS:-fastboot}.img}
+
+install -m755 "$ROOT/tools/initramfs/init" "$I/init"
+rm -f "$I/etc/a3-root"
+[ -n "$ROOTFS" ] && echo "$ROOTFS" > "$I/etc/a3-root"
+(cd "$I" && find . -print0 | cpio --null -o -H newc -R 0:0 --quiet) | gzip -9 > "$CPIO.new"
+mv "$CPIO.new" "$CPIO"
+rm -f "$I/etc/a3-root"
+
+grep -q '^CONFIG_INITRAMFS_SOURCE=""' "$O/.config" || {
+	echo "kernel .config embeds an initramfs: rerun tools/mkconfig-a3y17lte" >&2; exit 1; }
+
+nice make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1 CC="ccache clang" -j"$(nproc)" Image dtbs \
+	> "$ROOT/out/kernel-build.log" 2>&1 || { tail -20 "$ROOT/out/kernel-build.log"; exit 1; }
+
+# Real load addresses in bank 0. With the AOSP default (0x10008000) U-Boot runs the
+# kernel in place from the fastboot buffer and then moves it up for 2 MiB alignment,
+# right over the DTB that follows it in the image. Kernel at 0x40200000 (aligned, so no
+# move), DTB at 0x48000000 and ramdisk at 0x49000000, well clear of the kernel.
+mkbootimg --header_version 2 \
+	--base 0x40000000 --kernel_offset 0x00200000 \
+	--dtb_offset 0x08000000 --ramdisk_offset 0x09000000 \
+	--tags_offset 0x00000100 --second_offset 0x00f00000 \
+	--kernel "$O/arch/arm64/boot/Image" \
+	--dtb "$O/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dtb" \
+	--ramdisk "$CPIO" \
+	-o "$OUT"
+ls -l "$OUT"

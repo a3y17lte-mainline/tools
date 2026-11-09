@@ -1,0 +1,5 @@
+#!/bin/bash
+# Build peek (and poke, via a symlink named poke): freestanding static aarch64 MMIO tool.
+# Push to the phone: phone-sh '(nc -l -p 3000 > /tmp/peek &)'; ncat --send-only 10.78.70.1 3000 < peek
+set -e; cd "$(dirname "$0")"
+clang --target=aarch64-linux-gnu -ffreestanding -fno-stack-protector -nostdlib -static -O2 -fuse-ld=lld -o peek peek.c

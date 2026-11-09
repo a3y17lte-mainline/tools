@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+# phone-sh 'cmd' [timeout_s] : run a shell command on the phone and print its output.
+# Uses ssh (host "a3" in ~/.ssh/config, exit status passed through) when 10.78.70.1:22
+# answers, else the USB serial shell on /dev/ttyACM0. PHONE_SH_SERIAL=1 forces serial.
+import os, sys, termios, time, select, socket, subprocess
+tmo = float(sys.argv[2] if len(sys.argv) > 2 else 20)
+if not os.environ.get("PHONE_SH_SERIAL"):
+    try:
+        socket.create_connection(("10.78.70.1", 22), timeout=1).close()
+        try:
+            sys.exit(subprocess.run(["ssh", "-T", "a3", sys.argv[1]], timeout=tmo).returncode)
+        except subprocess.TimeoutExpired:
+            sys.exit(124)
+    except OSError:
+        pass
+fd = os.open("/dev/ttyACM0", os.O_RDWR | os.O_NOCTTY)
+a = termios.tcgetattr(fd); a[3] &= ~(termios.ECHO | termios.ICANON); termios.tcsetattr(fd, termios.TCSANOW, a)
+def drain(t):
+    out = b""; end = time.time() + t
+    while time.time() < end:
+        r, _, _ = select.select([fd], [], [], 0.1)
+        if r: out += os.read(fd, 4096); end = max(end, time.time() + 0.3)
+    return out
+drain(0.3)
+mark = "__END%d__" % os.getpid()
+os.write(fd, (" stty -echo 2>/dev/null; " + sys.argv[1] + "; echo " + mark + "\n").encode())
+buf = b""; end = time.time() + tmo
+while mark.encode() + b"\r" not in buf and mark.encode() + b"\n" not in buf and time.time() < end:
+    buf += drain(0.5)
+txt = buf.decode(errors="replace").replace("\r", "")
+txt = txt.split(mark)[0] if txt.count(mark) == 1 else txt.rsplit(mark, 2)[-2] if mark in txt else txt
+print(txt.strip())

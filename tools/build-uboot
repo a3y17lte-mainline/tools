@@ -1,0 +1,39 @@
+#!/bin/bash
+# build-uboot: build exynos-mobile U-Boot for the Galaxy A3 2017 and pack it as a BOOT image.
+#
+#   build-uboot [--native-header] [output.img]
+#
+# By default the arm64 Image header is patched to match Samsung kernels
+# (text_offset 0x80000, flags 0), the layout verified to boot from S-Boot.
+# U-Boot is position independent and never reads its own header.
+# --native-header  keep U-Boot's own header (text_offset 0, flags 0xa); untested.
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+SRC=$ROOT/src/u-boot
+O=$ROOT/out/u-boot
+LEGACY=1
+if [[ "${1:-}" == "--native-header" ]]; then LEGACY=0; shift; fi
+if [[ "${1:-}" == "--legacy-header" ]]; then shift; fi	# old flag, now the default
+OUT=${1:-$ROOT/out/images/u-boot-a3y17lte.img}
+
+export CROSS_COMPILE="ccache aarch64-linux-gnu-"
+make -s -C "$SRC" O="$O" exynos-mobile_defconfig a3y17lte-safe.config >/dev/null
+make -s -C "$SRC" O="$O" DEVICE_TREE=exynos/exynos7870-a3y17lte \
+	HOSTCFLAGS=-DOPENSSL_ENGINE_STUBS -j"$(nproc)" 2>&1 | grep -E ': error:|\*\*\* .*Error [0-9]|fatal error' && exit 1
+
+BIN=$O/u-boot-nodtb.bin
+if (( LEGACY )); then
+	BIN=$O/u-boot-nodtb-legacyhdr.bin
+	python3 -I - "$O/u-boot-nodtb.bin" "$BIN" <<'EOF'
+import struct, sys
+d = bytearray(open(sys.argv[1], "rb").read())
+assert d[0x38:0x3c] == b"ARMd", "no arm64 Image header"
+struct.pack_into("<Q", d, 0x08, 0x80000)   # text_offset
+struct.pack_into("<Q", d, 0x18, 0)         # flags
+open(sys.argv[2], "wb").write(d)
+EOF
+fi
+
+dtbTool-exynos -o "$O/stub-dt.img" "$O/u-boot.dtb" >/dev/null
+mkbootimg-samsung --kernel "$BIN" --dt "$O/stub-dt.img" -o "$OUT"
+echo "header:"; xxd -l 32 "$BIN"

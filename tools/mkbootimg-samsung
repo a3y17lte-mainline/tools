@@ -1,0 +1,102 @@
+#!/usr/bin/python3 -I
+"""mkbootimg-samsung: pack a Samsung Exynos (S-Boot) Android boot image, header v0 + DT table.
+
+Samsung's S-Boot reads the classic AOSP v0 header, with the dt.img (DTBH/QCDT table,
+from dtbTool-exynos) size stored in the slot AOSP later reused for header_version.
+
+  mkbootimg-samsung --kernel u-boot-nodtb.bin --dt dt.img -o u-boot.img
+  mkbootimg-samsung --unpack BOOT.img --outdir dir/     # split an existing image
+
+S-Boot ignores the load addresses; the defaults match stock A3 2017 images.
+"""
+import argparse, hashlib, os, struct, sys
+
+HDR = struct.Struct("<8s10I16s512s32s1024s")   # magic .. extra_cmdline (v0 layout)
+
+
+def pad(b, page):
+    return b + b"\0" * ((-len(b)) % page)
+
+
+def pack(a):
+    kernel = open(a.kernel, "rb").read()
+    ramdisk = open(a.ramdisk, "rb").read() if a.ramdisk else b""
+    second = open(a.second, "rb").read() if a.second else b""
+    dt = open(a.dt, "rb").read() if a.dt else b""
+    cmdline = a.cmdline.encode()
+    if len(cmdline) > 512 + 1024 - 2:
+        sys.exit("cmdline too long")
+    main, extra = cmdline[:511], cmdline[511:]
+
+    sha = hashlib.sha1()
+    for blob in (kernel, ramdisk, second, dt):
+        sha.update(blob)
+        sha.update(struct.pack("<I", len(blob)))
+    digest = sha.digest() + b"\0" * 12
+
+    base = a.base
+    hdr = HDR.pack(b"ANDROID!",
+                   len(kernel), base + a.kernel_offset,
+                   len(ramdisk), base + a.ramdisk_offset,
+                   len(second), base + a.second_offset,
+                   base + a.tags_offset, a.pagesize, len(dt), a.os_version,
+                   a.board.encode()[:15], main, digest, extra)
+    out = pad(hdr, a.pagesize) + pad(kernel, a.pagesize) + pad(ramdisk, a.pagesize)
+    out += pad(second, a.pagesize) + pad(dt, a.pagesize)
+    with open(a.output, "wb") as f:
+        f.write(out)
+    print(f"{a.output}: {len(out)} bytes (kernel {len(kernel)}, ramdisk {len(ramdisk)}, dt {len(dt)})")
+
+
+def unpack(path, outdir):
+    d = open(path, "rb").read()
+    f = HDR.unpack_from(d)
+    if f[0] != b"ANDROID!":
+        sys.exit("not an Android boot image")
+    ks, ka, rs, ra, ss, sa, ta, ps, dts, osv = f[1:11]
+    name, cmd, ident, extra = f[11:]
+    os.makedirs(outdir, exist_ok=True)
+    pg = lambda n: (n + ps - 1) // ps * ps
+    off = ps
+    for nm, size in (("kernel", ks), ("ramdisk", rs), ("second", ss), ("dt", dts)):
+        if size:
+            open(os.path.join(outdir, nm), "wb").write(d[off:off + size])
+        off += pg(size)
+    info = {"kernel_addr": hex(ka), "ramdisk_addr": hex(ra), "second_addr": hex(sa),
+            "tags_addr": hex(ta), "pagesize": ps, "os_version": osv,
+            "board": name.rstrip(b"\0").decode(errors="replace"),
+            "cmdline": (cmd.rstrip(b"\0") + extra.rstrip(b"\0")).decode(errors="replace"),
+            "id": ident.hex(), "image_bytes": off}
+    for k, v in info.items():
+        print(f"{k}: {v}")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--unpack")
+    ap.add_argument("--outdir")
+    ap.add_argument("--kernel")
+    ap.add_argument("--ramdisk")
+    ap.add_argument("--second")
+    ap.add_argument("--dt")
+    ap.add_argument("--cmdline", default="")
+    ap.add_argument("--board", default="")
+    ap.add_argument("--base", type=lambda x: int(x, 0), default=0x10000000)
+    ap.add_argument("--kernel_offset", type=lambda x: int(x, 0), default=0x00008000)
+    ap.add_argument("--ramdisk_offset", type=lambda x: int(x, 0), default=0x01000000)
+    ap.add_argument("--second_offset", type=lambda x: int(x, 0), default=0x00f00000)
+    ap.add_argument("--tags_offset", type=lambda x: int(x, 0), default=0x00000100)
+    ap.add_argument("--os_version", type=lambda x: int(x, 0), default=0)
+    ap.add_argument("--pagesize", type=int, default=2048)
+    ap.add_argument("-o", "--output")
+    a = ap.parse_args()
+    if a.unpack:
+        unpack(a.unpack, a.outdir or "unpacked")
+    else:
+        if not (a.kernel and a.output):
+            ap.error("--kernel and -o are required")
+        pack(a)
+
+
+if __name__ == "__main__":
+    main()

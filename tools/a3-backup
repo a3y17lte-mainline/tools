@@ -1,0 +1,177 @@
+#!/usr/bin/python3 -I
+"""a3-backup: full, verified, read-only eMMC backup of a Galaxy A3 2017 booted into TWRP.
+
+  a3-backup                  # everything, USERDATA included
+  a3-backup --skip-userdata  # skip the big (encrypted) USERDATA partition
+
+Reads only. Never writes to the phone. For every partition it streams
+`dd` over `adb exec-out`, hashes on the host while writing, hashes the block
+device on the phone with sha256sum, and records both in manifest.json.
+Critical partitions (EFS & co.) go first so an interrupted run still saves them.
+Also saves: eMMC boot0/boot1 hardware partitions, the GPT area, the running DTB
+(/sys/firmware/fdt), getprop, cmdline, partition listing.
+"""
+import argparse, datetime, hashlib, json, os, re, shlex, subprocess, sys
+
+ROOT = os.path.expanduser("~/Projects/exynos7870/backups")
+# From the unit's PIT (backups/pit/a3y17lte.pit). BOOTLOADER/CM are not by-name partitions:
+# they live in the eMMC hardware boot areas mmcblk0boot0/boot1, which are dumped explicitly.
+CRITICAL = ["EFS", "CPEFS", "m9kefs1", "m9kefs2", "m9kefs3", "CARRIER", "PARAM", "PERSISTENT",
+            "STEADY", "DNT", "NAD_REFER", "BOTA0", "BOTA1", "MD5HDR", "RADIO", "RECOVERY", "BOOT"]
+LAST = ["SYSTEM", "CACHE", "HIDDEN", "USERDATA"]
+
+
+def adb(*args, binary=False):
+    r = subprocess.run(["adb", *args], capture_output=True)
+    if r.returncode != 0:
+        sys.exit(f"adb {' '.join(args)} failed: {r.stderr.decode(errors='replace')}")
+    return r.stdout if binary else r.stdout.decode(errors="replace")
+
+
+def sh(cmd):
+    return adb("shell", cmd).strip()
+
+
+def dd_cmd(dev, rng=None):
+    # rng: "skip=N count=M" in 512-byte sectors, or None for the whole device
+    return f"dd if={shlex.quote(dev)} bs=512 {rng} 2>/dev/null" if rng else f"dd if={shlex.quote(dev)} bs=4194304 2>/dev/null"
+
+
+def dump(dev, out_path, rng=None):
+    """Stream a block device (or a sector range of it) to out_path, return (bytes, sha256)."""
+    h = hashlib.sha256()
+    n = 0
+    p = subprocess.Popen(["adb", "exec-out", dd_cmd(dev, rng)],
+                         stdout=subprocess.PIPE)
+    with open(out_path, "wb") as f:
+        for chunk in iter(lambda: p.stdout.read(1 << 20), b""):
+            f.write(chunk)
+            h.update(chunk)
+            n += len(chunk)
+    if p.wait() != 0:
+        raise RuntimeError(f"adb exec-out dd {dev} exited {p.returncode}")
+    return n, h.hexdigest()
+
+
+def device_sha256(dev, rng=None):
+    out = sh(f"{dd_cmd(dev, rng)} | sha256sum") if rng else sh(f"sha256sum {shlex.quote(dev)} 2>/dev/null")
+    m = re.match(r"^([0-9a-f]{64})\s", out)
+    return m.group(1) if m else None
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--skip-userdata", action="store_true")
+    ap.add_argument("--skip", nargs="*", default=[], help="partition names to leave out (recorded in manifest)")
+    ap.add_argument("--only", nargs="*", help="only these partition names (debugging)")
+    a = ap.parse_args()
+
+    devs = [l.split()[0] for l in adb("devices").splitlines()[1:] if l.strip()]
+    if len(devs) != 1:
+        sys.exit(f"need exactly one adb device, found {devs}")
+    state = adb("get-state").strip()
+    if state != "recovery":
+        sys.exit(f"phone must be booted into TWRP (adb state 'recovery'), got {state!r}")
+    if sh("id -u") != "0":
+        sys.exit("adb shell is not root; is this TWRP?")
+
+    serial = devs[0]
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    out = os.path.join(ROOT, f"{stamp}-{serial}")
+    os.makedirs(out, mode=0o700)
+    print(f"backup dir: {out}")
+
+    byname = sh("ls -d /dev/block/platform/*/by-name 2>/dev/null | head -1")
+    if not byname:
+        sys.exit("no /dev/block/platform/*/by-name directory")
+    parts = {}
+    for line in sh(f"ls -l {byname}").splitlines():
+        m = re.search(r"(\S+) -> (/dev/block/\S+)$", line)
+        if m:
+            parts[m.group(1)] = m.group(2)
+
+    info = {
+        "getprop.txt": "getprop",
+        "cmdline.txt": "cat /proc/cmdline",
+        "partitions.txt": "cat /proc/partitions",
+        "by-name.txt": f"ls -l {byname}",
+        "uname.txt": "uname -a",
+        "mmc-info.txt": "for f in /sys/block/mmcblk0/device/{name,manfid,oemid,date,cid,csd,fwrev,hwrev,type}; do echo $f: $(cat $f 2>/dev/null); done",
+    }
+    for fn, cmd in info.items():
+        with open(os.path.join(out, fn), "w") as f:
+            f.write(adb("shell", cmd))
+    with open(os.path.join(out, "running.dtb"), "wb") as f:
+        f.write(adb("exec-out", "cat /sys/firmware/fdt", binary=True))
+
+    def order(name):
+        if name in CRITICAL:
+            return (0, CRITICAL.index(name))
+        if name in LAST:
+            return (2, LAST.index(name))
+        return (1, name)
+
+    names = sorted(parts, key=order)
+    skipped = list(a.skip) + (["USERDATA"] if a.skip_userdata else [])
+    names = [n for n in names if n not in skipped]
+    if a.only:
+        names = [n for n in names if n in a.only]
+
+    targets = [(n, parts[n], f"{n}.img") for n in names]
+    # eMMC hardware boot partitions + GPT area, if present
+    for extra in ("mmcblk0boot0", "mmcblk0boot1"):
+        if sh(f"[ -b /dev/block/{extra} ] && echo y") == "y" and not a.only:
+            targets.append((extra, f"/dev/block/{extra}", f"{extra}.img"))
+
+    manifest = {"device_serial": serial, "started": stamp, "by_name_dir": byname, "skipped": skipped,
+                "partitions": [], "complete": False}
+    man_path = os.path.join(out, "manifest.json")
+
+    if not a.only:
+        # GPT: primary header+entries in the first MiB, backup copy in the last MiB
+        disk_sectors = int(sh("blockdev --getsz /dev/block/mmcblk0"))
+        manifest["disk_sectors_512"] = disk_sectors
+        targets.append(("GPT_HEAD", "/dev/block/mmcblk0", "mmcblk0-first-1MiB.img", "skip=0 count=2048"))
+        targets.append(("GPT_TAIL", "/dev/block/mmcblk0", "mmcblk0-last-1MiB.img",
+                        f"skip={disk_sectors - 2048} count=2048"))
+
+    for t in targets:
+        name, dev, fn = t[:3]
+        rng = t[3] if len(t) > 3 else None
+        size = "1048576" if rng else sh(f"blockdev --getsize64 {shlex.quote(dev)}")
+        print(f"  {name:<14} {dev:<26} {size:>12} bytes ... ", end="", flush=True)
+        rec = {"name": name, "device": dev, "file": fn, "size": int(size) if size.isdigit() else None}
+        if rng:
+            rec["range_512b_sectors"] = rng
+        for attempt in (1, 2):
+            n, host = dump(dev, os.path.join(out, fn), rng)
+            phone = device_sha256(dev, rng)
+            rec.update(bytes=n, sha256_host=host, sha256_phone=phone, attempts=attempt)
+            rec["verified"] = bool(phone and phone == host and (rec["size"] in (None, n)))
+            if rec["verified"]:
+                break
+        print("OK" if rec["verified"] else "MISMATCH")
+        manifest["partitions"].append(rec)
+        with open(man_path, "w") as f:
+            json.dump(manifest, f, indent=2)
+
+    bad = [p["name"] for p in manifest["partitions"] if not p["verified"]]
+    manifest["complete"] = not bad and not a.only
+    manifest["finished"] = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    with open(man_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+    with open(os.path.join(out, "SHA256SUMS"), "w") as f:
+        for p in manifest["partitions"]:
+            f.write(f"{p['sha256_host']}  {p['file']}\n")
+    for fn in os.listdir(out):
+        os.chmod(os.path.join(out, fn), 0o400)
+
+    print(json.dumps({"ok": not bad, "dir": out, "unverified": bad}))
+    if not bad:
+        print("\nNow copy this directory OFF this machine (USB drive / encrypted cloud).\n"
+              "It contains your IMEI/EFS: keep it private.")
+    sys.exit(1 if bad else 0)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,125 @@
+#!/bin/sh
+# a3y17lte debug initramfs: USB serial shell (ttyGS0) + NCM network at 10.78.70.1/24.
+# Never uses 172.16.42.x (the user's home LAN). Host side: 10.78.70.2/24, static.
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts /tmp /run
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /tmp
+mount -t tmpfs tmpfs /run
+mount -t configfs configfs /sys/kernel/config
+mount -t pstore pstore /sys/fs/pstore 2>/dev/null
+
+log() { echo "[init] $*" > /dev/kmsg; echo "[init] $*" > /dev/tty0 2>/dev/null; }
+log "a3y17lte debug initramfs: $(uname -r)"
+# Crash logs of the previous boot are shown by U-Boot (pstore display) and are also
+# readable here under /sys/fs/pstore.
+
+# USB gadget: NCM network + ACM serial
+G=/sys/kernel/config/usb_gadget/g1
+mkdir -p $G
+echo 0x1d6b > $G/idVendor		# Linux Foundation
+echo 0x0104 > $G/idProduct		# Multifunction Composite Gadget
+mkdir -p $G/strings/0x409
+echo "a3y17lte" > $G/strings/0x409/manufacturer
+echo "a3y17lte mainline debug" > $G/strings/0x409/product
+echo "a3y17lte-$(cat /proc/sys/kernel/random/boot_id | cut -c1-8)" > $G/strings/0x409/serialnumber
+mkdir -p $G/functions/ncm.usb0 $G/functions/acm.GS0
+mkdir -p $G/configs/c.1/strings/0x409
+echo "NCM + ACM" > $G/configs/c.1/strings/0x409/configuration
+echo 250 > $G/configs/c.1/MaxPower
+ln -s $G/functions/ncm.usb0 $G/configs/c.1/
+ln -s $G/functions/acm.GS0 $G/configs/c.1/
+
+UDC=""
+for i in $(seq 1 50); do
+	UDC=$(ls /sys/class/udc 2>/dev/null | head -n1)
+	[ -n "$UDC" ] && break
+	sleep 0.2
+done
+if [ -n "$UDC" ]; then
+	echo "$UDC" > $G/UDC && log "USB gadget bound to $UDC"
+else
+	log "ERROR: no UDC found"
+fi
+
+for i in $(seq 1 50); do
+	[ -e /sys/class/net/usb0 ] && break
+	sleep 0.2
+done
+# Rootfs on SYSTEM (mmcblk0p19): only in images built with `build-kernel-img --root=system`,
+# which adds /etc/a3-root. The USB gadget stays as configured here; the rootfs's openrc brings
+# up usb0 (10.78.70.1), dropbear and the dmesg port. Falls through to the debug shell on failure.
+if [ -f /etc/a3-root ]; then
+	for i in $(seq 1 50); do
+		[ -b /dev/mmcblk0p19 ] && break
+		sleep 0.1
+	done
+	mkdir -p /newroot
+	if mount -t ext4 -o rw,noatime /dev/mmcblk0p19 /newroot && [ -x /newroot/sbin/init ]; then
+		log "switching to the rootfs on SYSTEM (mmcblk0p19)"
+		for m in /dev /proc /sys /run; do
+			mkdir -p /newroot$m
+			mount --move $m /newroot$m
+		done
+		exec switch_root /newroot /sbin/init
+	fi
+	log "ERROR: no rootfs on SYSTEM (mmcblk0p19): staying in the debug initramfs"
+	umount /newroot 2>/dev/null
+fi
+
+ip addr add 10.78.70.1/24 dev usb0 && ip link set usb0 up && log "usb0 = 10.78.70.1/24"
+
+# SSH on the USB link only, public key only (host key + authorized_keys baked in at build time)
+mkdir -p /var/log && touch /var/log/lastlog
+dropbear -s -g -p 10.78.70.1:22 -r /etc/dropbear/dropbear_ed25519_host_key && log "ssh on 10.78.70.1:22"
+
+# Serve the kernel log on TCP 2323 (one connection per dump)
+( while true; do dmesg | nc -l -p 2323 >/dev/null 2>&1; done ) &
+
+# Shell on the USB serial port, respawned forever
+( while true; do
+	if [ -e /dev/ttyGS0 ]; then
+		setsid sh -c 'exec sh -i </dev/ttyGS0 >/dev/ttyGS0 2>&1'
+	fi
+	sleep 1
+done ) &
+
+# Hold the power key for 3+ seconds and release it: power off (PS_HOLD low).
+# struct input_event on arm64 = 24 bytes; od prints 6 int32s:
+# sec_lo sec_hi usec_lo usec_hi (type | code << 16) value. EV_KEY=1, KEY_POWER=116.
+powerkey_watch() {
+	ev=""
+	for d in /sys/class/input/event*; do
+		[ "$(cat "$d/device/name" 2>/dev/null)" = "gpio-keys" ] && ev=/dev/input/${d##*/}
+	done
+	[ -n "$ev" ] || { log "no gpio-keys input device: power-key poweroff disabled"; return; }
+	exec 3<"$ev"
+	t0=""
+	while true; do
+		set -- $(dd bs=24 count=1 <&3 2>/dev/null | od -An -v -w24 -t d4)
+		[ $# -eq 6 ] && [ "$5" -eq $((1 | 116 << 16)) ] || continue
+		if [ "$6" -eq 1 ]; then
+			t0=$1
+		elif [ "$6" -eq 0 ] && [ -n "$t0" ]; then
+			held=$(($1 - t0)); t0=""
+			if [ $held -ge 3 ]; then
+				log "power key held ${held}s: powering off"
+				sync
+				sleep 1
+				poweroff -f
+			fi
+		fi
+	done
+}
+powerkey_watch &
+
+log "ready: ssh root@10.78.70.1, serial shell on ttyGS0, dmesg on 10.78.70.1:2323, hold power 3s to power off"
+
+# PID 1 must never exit
+while true; do
+	sleep 3600
+done

@@ -1,0 +1,19 @@
+Bare-metal S-Boot payload probes for the Galaxy A3 2017 (no UART needed).
+
+  rebootdl.S     paints the framebuffer red, then reboots into download mode via PMU
+                 INFORM3/SWRESET. If the phone returns to download mode by itself, S-Boot
+                 ran our code.
+  decon_probe.c  tests DECON trigger modes on the command-mode panel (see CLAUDE.md, Display).
+  asv-fuse/      kernel module (not a payload): reads the secure-only ASV fuses at 0x100d9000 through
+                 the vendor SMC, prints them, then refuses to load. Build with the kernel's Kbuild
+                 (make ARCH=arm64 -C <kernel out dir> M=$PWD/asv-fuse) and insmod on the phone.
+                 Superseded in practice by exynos7870-asv, which logs the group at boot.
+
+Build (from this directory):
+  aarch64-linux-gnu-gcc -nostdlib -nostartfiles -Wl,-Ttext=0 -Wl,--build-id=none -o rebootdl.elf rebootdl.S
+  aarch64-linux-gnu-gcc -O2 -ffreestanding -nostdlib -nostartfiles -fno-pic -fno-stack-protector \
+    -mgeneral-regs-only -mstrict-align -mbranch-protection=none -Wl,-T,probe.lds -Wl,--build-id=none \
+    -o decon_probe.elf decon_start.S decon_probe.c
+  aarch64-linux-gnu-objcopy -O binary X.elf X.bin
+Pack: mkbootimg-samsung --kernel X.bin --dt <dt.img> -o X.img ; flash to BOOT with a3-flash.
+Check `xxd -l 64 X.bin` starts with the branch + text_offset 0x80000 + "ARMd" at 0x38.

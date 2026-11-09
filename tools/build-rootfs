@@ -1,0 +1,95 @@
+#!/bin/bash
+# build-rootfs: minimal Alpine (openrc) rootfs for the SYSTEM partition (mmcblk0p19) as an
+# ext4 image. The debug initramfs switches to it when built with `build-kernel-img --root=system`.
+# /boot gets the current kernel build (run `build-kernel-img --root=system` first), so U-Boot
+# autoboots the image without a PC.
+#
+#   build-rootfs [output.img]        (SIZE=1024M by default; grow it on the phone with resize2fs)
+#
+# Base = the debug initramfs tree (Alpine 3.24 minirootfs + dropbear/f3/e2fsprogs, same ssh host
+# key and authorized_keys), plus openrc. Packages are installed with the tree's own aarch64 apk
+# under qemu-aarch64-static and verified against the tree's Alpine keys. Ownership is set to root
+# via a user namespace, so no root/fakeroot is needed. USB net is 10.78.70.1/24 (never 172.16.42.x).
+#
+# Flash (needs the user's approval): tools/a3-flash SYSTEM out/images/rootfs-a3y17lte.img --i-mean-it
+# Restore stock:                     tools/a3-flash SYSTEM work/system/SYSTEM.img --i-mean-it
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+I=$ROOT/work/initramfs
+R=$ROOT/out/rootfs
+IMG=${1:-$ROOT/out/images/rootfs-a3y17lte.img}
+SIZE=${SIZE:-1024M}
+PKGS="alpine-base i2c-tools openrc dropbear-openrc iproute2 ifupdown-ng e2fsprogs-extra
+	kmod iw wireless-regdb wpa_supplicant wpa_supplicant-openrc bluez bluez-openrc bluez-btmgmt dbus-openrc"
+
+rm -rf "$R"; mkdir -p "$R"
+tar -C "$I" --exclude=./dev --exclude=./init -cf - . | tar -C "$R" -xf -
+mkdir -p "$R/dev" "$R/proc" "$R/sys" "$R/run" "$R/tmp"
+
+apk() { qemu-aarch64-static -L "$I" "$I/sbin/apk" --root "$R" --arch aarch64 --no-interactive "$@"; }
+# The busybox trigger fails under qemu (no unshare); its links already exist in the base tree.
+apk update >/dev/null
+apk --usermode add $PKGS >/dev/null 2>&1 || true
+for p in $PKGS; do apk info -e "$p" >/dev/null || { echo "build-rootfs: $p not installed" >&2; exit 1; }; done
+rm -rf "$R"/var/cache/apk/*
+
+# Kernel, DTB, initramfs and extlinux.conf in /boot: our U-Boot boots them from SYSTEM by itself
+"$ROOT/tools/a3-install-kernel" --stage "$R/boot"
+
+# Kernel modules + QCA9377 firmware + /etc/modules (proprietary blobs: the image stays local)
+"$ROOT/tools/a3-sync-modules" --stage-only
+tar -C "$ROOT/out/a3-extra" -cf - . | tar -C "$R" -xf -
+
+echo a3y17lte > "$R/etc/hostname"
+printf '/dev/mmcblk0p19\t/\text4\trw,noatime\t0 1\n' > "$R/etc/fstab"
+
+cat > "$R/etc/inittab" <<'EOF'
+::sysinit:/sbin/openrc sysinit
+::sysinit:/sbin/openrc boot
+::wait:/sbin/openrc default
+# Root shell on the USB serial port (ACM gadget, set up by the initramfs)
+ttyGS0::respawn:-/bin/sh
+::ctrlaltdel:/sbin/reboot
+::shutdown:/sbin/openrc shutdown
+EOF
+
+cat > "$R/etc/network/interfaces" <<'EOF'
+auto lo
+iface lo inet loopback
+
+auto usb0
+iface usb0 inet static
+	address 10.78.70.1/24
+EOF
+
+echo 'DROPBEAR_OPTS="-s -g -p 10.78.70.1:22"' > "$R/etc/conf.d/dropbear"
+
+mkdir -p "$R/etc/local.d"
+cat > "$R/etc/local.d/dmesg-nc.start" <<'EOF'
+#!/bin/sh
+# Serve the kernel log on TCP 2323, one connection per dump (same as the debug initramfs)
+( while true; do dmesg | nc -l -p 2323 >/dev/null 2>&1; done ) </dev/null >/dev/null 2>&1 &
+EOF
+chmod 755 "$R/etc/local.d/dmesg-nc.start"
+cat > "$R/etc/local.d/touchkey-led.start" <<'EOF'
+#!/bin/sh
+# The touch key backlights come up on at boot (tm2-touchkey): switch them off
+echo 0 > /sys/class/leds/tm2-touchkey/brightness 2>/dev/null || true
+EOF
+chmod 755 "$R/etc/local.d/touchkey-led.start"
+
+svc() { mkdir -p "$R/etc/runlevels/$1"; ln -sfn "/etc/init.d/$2" "$R/etc/runlevels/$1/$2"; }
+for s in devfs dmesg sysfs; do svc sysinit $s; done
+for s in bootmisc hostname hwclock modules a3-addr sysctl syslog networking; do
+	[ -e "$R/etc/init.d/$s" ] && svc boot $s
+done
+for s in dropbear dbus bluetooth wpa_supplicant acpid local; do svc default $s; done
+for s in killprocs savecache mount-ro; do svc shutdown $s; done
+
+# apk leaves some files (setuid bbsuid) unreadable to our user; mke2fs needs to read them.
+find "$R" -type f ! -perm -u=r -exec chmod u+r {} +
+# Fedora's mke2fs can't read tarballs (no libarchive). In a user namespace our uid maps to 0,
+# so mke2fs -d stores every file as root:root.
+rm -f "$IMG"; truncate -s "$SIZE" "$IMG"
+unshare -r mkfs.ext4 -q -L a3root -d "$R" "$IMG"
+ls -l "$IMG"

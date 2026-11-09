@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""ect-parse: decode a Samsung ECT ("PARA") blob dumped from RAM.
+
+S-Boot leaves the ECT at 0x90000000 (0x14000 bytes) on the Exynos 7870. Dump it with
+`/tmp/dump 0x90000000 0x14000` (tools/peek) while the a3y17lte DTS reserves that range.
+Port of the PLL, DVFS, ASV and GEN parts of vendor drivers/soc/samsung/ect_parser.c.
+
+  ect-parse FILE [DOMAIN-SUBSTRING ...]   (default filter: cpucl)
+"""
+import struct
+import sys
+
+PMIC_VOLTAGE_STEP = 6250
+
+
+class R:
+    def __init__(self, data, off):
+        self.d, self.o = data, off
+
+    def u32(self):
+        v = struct.unpack_from("<I", self.d, self.o)[0]
+        self.o += 4
+        return v
+
+    def i32(self):
+        v = struct.unpack_from("<i", self.d, self.o)[0]
+        self.o += 4
+        return v
+
+    def raw(self, n):
+        v = self.d[self.o:self.o + n]
+        self.o += n
+        return v
+
+    def string(self):
+        n = self.u32() + 1  # stored length excludes the NUL
+        s = self.d[self.o:self.o + n].split(b"\0")[0].decode()
+        self.o += (n + 3) & ~3
+        return s
+
+
+def named_list(r):
+    parser_version = r.u32()
+    version = r.raw(4)
+    n = r.u32()
+    return parser_version, version, [(r.string(), r.u32()) for _ in range(n)]
+
+
+def parse_pll(d, base):
+    _, _, plls = named_list(R(d, base))
+    out = {}
+    for name, off in plls:
+        r = R(d, base + off)
+        typ, n = r.u32(), r.u32()
+        out[name] = (typ, [tuple(r.u32() for _ in range(5)) for _ in range(n)])
+    return out
+
+
+def parse_dvfs(d, base):
+    pv, _, doms = named_list(R(d, base))
+    out = {}
+    for name, off in doms:
+        r = R(d, base + off)
+        maxf, minf = r.u32(), r.u32()
+        boot = resume = -1
+        if pv >= 2:
+            boot, resume = r.i32(), r.i32()
+        nclk, nlvl = r.u32(), r.u32()
+        clocks = [r.string() for _ in range(nclk)]
+        levels = [(r.u32(), r.i32()) for _ in range(nlvl)]
+        values = [[r.u32() for _ in range(nclk)] for _ in range(nlvl)]
+        out[name] = dict(max=maxf, min=minf, boot=boot, resume=resume,
+                         clocks=clocks, levels=levels, values=values)
+    return out
+
+
+def parse_asv(d, base):
+    pv, _, doms = named_list(R(d, base))
+    out = {}
+    for name, off in doms:
+        r = R(d, base + off)
+        ngrp, nlvl, ntbl = r.u32(), r.u32(), r.u32()
+        freqs = [r.u32() for _ in range(nlvl)]
+        tables = []
+        for _ in range(ntbl):
+            t = dict(version=r.i32(), boot=-1, resume=-1, level_en=None)
+            if pv >= 2:
+                t["boot"], t["resume"] = r.i32(), r.i32()
+                t["level_en"] = [r.i32() for _ in range(nlvl)]
+            if pv >= 3:
+                raw = r.raw(ngrp * nlvl)
+                t["uv"] = [[raw[l * ngrp + g] * PMIC_VOLTAGE_STEP for g in range(ngrp)]
+                           for l in range(nlvl)]
+            else:
+                t["uv"] = [[r.u32() for _ in range(ngrp)] for _ in range(nlvl)]
+            tables.append(t)
+        out[name] = dict(groups=ngrp, freqs=freqs, tables=tables, parser_version=pv)
+    return out
+
+
+def parse_gen(d, base):
+    _, _, tbls = named_list(R(d, base))
+    out = {}
+    for name, off in tbls:
+        r = R(d, base + off)
+        ncol, nrow = r.u32(), r.u32()
+        out[name] = [[r.u32() for _ in range(ncol)] for _ in range(nrow)]
+    return out
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(__doc__)
+    d = open(sys.argv[1], "rb").read()
+    filt = sys.argv[2:] or ["cpucl"]
+    r = R(d, 0)
+    sign, ver, total, nhdr = r.raw(4), r.raw(4), r.u32(), r.u32()
+    if sign != b"PARA":
+        sys.exit("not an ECT blob (no PARA signature)")
+    blocks = {}
+    for _ in range(nhdr):
+        name = r.string()
+        blocks[name] = r.u32()
+    print(f"ECT {ver.decode()} size {total:#x} blocks: " +
+          ", ".join(f"{k}@{v:#x}" for k, v in blocks.items()))
+    want = lambda n: any(f.lower() in n.lower() for f in filt)
+
+    if "PLL" in blocks:
+        for name, (typ, rows) in parse_pll(d, blocks["PLL"]).items():
+            if not want(name):
+                continue
+            print(f"\nPLL {name} type {typ}: (rate_kHz p m s k)")
+            for row in rows:
+                print("  ", *row)
+
+    if "DVFS" in blocks:
+        for name, dom in parse_dvfs(d, blocks["DVFS"]).items():
+            if not want(name):
+                continue
+            print(f"\nDVFS {name}: max {dom['max']} min {dom['min']} boot idx {dom['boot']} "
+                  f"resume idx {dom['resume']}")
+            print("   level_kHz en  " + " ".join(dom["clocks"]))
+            for (lv, en), vals in zip(dom["levels"], dom["values"]):
+                print(f"   {lv:9d} {en:2d}  " + " ".join(str(v) for v in vals))
+
+    if "ASV" in blocks:
+        for name, dom in parse_asv(d, blocks["ASV"]).items():
+            if not want(name):
+                continue
+            print(f"\nASV {name}: {dom['groups']} groups, parser v{dom['parser_version']}")
+            for t in dom["tables"]:
+                print(f"  table version {t['version']} boot idx {t['boot']} resume idx {t['resume']}")
+                print("   level_kHz en  uV per ASV group 0..")
+                for i, (f, uv) in enumerate(zip(dom["freqs"], t["uv"])):
+                    en = t["level_en"][i] if t["level_en"] else "-"
+                    print(f"   {f:9d} {en:>2}  " + " ".join(str(v) for v in uv))
+
+    if "GEN" in blocks:
+        for name, rows in parse_gen(d, blocks["GEN"]).items():
+            if not want(name):
+                continue
+            print(f"\nGEN {name}: {len(rows)} rows")
+            for row in rows:
+                print("  ", *row)
+
+
+if __name__ == "__main__":
+    main()

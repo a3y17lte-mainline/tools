@@ -1,0 +1,42 @@
+#!/bin/bash
+# mkconfig-a3y17lte: regenerate out/linux/.config from the pmOS exynos7870 config plus
+# the a3y17lte debug changes. Always ARCH=arm64 (running olddefconfig without it turns
+# the config into an x86 one and silently drops everything Exynos).
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+SRC=$ROOT/src/linux
+O=$ROOT/out/linux
+K=(make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1)
+C=("$SRC/scripts/config" --file "$O/.config")
+
+mkdir -p "$O"
+cp "$ROOT/src/pmaports/device/testing/linux-postmarketos-exynos7870/config-postmarketos-exynos7870.aarch64" "$O/.config"
+"${K[@]}" olddefconfig
+
+"${C[@]}" \
+	-e MFD_SEC_I2C -e REGULATOR_S2MPS11 \
+	-e TOUCHSCREEN_IMAGIS -e INPUT_EVDEV -e INPUT_REGULATOR_HAPTIC -e KEYBOARD_TM2_TOUCHKEY -e I2C_GPIO \
+	-e PSTORE_CONSOLE -e PSTORE_PMSG \
+	-e CPU_FREQ -e CPUFREQ_DT -e CPUFREQ_DT_PLATDEV -e CPU_FREQ_STAT -e CPU_THERMAL \
+	-e CPU_FREQ_GOV_USERSPACE -e CPU_FREQ_GOV_PERFORMANCE -e CPU_FREQ_GOV_SCHEDUTIL \
+	-e CPU_FREQ_DEFAULT_GOV_USERSPACE -d CPU_FREQ_DEFAULT_GOV_SCHEDUTIL \
+	-e PWRSEQ_SIMPLE -m CFG80211 -m MAC80211 -m ATH10K -m ATH10K_SDIO \
+	-m BT -m BT_HCIUART -e BT_HCIUART_SERDEV -e BT_HCIUART_QCA -e I2C_CHARDEV -e BATTERY_S2MU005 -e CHARGER_S2M \
+	-d LOCALVERSION_AUTO --set-str LOCALVERSION "-a3y17lte" \
+	-d DEBUG_INFO_BTF -d DEBUG_INFO_BTF_MODULES -d DEBUG_INFO_DWARF5 -d DEBUG_INFO_DWARF4 \
+	-d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_NONE \
+	--set-str CMDLINE "console=tty0 loglevel=8 ignore_loglevel clk_ignore_unused pd_ignore_unused rdinit=/init panic=0 s3c2410_wdt.tmr_atboot=1" \
+	-e CMDLINE_FORCE \
+	--set-str INITRAMFS_SOURCE ""
+"${K[@]}" olddefconfig 2>&1 | grep -v 'invalid for' || true
+
+for c in ARM64 ARCH_EXYNOS USB_DWC3_EXYNOS PHY_EXYNOS5_USBDRD MFD_SEC_I2C REGULATOR_S2MPS11 \
+	TOUCHSCREEN_IMAGIS INPUT_EVDEV KEYBOARD_TM2_TOUCHKEY I2C_GPIO CMDLINE_FORCE DEBUG_INFO_NONE \
+	CPUFREQ_DT CPU_THERMAL CPU_FREQ_DEFAULT_GOV_USERSPACE PWRSEQ_SIMPLE BT_HCIUART_QCA I2C_CHARDEV BATTERY_S2MU005 CHARGER_S2M; do
+	grep -q "^CONFIG_$c=y" "$O/.config" || { echo "mkconfig: CONFIG_$c is not =y" >&2; exit 1; }
+done
+for c in ATH10K ATH10K_SDIO BT_HCIUART BT_QCA CFG80211 MAC80211; do
+	grep -q "^CONFIG_$c=m" "$O/.config" || { echo "mkconfig: CONFIG_$c is not =m" >&2; exit 1; }
+done
+cp "$O/.config" "$ROOT/work/config-a3y17lte"
+echo "config ok: $(grep '^CONFIG_LOCALVERSION=' "$O/.config")"

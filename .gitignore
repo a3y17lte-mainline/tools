@@ -1,0 +1,22 @@
+# Allowlist: everything is ignored unless listed below.
+# Never track: backups/ (IMEI/EFS), firmware/ and work/firmware/ (proprietary blobs),
+# work/system/ (stock SYSTEM image), work/ssh/ (dropbear host key), src/ (own git repos), out/.
+/*
+!/.gitignore
+!/CLAUDE.md
+!/tools/
+!/work/
+/work/*
+!/work/notes/
+!/work/config-a3y17lte
+
+# build products in tools/
+*.o
+*.ko
+*.mod
+*.mod.c
+*.cmd
+*.order
+*.symvers
+/tools/peek/peek
+/tools/peek/dump

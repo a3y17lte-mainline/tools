@@ -1,0 +1,191 @@
+#!/usr/bin/python3 -I
+"""a3-flash: the ONLY sanctioned way to write to the Galaxy A3 2017 (a3y17lte) eMMC.
+
+Wraps Heimdall with a partition allowlist and pre-flight checks.
+
+  a3-flash RECOVERY twrp.img            # stays in download mode (--no-reboot) by default
+  a3-flash BOOT boot.img --reboot
+  a3-flash --dry-run BOOT boot.img
+  a3-flash SYSTEM rootfs.img --i-mean-it --via-linux
+
+--via-linux (SYSTEM/CACHE/USERDATA only): write from our RAM-booted mainline Linux over
+`ssh a3` instead of Heimdall, which times out on large partitions over the VMware USB link
+(S-Boot erased SYSTEM and never committed the data, 2026-11-08). Checks the target's GPT name
+and PIT size, that it is not mounted, streams the raw image with dd conv=fsync, then reads
+it back on the phone and compares sha256. Sparse images are refused (simg2img them first).
+
+Never flashed, under any flag: BOOTLOADER, CM, PARAM, EFS, CPEFS, RADIO, PIT/repartition,
+PERSISTENT, STEADY, ... (anything not in ALLOWED). Edit ALLOWED only by hand, deliberately.
+"""
+import argparse, datetime, hashlib, json, os, subprocess, sys
+
+ALLOWED = {
+    # partition: (requires Android boot image magic, needs --i-mean-it, max bytes from this unit's PIT)
+    "BOOT":     (True,  False, 65536 * 512),     # 32 MiB
+    "RECOVERY": (True,  False, 77824 * 512),     # 38 MiB
+    "SYSTEM":   (False, True,  8192000 * 512),   # ~3.9 GiB
+    "CACHE":    (False, True,  409600 * 512),    # 200 MiB
+    "USERDATA": (False, True,  None),            # rest of the disk
+}
+# --via-linux targets on this unit (GPT names checked on the phone before writing)
+LINUX_PART = {"SYSTEM": 19, "CACHE": 20, "USERDATA": 24}
+PIT_SECTORS = {"SYSTEM": 8192000, "CACHE": 409600, "USERDATA": 21635072}
+SPARSE_MAGIC = b"\x3a\xff\x26\xed"
+PIT_SHA256 ="a2c2011bb13ae68aec714e9e043349134f83e74830e679d940368939cfb24261"
+ROOT = os.path.expanduser("~/Projects/exynos7870")
+LOG = os.path.join(ROOT, "out", "flash-log", "flash-log.jsonl")
+BACKUPS = os.path.join(ROOT, "backups")
+
+
+def die(msg, code=2):
+    print(json.dumps({"ok": False, "refused": msg}))
+    sys.exit(code)
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def have_verified_backup():
+    """A backup counts only if a3-backup wrote a manifest with EFS verified."""
+    if not os.path.isdir(BACKUPS):
+        return False
+    for d in os.listdir(BACKUPS):
+        m = os.path.join(BACKUPS, d, "manifest.json")
+        try:
+            with open(m) as f:
+                man = json.load(f)
+            parts = {p["name"]: p for p in man.get("partitions", [])}
+            if man.get("complete") and parts.get("EFS", {}).get("verified"):
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("partition")
+    ap.add_argument("image")
+    ap.add_argument("--reboot", action="store_true", help="reboot after flashing (default: stay in download mode)")
+    ap.add_argument("--resume", action="store_true", help="pass --resume (previous action used --no-reboot)")
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--via-linux", action="store_true",
+                    help="write SYSTEM/CACHE/USERDATA from the running mainline kernel over ssh (see above)")
+    ap.add_argument("--i-mean-it", action="store_true", help="required for SYSTEM/CACHE/USERDATA")
+    ap.add_argument("--no-backup-ok", action="store_true",
+                    help="allow flashing RECOVERY before any backup exists (needed once, to get TWRP on)")
+    a = ap.parse_args()
+
+    part = a.partition.upper()
+    if part not in ALLOWED:
+        die(f"partition {part!r} is not on the allowlist {sorted(ALLOWED)}")
+    need_magic, need_confirm, max_bytes = ALLOWED[part]
+    if need_confirm and not a.i_mean_it:
+        die(f"{part} requires --i-mean-it")
+
+    img = os.path.realpath(a.image)
+    if not os.path.isfile(img):
+        die(f"image not found: {img}")
+    size = os.path.getsize(img)
+    if size == 0:
+        die("image is empty")
+    with open(img, "rb") as f:
+        head = f.read(8)
+    if need_magic and head != b"ANDROID!":
+        die(f"{part} image lacks Android boot image magic (got {head!r}); refusing")
+    if max_bytes and size > max_bytes:
+        die(f"{part} image is {size} bytes, larger than the partition ({max_bytes} bytes per PIT)")
+
+    if not have_verified_backup():
+        if not (part == "RECOVERY" and a.no_backup_ok):
+            die("no verified backup (with EFS) under backups/ yet; run a3-backup first "
+                "(only exception: RECOVERY with --no-backup-ok, to install TWRP for the backup)")
+
+    if a.via_linux:
+        return via_linux(a, part, img, size)
+
+    cmd = ["heimdall", "flash", f"--{part}", img]
+    if not a.reboot:
+        cmd.append("--no-reboot")
+    if a.resume:
+        cmd.append("--resume")
+
+    entry = {"time": datetime.datetime.now().isoformat(timespec="seconds"), "partition": part,
+             "image": img, "size": size, "sha256": sha256(img), "cmd": cmd, "dry_run": a.dry_run}
+    if a.dry_run:
+        print(json.dumps({"ok": True, **entry}))
+        return
+
+    os.makedirs(os.path.dirname(LOG), exist_ok=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    entry.update(rc=r.returncode, stdout_tail=r.stdout[-2000:], stderr_tail=r.stderr[-2000:])
+    with open(LOG, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+    print(json.dumps({"ok": r.returncode == 0, **entry}))
+    sys.exit(r.returncode)
+
+
+def ssh(script, **kw):
+    return subprocess.run(["ssh", "-T", "a3", script], capture_output=True, text=True, **kw)
+
+
+def via_linux(a, part, img, size):
+    if part not in LINUX_PART:
+        die(f"--via-linux only writes {sorted(LINUX_PART)}, not {part}")
+    if a.reboot or a.resume:
+        die("--reboot/--resume are Heimdall options; not valid with --via-linux")
+    with open(img, "rb") as f:
+        if f.read(4) == SPARSE_MAGIC:
+            die("sparse image: convert it with simg2img first (--via-linux writes raw bytes)")
+    dev = f"/dev/mmcblk0p{LINUX_PART[part]}"
+    sysd = f"/sys/class/block/mmcblk0p{LINUX_PART[part]}"
+
+    # Identify the target on the running phone before anything is written.
+    r = ssh(f"uname -r; grep PARTNAME= {sysd}/uevent; cat {sysd}/size; cat /sys/block/mmcblk0/device/type; "
+            f"grep -c '^{dev} ' /proc/mounts", timeout=20)
+    lines = r.stdout.split()
+    if len(lines) != 5:
+        die(f"could not query the phone over ssh (rc {r.returncode}): {r.stdout!r} {r.stderr.strip()!r}")
+    rel, partname, sectors, devtype, mounted = lines
+    if "a3y17lte" not in rel:
+        die(f"phone is not running our kernel (uname -r {rel!r})")
+    if partname != f"PARTNAME={part}":
+        die(f"{dev} is {partname!r}, expected PARTNAME={part}")
+    if int(sectors) != PIT_SECTORS[part] or devtype != "MMC":
+        die(f"{dev}: {sectors} sectors on a {devtype} device, expected {PIT_SECTORS[part]} on MMC (eMMC)")
+    if mounted != "0":
+        die(f"{dev} is mounted on the phone; unmount it first")
+
+    digest = sha256(img)
+    cmd = ["ssh", "a3", f"dd of={dev} bs=4M conv=fsync"]
+    entry = {"time": datetime.datetime.now().isoformat(timespec="seconds"), "partition": part,
+             "image": img, "size": size, "sha256": digest, "cmd": cmd, "method": "via-linux",
+             "dry_run": a.dry_run}
+    if a.dry_run:
+        print(json.dumps({"ok": True, **entry}))
+        return
+
+    os.makedirs(os.path.dirname(LOG), exist_ok=True)
+    with open(img, "rb") as f:
+        w = subprocess.run(cmd, stdin=f, capture_output=True, text=True)
+    # Read back exactly the image's length (whole 4 KiB blocks + remainder) and hash it on the phone.
+    blocks, rest = divmod(size, 4096)
+    rb = ssh(f"sync; echo 3 > /proc/sys/vm/drop_caches; "
+             f"(dd if={dev} bs=4096 count={blocks} 2>/dev/null; "
+             f"[ {rest} -gt 0 ] && dd if={dev} bs=1 skip={blocks * 4096} count={rest} 2>/dev/null) | sha256sum")
+    got = rb.stdout.split()[0] if rb.stdout.split() else ""
+    ok = w.returncode == 0 and got == digest
+    entry.update(rc=w.returncode, stderr_tail=w.stderr[-2000:], readback_sha256=got, verified=got == digest)
+    with open(LOG, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+    print(json.dumps({"ok": ok, **entry}))
+    sys.exit(0 if ok else 1)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,97 @@
+#!/bin/bash
+# a3-sync-modules: stage kernel modules + Wi-Fi/BT firmware for the a3y17lte rootfs and
+# (unless --stage-only) copy them onto the running phone's rootfs on SYSTEM over `ssh a3`.
+#
+#   a3-sync-modules [--stage-only] [--apk]
+#
+# Stage: out/a3-extra/ = lib/modules/<release> (make modules_install, stripped, depmod'ed on the
+# host) + lib/firmware (QCA9377 blobs from work/firmware, see its README) + etc/modules.
+# build-rootfs copies the same tree into a fresh image. The firmware is proprietary: out/ stays
+# local, never commit or upload it.
+# --apk: also install the userspace packages fetched into out/apk-extra/ (apk add on the phone,
+# verified with the phone's Alpine keys; the phone has no internet of its own).
+# This only copies files into the mounted root filesystem; it never writes a block device.
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+SRC=$ROOT/src/linux
+O=$ROOT/out/linux
+S=$ROOT/out/a3-extra
+FW=$ROOT/work/firmware
+STAGE_ONLY= APK=
+for a; do case $a in
+	--stage-only) STAGE_ONLY=1 ;;
+	--apk) APK=1 ;;
+	*) echo "usage: $0 [--stage-only] [--apk]" >&2; exit 2 ;;
+esac; done
+
+rm -rf "$S"; mkdir -p "$S/etc" "$S/lib/firmware/ath10k/QCA9377/hw1.0" "$S/lib/firmware/qca"
+make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1 INSTALL_MOD_PATH="$S" INSTALL_MOD_STRIP=1 modules_install
+REL=$(cat "$O/include/config/kernel.release")
+rm -f "$S/lib/modules/$REL/build" "$S/lib/modules/$REL/source"
+
+# Wi-Fi: linux-firmware SDIO firmware + this unit's board data (bdwlan30.bin). No board-2.bin,
+# so ath10k uses board.bin.
+install -m644 "$FW/linux-firmware/ath10k/QCA9377/hw1.0/firmware-sdio-5.bin" "$S/lib/firmware/ath10k/QCA9377/hw1.0/"
+install -m644 "$FW/system/bdwlan30.bin" "$S/lib/firmware/ath10k/QCA9377/hw1.0/board.bin"
+# BT: hci_qca reads "QCA controller version 0x00230302" on this unit and wants rampatch/nvm_00230302.
+# linux-firmware's 00230302 files are an older, smaller QCA6174 patch; use the A3's own TF 1.1 pair.
+install -m644 "$FW/system/rampatch_tlv_tf_1.1.tlv" "$S/lib/firmware/qca/rampatch_00230302.bin"
+install -m644 "$FW/system/nvm_tlv_tf_1.1.bin" "$S/lib/firmware/qca/nvm_00230302.bin"
+
+# No udev/mdev hotplug in the rootfs: load the drivers from openrc's "modules" service.
+printf '# QCA9377 Wi-Fi (SDIO) and Bluetooth (UART)\nath10k_sdio\nhci_uart\n' > "$S/etc/modules"
+
+# Made-up, locally administered addresses (the real ones are in Samsung EFS; we don't use them).
+# Without one, hci0 stays "unconfigured" and wlan0 has Qualcomm's placeholder 00:03:7f:50:00:01.
+mkdir -p "$S/etc/init.d" "$S/etc/local.d"
+cat > "$S/etc/init.d/a3-addr" <<'EOF'
+#!/sbin/openrc-run
+description="Set made-up Wi-Fi/BT addresses on the QCA9377"
+WLAN_ADDR=02:a3:17:00:00:02
+BT_ADDR=02:A3:17:00:00:01
+
+depend() {
+	need modules
+	before wpa_supplicant bluetooth net
+}
+
+start() {
+	ebegin "Setting wlan0 $WLAN_ADDR, hci0 $BT_ADDR"
+	i=0
+	while [ $i -lt 50 ] && ! [ -e /sys/class/net/wlan0 -a -e /sys/class/bluetooth/hci0 ]; do
+		sleep 0.2; i=$((i + 1))
+	done
+	ip link set wlan0 down 2>/dev/null
+	ip link set wlan0 address $WLAN_ADDR
+	r=$?
+	# hci0 accepts the address once its firmware setup is done; retry for a few seconds
+	i=0
+	until btmgmt --index 0 public-addr $BT_ADDR 2>/dev/null | grep -q complete; do
+		i=$((i + 1)); [ $i -ge 10 ] && { r=1; break; }; sleep 0.5
+	done
+	eend $r
+}
+EOF
+chmod 755 "$S/etc/init.d/a3-addr"
+
+# wlan0: DHCP in the background once wpa_supplicant associates (udhcpc keeps retrying), then NTP.
+cat > "$S/etc/local.d/wlan.start" <<'EOF'
+#!/bin/sh
+udhcpc -i wlan0 -b -S -p /run/udhcpc.wlan0.pid >/dev/null 2>&1
+ntpd -p pool.ntp.org
+EOF
+chmod 755 "$S/etc/local.d/wlan.start"
+
+echo "staged $REL: $(find "$S/lib/modules" -name '*.ko*' | wc -l) modules, $(find "$S/lib/firmware" -type f | wc -l) firmware files"
+[ -n "$STAGE_ONLY" ] && exit 0
+
+PHONE_REL=$(ssh -T a3 uname -r)
+[ "$PHONE_REL" = "$REL" ] || echo "note: phone runs $PHONE_REL, staged $REL (takes effect after booting the new kernel)"
+tar -C "$S" -cf - lib etc | ssh -T a3 "rm -rf /lib/modules/$REL && tar -xf - -C / && rc-update add modules boot >/dev/null && rc-update add a3-addr boot >/dev/null && for x in dbus bluetooth wpa_supplicant; do rc-update add \$x default >/dev/null; done; sync"
+echo "synced to the phone"
+
+if [ -n "$APK" ]; then
+	ssh -T a3 'rm -rf /tmp/apk-extra && mkdir /tmp/apk-extra'
+	scp -q "$ROOT"/out/apk-extra/*.apk a3:/tmp/apk-extra/
+	ssh -T a3 'apk add --no-network /tmp/apk-extra/*.apk && rm -rf /tmp/apk-extra && sync'
+fi

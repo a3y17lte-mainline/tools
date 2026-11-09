@@ -1,0 +1,46 @@
+# expected-exit<TAB>command   (2 = blocked, 0 = allowed)
+2	heimdall flash --BOOTLOADER sboot.bin
+2	sudo heimdall flash --EFS efs.img --no-reboot
+2	bash -c "heimdall   flash --RECOVERY x.img"
+2	heimdall flash --repartition --pit a.pit
+2	adb shell "dd if=/sdcard/x of=/dev/block/mmcblk0p3"
+2	adb shell dd if=x of=/dev/block/platform/13540000.dwmmc0/by-name/EFS
+2	adb shell "echo 0 > /sys/block/mmcblk0boot0/force_ro"
+2	adb shell blockdev --setrw /dev/block/mmcblk0
+2	adb sideload update.zip
+2	fastboot flash boot boot.img
+2	fastboot erase userdata
+2	fastboot format userdata
+2	fastboot oem unlock
+2	fastboot flashing unlock
+2	fastboot -w
+2	fastboot update image.zip
+2	adb shell "cat x > /dev/block/mmcblk0p9"
+2	adb shell mke2fs /dev/block/platform/x/by-name/USERDATA
+2	adb shell twrp wipe data
+2	odin4 -b BL.tar
+2	sudo odin4 -a AP.tar
+2	./odin4 -d /dev/bus/usb/002/003
+0	echo "Odin download mode (Heimdall)" > notes.txt
+0	grep -i odin README
+0	fastboot boot out/images/test.img
+0	fastboot getvar all
+0	fastboot devices
+0	fastboot reboot
+0	heimdall detect
+0	heimdall print-pit --no-reboot
+0	heimdall download-pit --output a.pit --no-reboot
+0	a3-flash RECOVERY twrp.img --no-backup-ok
+0	a3-backup --skip-userdata
+0	adb exec-out "dd if=/dev/block/mmcblk0p3 bs=4194304"
+0	adb shell sha256sum /dev/block/mmcblk0p3
+0	make ARCH=arm64 dtbs
+0	dd if=/dev/zero of=out/test.img bs=1M count=1
+0	a3-flash SYSTEM out/images/rootfs-a3y17lte.img --i-mean-it --via-linux
+2	ssh a3 "dd of=/dev/mmcblk0p19 bs=4M"
+2	ssh a3 mkfs.ext4 /dev/mmcblk0p19
+2	ssh a3 'fdisk /dev/mmcblk2'
+2	ssh a3 i2cset -y 4 0x3d 0x1d 0x00
+2	tools/phone-sh 'i2ctransfer -y 0 w1@0x3b 0x0c'
+2	ssh -T a3 "i2cdetect -y 0"
+0	ssh -T a3 i2cget -y 0 0x3b 0x04 w

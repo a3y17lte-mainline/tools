@@ -87,10 +87,12 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 ## Layout
 
 - GitHub org a3y17lte-mainline (ssh key ~/.ssh/id_ed25519, account Sap1k). Remote name `gh` in each
-  repo; `origin` stays the upstream (kernel.org / denx):
+  repo; `origin` stays the upstream (kernel.org; U-Boot: git.u-boot-project.org, whose dev branch is
+  now `main`, `master` froze at v2026.07):
   - tools: git@github.com:a3y17lte-mainline/tools.git (this folder, branch main)
   - linux: git@github.com:a3y17lte-mainline/linux.git (fork of torvalds/linux, branch a3y17lte)
-  - u-boot: git@github.com:a3y17lte-mainline/u-boot.git (fork of u-boot/u-boot, branch a3y17lte)
+  - u-boot: git@github.com:a3y17lte-mainline/u-boot.git (fork of u-boot/u-boot, branch a3y17lte on upstream main,
+    rebased 2026-11-09 onto 934995f642 = v2027.01-rc1+; old tip tagged a3y17lte-pre-rebase-20261109)
   A rebased series is a force push: use `git push --force-with-lease gh a3y17lte`.
   src/ trees are blob:none partial clones: only push to repos that already have the upstream
   history (the forks), never to an empty repo.
@@ -111,7 +113,7 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - `work/firmware/` Wi-Fi/BT/touch-key/sensor-hub blobs + README (sources, sha256, which file goes where;
   proprietary: never commit or upload). `work/system/SYSTEM.img` = stock SYSTEM (A320FLXXS9CTK2), raw, read-only
   copy: pull more files with `debugfs -R "dump /path out" work/system/SYSTEM.img`, no need to touch the phone.
-- `out/images/` current u-boot-a3y17lte.img (on BOOT since 2026-11-09: eMMC autoboot) and linux-a3y17lte-fastboot.img
+- `out/images/` current u-boot-a3y17lte.img (on BOOT since 2026-11-09 13:35, 2027.01-rc1-00335, eMMC autoboot) and linux-a3y17lte-fastboot.img
 - `out/upstream/` patches prepared for sending (rfc-cpufreq-dt-boot-opp: the cpufreq-dt commit, sent apart
   from the 7870 series as an RFC)
 - Upstream tracker: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r (artifact db: `groups/<A..L,Dp>` with

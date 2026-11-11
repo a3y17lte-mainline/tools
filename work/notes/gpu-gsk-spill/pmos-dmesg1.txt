@@ -1,0 +1,635 @@
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+[    0.000000] Linux version 7.4.0-rc2-samsung-a3y17lte (pmos@fedora) (Alpine clang version 23.1.5, LLD 23.1.5) #1-postmarketOS SMP PREEMPT Mon Nov  9 22:13:51 UTC 2026
+[    0.000000] KASLR disabled due to lack of seed
+[    0.000000] Machine model: Samsung Galaxy A3 (2017)
+[    0.000000] efi: UEFI not found.
+[    0.000000] OF: reserved mem: 0x0000000046e00000..0x0000000046e07fff (32 KiB) map non-reusable ramoops@46e00000
+[    0.000000] OF: reserved mem: 0x0000000067000000..0x0000000067383fff (3600 KiB) nomap non-reusable framebuffer@67000000
+[    0.000000] NUMA: Faking a node at [mem 0x0000000040000000-0x00000000bfffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0xbfbc4b80-0xbfbc737f]
+[    0.000000] cma: Reserved 32 MiB at 0x00000000bda00000
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: Using PSCI v0.1 Function IDs from DT
+[    0.000000] Zone ranges:
+[    0.000000]   DMA      [mem 0x0000000040000000-0x00000000bfffffff]
+[    0.000000]   DMA32    empty
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000040000000-0x0000000066ffffff]
+[    0.000000]   node   0: [mem 0x0000000067000000-0x0000000067383fff]
+[    0.000000]   node   0: [mem 0x0000000067384000-0x000000007e3fffff]
+[    0.000000]   node   0: [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000040000000-0x00000000bfffffff]
+[    0.000000] On node 0, zone DMA: 7168 pages in unavailable ranges
+[    0.000000] percpu: Embedded 36 pages/cpu s107224 r8192 d32040 u147456
+[    0.000000] pcpu-alloc: s107224 r8192 d32040 u147456 alloc=36*4096
+[    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 [0] 4 [0] 5 [0] 6 [0] 7 
+[    0.000000] CPU features: detected: ARM erratum 845719
+[    0.000000] alternatives: applying boot alternatives
+[    0.000000] Kernel command line: quiet splash plymouth.ignore-serial-consoles plymouth.prefer-fbcon console=tty0 clk_ignore_unused pd_ignore_unused pmos_boot_uuid=136a0e89-1c8a-4606-ac3b-78a221bdcac6 pmos_root_uuid=f13c89ae-c7a3-4695-acbd-544183ee16b3 pmos_rootfsopts=defaults
+[    0.000000] Unknown kernel command line parameters "splash pmos_boot_uuid=136a0e89-1c8a-4606-ac3b-78a221bdcac6 pmos_root_uuid=f13c89ae-c7a3-4695-acbd-544183ee16b3 pmos_rootfsopts=defaults", will be passed to user space.
+[    0.000000] printk: log buffer data + meta data: 131072 + 458752 = 589824 bytes
+[    0.000000] Dentry cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 2MB
+[    0.000000] software IO TLB: area num 8.
+[    0.000000] software IO TLB: mapped [mem 0x00000000bb500000-0x00000000bb700000] (2MB)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 517120
+[    0.000000] Policy zone: DMA
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=8, Nodes=1
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU event tracing is enabled.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=512 to nr_cpu_ids=8.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 25 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=8
+[    0.000000] RCU Tasks: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] Root IRQ handler: gic_handle_irq
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    0.000000] clocksource: mct-frc: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 73510017198 ns
+[    0.000001] sched_clock: 32 bits at 26MHz, resolution 38ns, wraps every 82595524588ns
+[    0.000657] arch_timer: cp15 timer running at 26.00MHz (virt).
+[    0.000667] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x5ff13d5a9, max_idle_ns: 440795202370 ns
+[    0.000676] sched_clock: 56 bits at 26MHz, resolution 38ns, wraps every 4398046511088ns
+[    0.000972] Console: colour dummy device 80x25
+[    0.000985] printk: legacy console [tty0] enabled
+[    0.001113] Calibrating delay loop (skipped), value calculated using timer frequency.. 52.00 BogoMIPS (lpj=104000)
+[    0.001130] pid_max: default: 32768 minimum: 301
+[    0.001743] LSM support for eBPF active
+[    0.002001] VFS: Disk quotas dquot_6.6.0
+[    0.002014] VFS: Dquot-cache hash table entries: 512 (4096 bytes)
+[    0.002073] Mount-cache hash table entries: 4096 (order: 3, 32768 bytes, linear)
+[    0.002092] Mountpoint-cache hash table entries: 4096 (order: 3, 32768 bytes, linear)
+[    0.002481] VFS: Finished mounting rootfs on nullfs
+[    0.005179] rcu: Hierarchical SRCU implementation.
+[    0.005193] rcu: 	Max phase no-delay instances is 1000.
+[    0.005500] Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+[    0.006153] EFI services will not be available.
+[    0.006605] smp: Bringing up secondary CPUs ...
+[    0.007417] CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+[    0.008350] CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+[    0.009306] CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+[    0.010319] CPU4: Booted secondary processor 0x0000000100 [0x410fd034]
+[    0.011268] CPU5: Booted secondary processor 0x0000000101 [0x410fd034]
+[    0.012210] CPU6: Booted secondary processor 0x0000000102 [0x410fd034]
+[    0.013125] CPU7: Booted secondary processor 0x0000000103 [0x410fd034]
+[    0.013306] smp: Brought up 1 node, 8 CPUs
+[    0.013327] SMP: Total of 8 processors activated.
+[    0.013333] CPU: All CPU(s) started at EL1
+[    0.013360] CPU features: detected: 32-bit EL0 Support
+[    0.013366] CPU features: detected: 32-bit EL1 Support
+[    0.013374] CPU features: detected: CRC32 instructions
+[    0.013389] CPU features: detected: PMUv3
+[    0.013471] alternatives: applying system-wide alternatives
+[    0.017051] Memory: 1935004K/2068480K available (17408K kernel code, 2694K rwdata, 12568K rodata, 2048K init, 600K bss, 94096K reserved, 32768K cma-reserved)
+[    0.017829] devtmpfs: initialized
+[    0.027461] posixtimers hash table entries: 4096 (order: 4, 65536 bytes, linear)
+[    0.027594] futex hash table entries: 2048 (131072 bytes on 1 NUMA nodes, total 128 KiB, linear).
+[    0.028241] 23872 pages in range for non-PLT usage
+[    0.028254] 515392 pages in range for PLT usage
+[    0.030082] DMI: not present or invalid.
+[    0.032365] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.033834] DMA: preallocated 256 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.033892] audit: initializing netlink subsys (disabled)
+[    0.034077] audit: type=2000 audit(0.032:1): state=initialized audit_enabled=0 res=1
+[    0.105088] thermal_sys: Registered thermal governor 'step_wise'
+[    0.105101] thermal_sys: Registered thermal governor 'power_allocator'
+[    0.105202] cpuidle: using governor menu
+[    0.105383] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.105615] ASID allocator initialised with 65536 entries
+[    0.106314] ramoops: found existing invalid buffer, size 262208, start 1048592
+[    0.106330] printk: legacy console [ramoops-1] enabled
+[    0.106697] pstore: Registered ramoops as persistent store backend
+[    0.106706] ramoops: using 0x8000@0x46e00000, ecc: 0
+[    0.111585] /soc@0/interrupt-controller@104e1000: Fixed dependency cycle(s) with /soc@0/interrupt-controller@104e1000
+[    0.111973] /soc@0/display-controller@14830000: Fixed dependency cycle(s) with /soc@0/dsi@14800000
+[    0.111993] /soc@0/dsi@14800000: Fixed dependency cycle(s) with /soc@0/display-controller@14830000
+[    0.138855] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.138872] HugeTLB: 0 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.138882] HugeTLB: registered 32.0 MiB page size, pre-allocated 0 pages
+[    0.138889] HugeTLB: 0 KiB vmemmap can be freed for a 32.0 MiB page
+[    0.138897] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.138904] HugeTLB: 0 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.138912] HugeTLB: registered 64.0 KiB page size, pre-allocated 0 pages
+[    0.138919] HugeTLB: 0 KiB vmemmap can be freed for a 64.0 KiB page
+[    0.141089] raid6: using neon recovery algorithm
+[    0.141644] iommu: Default domain type: Translated
+[    0.141656] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.142723] SCSI subsystem initialized
+[    0.142982] usbcore: registered new interface driver usbfs
+[    0.143037] usbcore: registered new interface driver hub
+[    0.143100] usbcore: registered new device driver usb
+[    0.143787] i2c-gpio i2c-touchkey: using lines 558 (SDA) and 559 (SCL)
+[    0.144292] s3c-i2c 13830000.i2c: slave address 0x00
+[    0.144307] s3c-i2c 13830000.i2c: bus frequency set to 378 KHz
+[    0.144754] s3c-i2c 13830000.i2c: i2c-1: S3C I2C adapter
+[    0.145044] s3c-i2c 13870000.i2c: slave address 0x00
+[    0.145057] s3c-i2c 13870000.i2c: bus frequency set to 378 KHz
+[    0.145533] s3c-i2c 13870000.i2c: i2c-2: S3C I2C adapter
+[    0.146023] s3c-i2c 13890000.i2c: slave address 0x00
+[    0.146038] s3c-i2c 13890000.i2c: bus frequency set to 378 KHz
+[    0.146574] s3c-i2c 13890000.i2c: i2c-3: S3C I2C adapter
+[    0.146901] pps_core: LinuxPPS API ver. 1 registered
+[    0.146910] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+[    0.146928] PTP clock support registered
+[    0.148079] scmi_core: SCMI protocol bus registered
+[    0.150177] clocksource: Switched to clocksource arch_sys_counter
+[    0.160907] NET: Registered PF_INET protocol family
+[    0.161090] IP idents hash table entries: 32768 (order: 6, 262144 bytes, linear)
+[    0.162898] tcp_listen_portaddr_hash hash table entries: 1024 (order: 2, 16384 bytes, linear)
+[    0.162933] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.162950] TCP established hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    0.163098] TCP bind hash table entries: 16384 (order: 7, 524288 bytes, linear)
+[    0.163580] TCP: Hash tables configured (established 16384 bind 16384)
+[    0.163702] UDP hash table entries: 1024 (order: 4, 65536 bytes, linear)
+[    0.163939] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.164775] RPC: Registered named UNIX socket transport module.
+[    0.164787] RPC: Registered udp transport module.
+[    0.164793] RPC: Registered tcp transport module.
+[    0.164799] RPC: Registered tcp-with-tls transport module.
+[    0.164805] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    0.164868] NET: Registered PF_INET6 protocol family
+[    0.165914] Segment Routing with IPv6
+[    0.165962] In-situ OAM (IOAM) with IPv6
+[    0.166285] Unpacking initramfs...
+[    0.174274] kvm [1]: HYP mode not available
+[    0.175646] Initialise system trusted keyrings
+[    0.176191] workingset: timestamp_bits=42 (anon: 37) max_order=19 bucket_order=0 (anon: 0)
+[    0.176654] squashfs: version 4.0 (2009/01/31) Phillip Lougher
+[    0.176793] Key type nfs_keyring registered
+[    0.177214] NFS: Registering the id_resolver key type
+[    0.177240] Key type id_resolver registered
+[    0.177248] Key type id_legacy registered
+[    0.177286] nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+[    0.177296] nfs4flexfilelayout_init: NFSv4 Flexfile Layout Driver Registering...
+[    0.177530] SGI XFS with security attributes, no debug enabled
+[    0.224967] Key type asymmetric registered
+[    0.224986] Asymmetric key parser 'x509' registered
+[    0.225063] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 247)
+[    0.225073] io scheduler mq-deadline registered
+[    0.225083] io scheduler kyber registered
+[    0.225460] xor: measuring software checksum speed
+[    0.229433]    neon            :  3306 MB/sec
+[    0.233023]    32regs          :  3661 MB/sec
+[    0.236552]    8regs           :  3724 MB/sec
+[    0.236560] xor: using function: 8regs (3724 MB/sec)
+[    0.297629] raid6: int64x1  gen()   429 MB/s
+[    0.338847] raid6: int64x2  gen()   636 MB/s
+[    0.368710] raid6: int64x4  gen()   878 MB/s
+[    0.398303] raid6: int64x8  gen()   886 MB/s
+[    0.434616] raid6: neonx1   gen()   722 MB/s
+[    0.459380] raid6: neonx2   gen()  1058 MB/s
+[    0.477433] raid6: neonx4   gen()  1452 MB/s
+[    0.493793] raid6: neonx8   gen()  1603 MB/s
+[    0.493802] raid6: using algorithm neonx8 gen() 1603 MB/s
+[    0.503197] raid6: .... xor() 1396 MB/s, rmw enabled
+[    0.504709] samsung-pinctrl 139f0000.pinctrl: Failed to create device link (0x180) with supplier soc@0 for /soc@0/pinctrl@139f0000/wakeup-interrupt-controller
+[    0.506408] exynos5_usb3drd_phy 135c0000.phy: supply vbus not found, using dummy regulator
+[    0.506546] exynos5_usb3drd_phy 135c0000.phy: supply vbus-boost not found, using dummy regulator
+[    0.507919] ledtrig-cpu: registered to indicate activity on CPUs
+[    0.508591] exynos-clkout exynos-clkout: cannot match parent device
+[    0.508622] exynos-clkout exynos-clkout: probe with driver exynos-clkout failed with error -22
+[    0.565225] 13810000.serial: ttySAC1 MMIO:0x0000000013810000 (irq = 48, base_baud = 0) is a S3C6400/10
+[    0.565516] serial serial0: tty port ttySAC1 registered
+[    0.566111] 13820000.serial: ttySAC2 MMIO:0x0000000013820000 (irq = 49, base_baud = 0) is a S3C6400/10
+[    0.567421] exynos-dsi 14800000.dsi: supply vddcore not found, using dummy regulator
+[    0.567559] exynos-dsi 14800000.dsi: supply vddio not found, using dummy regulator
+[    0.570097] [drm] Initialized simpledrm 1.0.0 for 67000000.framebuffer on minor 0
+[    0.583260] Console: switching to colour frame buffer device 90x80
+[    0.593344] simple-framebuffer 67000000.framebuffer: [drm] fb0: simpledrmdrmfb frame buffer device
+[    0.607815] loop: module loaded
+[    0.611926] tun: Universal TUN/TAP device driver, 1.6
+[    0.614646] usbcore: registered new interface driver usb-storage
+[    0.615701] i2c_dev: i2c /dev entries driver
+[    0.620927] exynos-dsi 14800000.dsi: Failed to create device link (0x180) with supplier 4-0066 for /soc@0/dsi@14800000/panel@0
+[    0.631164] s3c2410-wdt 10170000.watchdog: watchdog inactive, reset disabled, irq disabled
+[    0.631860] device-mapper: ioctl: 4.50.0-ioctl (2025-04-28) initialised: dm-devel@lists.linux.dev
+[    0.633577] dwmmc_exynos 13540000.mmc: IDMAC supports 64-bit address mode.
+[    0.633620] dwmmc_exynos 13540000.mmc: Using internal DMA controller.
+[    0.633635] dwmmc_exynos 13540000.mmc: Version ID is 270a
+[    0.633695] dwmmc_exynos 13540000.mmc: DW MMC controller at irq 63,64 bit host data width,64 deep fifo
+[    0.633999] dwmmc_exynos 13550000.mmc: IDMAC supports 64-bit address mode.
+[    0.634030] dwmmc_exynos 13550000.mmc: Using internal DMA controller.
+[    0.634045] dwmmc_exynos 13550000.mmc: Version ID is 270a
+[    0.634087] dwmmc_exynos 13550000.mmc: DW MMC controller at irq 64,64 bit host data width,64 deep fifo
+[    0.634142] hid: raw HID events driver (C) Jiri Kosina
+[    0.634218] dwmmc_exynos 13550000.mmc: allocated mmc-pwrseq
+[    0.634247] mmc_host mmc1: card is non-removable.
+[    0.634308] dwmmc_exynos 13560000.mmc: IDMAC supports 64-bit address mode.
+[    0.634332] usbcore: registered new interface driver usbhid
+[    0.634336] dwmmc_exynos 13560000.mmc: Using internal DMA controller.
+[    0.634346] usbhid: USB HID core driver
+[    0.634349] dwmmc_exynos 13560000.mmc: Version ID is 270a
+[    0.634401] dwmmc_exynos 13560000.mmc: DW MMC controller at irq 65,64 bit host data width,64 deep fifo
+[    0.635080] dwmmc_exynos 13560000.mmc: Got CD GPIO
+[    0.635640] NET: Registered PF_PACKET protocol family
+[    0.635749] 9pnet: Installing 9P2000 support
+[    0.635828] Key type dns_resolver registered
+[    0.646345] mmc_host mmc1: Bus speed = 49968750Hz (req 400000Hz, actual 396577HZ div = 63)
+[    0.647183] registered taskstats version 1
+[    0.647974] Loading compiled-in X.509 certificates
+[    0.652520] mmc_host mmc2: Bus speed = 49968750Hz (req 400000Hz, actual 396577HZ div = 63)
+[    0.658034] vdd_ldo32: Bringing 3300000uV into 3325000-3325000uV
+[    0.661004] Demotion targets for Node 0: null
+[    0.662187] vdd_ldo33: Bringing 2800000uV into 3300000-3300000uV
+[    0.663148] Btrfs loaded, zoned=no, fsverity=no
+[    0.667922] vdd_ldo35: Bringing 3000000uV into 2950000-2950000uV
+[    0.683333] platform 14830000.display-controller: Adding to iommu group 0
+[    0.684324] mmc1: queuing unknown CIS tuple 0x01 [d9 01 ff] (3 bytes)
+[    0.692969] mmc1: queuing unknown CIS tuple 0x1a [01 01 00 02 07] (5 bytes)
+[    0.696827] mmc1: queuing unknown CIS tuple 0x1b [c1 41 30 30 ff ff 32 00] (8 bytes)
+[    0.697629] mmc1: queuing unknown CIS tuple 0x14 [] (0 bytes)
+[    0.698806] Freeing initrd memory: 11348K
+[    0.698810] mmc_host mmc1: Bus speed = 49968750Hz (req 50000000Hz, actual 49968750HZ div = 0)
+[    0.702934] mmc1: new high speed SDIO card at address 0001
+[    0.734261] [drm] Exynos DRM: using 14830000.display-controller device for DMA mapping operations
+[    0.734318] exynos-drm exynos-drm: bound 14830000.display-controller (ops decon_component_ops)
+[    0.735140] exynos-dsi 14800000.dsi: [drm:samsung_dsim_host_attach] Attached s6e3aa2-ams474mm01 device (lanes:4 bpp:24 mode-flags:0x400)
+[    0.735258] exynos-drm exynos-drm: bound 14800000.dsi (ops exynos_dsi_component_ops)
+[    0.736516] Console: switching to colour dummy device 80x25
+[    0.738647] exynos-drm exynos-drm: [drm] [PLANE:35:plane-0] pixel format with alpha exposed but blend mode not setup. Please fix.
+[    0.738667] exynos-drm exynos-drm: [drm] [PLANE:38:plane-1] pixel format with alpha exposed but blend mode not setup. Please fix.
+[    0.739391] [drm] Initialized exynos 1.1.0 for exynos-drm on minor 1
+[    0.836616] panel-samsung-s6e3aa2 14800000.dsi.0: panel ID 460002
+[    1.003017] Console: switching to colour frame buffer device 90x80
+[    1.022622] exynos-drm exynos-drm: [drm] fb0: exynosdrmfb frame buffer device
+[    1.023397] panfrost 11400000.gpu: clock rate = 343000000
+[    1.023429] panfrost 11400000.gpu: bus_clock rate = 343000000
+[    1.025083] panfrost 11400000.gpu: mali-t830 id 0x830 major 0x0 minor 0x1 status 0x0
+[    1.025100] panfrost 11400000.gpu: features: 00000000,00000407, issues: 00000000,24040400
+[    1.025113] panfrost 11400000.gpu: Features: L2:0x07100206 Shader:0x00000000 Tiler:0x00000809 Mem:0x1 MMU:0x00002821 AS:0xff JS:0x7
+[    1.025128] panfrost 11400000.gpu: shader_present=0x1 l2_present=0x1
+[    1.027258] panfrost 11400000.gpu: [drm] Using Transparent Hugepage
+[    1.027805] [drm] Initialized panfrost 1.7.0 for 11400000.gpu on minor 0
+[    1.028960] exynos-dwc3 soc@0:usb@13600000: supply vdd10 not found, using dummy regulator
+[    1.031304] tm2-touchkey 0-0020: supply vddio not found, using dummy regulator
+[    1.109311] mmc_host mmc2: Bus speed = 49968750Hz (req 50000000Hz, actual 49968750HZ div = 0)
+[    1.109468] mmc2: new high speed SDHC card at address 678c
+[    1.110586] mmcblk2: mmc2:678c SD08G 7.42 GiB
+[    1.116181]  mmcblk2: p1
+[    1.186414] input: tm2-touchkey as /devices/platform/i2c-touchkey/i2c-0/0-0020/input/input0
+[    1.252004] input: Imagis capacitive touchscreen as /devices/platform/soc@0/13890000.i2c/i2c-3/3-0050/input/input1
+[    1.253399] input: regulator-haptic as /devices/platform/vibrator/input/input2
+[    1.269636] exynos-chipid 10100000.chipid: CPU cluster 0: ASV group 9, table version 5
+[    1.269654] exynos-chipid 10100000.chipid: CPU cluster 1: ASV group 9, table version 5
+[    1.269678] cpu cpu0: Couldn't find Energy Model
+[    1.269699] cpu cpu4: Couldn't find Energy Model
+[    1.270450] input: GPIO Hall Effect Sensor as /devices/platform/gpio-hall-effect-sensor/input/input3
+[    1.271533] dwmmc_exynos 13540000.mmc: IDMAC supports 64-bit address mode.
+[    1.271569] input: gpio-keys as /devices/platform/gpio-keys/input/input4
+[    1.271611] dwmmc_exynos 13540000.mmc: Using internal DMA controller.
+[    1.271645] dwmmc_exynos 13540000.mmc: Version ID is 270a
+[    1.271711] dwmmc_exynos 13540000.mmc: DW MMC controller at irq 63,64 bit host data width,64 deep fifo
+[    1.274060] mmc_host mmc0: card is non-removable.
+[    1.291392] mmc_host mmc0: Bus speed = 49968750Hz (req 400000Hz, actual 396577HZ div = 63)
+[    1.389011] mmc_host mmc0: Bus speed = 49968750Hz (req 25000000Hz, actual 24984375HZ div = 1)
+[    1.390225] mmc0: new MMC card at address 0001
+[    1.392019] mmcblk0: mmc0:0001 400073 14.7 GiB
+[    1.401055]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15 p16 p17 p18 p19 p20 p21 p22 p23 p24
+[    1.405657] mmcblk0boot0: mmc0:0001 400073 4.00 MiB
+[    1.409100] mmcblk0boot1: mmc0:0001 400073 4.00 MiB
+[    1.411660] mmcblk0rpmb: mmc0:0001 400073 4.00 MiB, chardev (245:0)
+[    1.774839] clk: Not disabling unused clocks
+[    1.774854] PM: genpd: Not disabling unused power domains
+[    1.775731] Freeing unused kernel memory: 2048K
+[    1.810153] Checked W+X mappings: passed, no W+X pages found
+[    1.810200] Run /init as init process
+[    1.810206]   with arguments:
+[    1.810209]     /init
+[    1.810213]     splash
+[    1.810217]   with environment:
+[    1.810221]     HOME=/
+[    1.810225]     TERM=linux
+[    1.810229]     pmos_boot_uuid=136a0e89-1c8a-4606-ac3b-78a221bdcac6
+[    1.810233]     pmos_root_uuid=f13c89ae-c7a3-4695-acbd-544183ee16b3
+[    1.810237]     pmos_rootfsopts=defaults
+[    1.904204] syslogd started: BusyBox v1.38.0
+[    1.910956] [pmOS-rd]:   ❬❬ PMOS STAGE 1 ❭❭
+[    1.910988] [pmOS-rd]: initramfs version: 3.12.5-r0
+[    1.911003] [pmOS-rd]:   ❬❬ PMOS STAGE 2 ❭❭
+[    3.273391] [pmOS-rd]:   Setting up USB gadget through configfs
+[    3.287659] configfs-gadget.g1 gadget.0: HOST MAC 92:04:1a:bb:b3:14
+[    3.287678] configfs-gadget.g1 gadget.0: MAC 1e:5e:c3:5a:8f:54
+[    3.319099] [pmOS-rd]: Trying to start server with parameters: Server IP addr: 10.78.70.1:67, client IP addr: 10.78.70.2, interface: usb0
+[    3.326711] [pmOS-rd]: Setting framebuffer mode to: U:720x1280p-0
+[    3.654213] random: crng init done
+[    5.021480] [pmOS-rd]: Trying to mount subpartitions for 10 seconds...
+[    5.769054] [pmOS-rd]: Unable to resize root partition: failed to find qualifying partition
+[    5.781131] [pmOS-rd]: Auto-repair and check 'ext' filesystem (/dev/mmcblk0p24)
+[    5.793077] [pmOS-rd]: pmOS_root: clean, 32874/310688 files, 533162/621056 blocks
+[    5.930785] [pmOS-rd]: Resize 'ext4' root filesystem (/dev/mmcblk0p24)
+[    5.940272] [pmOS-rd]: resize2fs 1.47.4 (6-Mar-2025)
+[    5.943795] [pmOS-rd]: Resizing the filesystem on /dev/mmcblk0p24 to 2704384 (4k) blocks.
+[    6.199852] [pmOS-rd]: The filesystem on /dev/mmcblk0p24 is now 2704384 (4k) blocks long.
+[    6.205711] [pmOS-rd]: Mount root partition (/dev/mmcblk0p24) to /sysroot (read-write) with options defaults
+[    6.362723] EXT4-fs (mmcblk0p24): mounted filesystem f13c89ae-c7a3-4695-acbd-544183ee16b3 r/w with ordered data mode. Quota mode: none.
+[    6.431903] [pmOS-rd]: Switching root
+[    6.545897] syslogd exiting
+[    6.959017] systemd[1]: System time advanced to built-in epoch: Fri 2026-11-06 12:22:36 CET
+[    7.128387] systemd[1]: Failed to find module 'autofs4'
+[    7.236163] systemd[1]: systemd 262.2 running in system mode (+PAM +AUDIT -SELINUX +APPARMOR +IMA +IPE +SMACK +SECCOMP +GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 +KMOD +LIBCRYPTSETUP +LIBCRYPTSETUP_PLUGINS +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +BTF +XKBCOMMON -UTMP +LIBARCHIVE)
+[    7.236330] systemd[1]: Detected architecture arm64.
+[    7.236895] systemd[1]: Detected first boot.
+[    7.253826] systemd[1]: Initializing machine ID from random generator.
+[    7.277673] systemd[1]: Hostname set to <a3y17lte>.
+[    7.596321] systemd[1]: bpf-restrict-fs: Failed to link 'restrict_filesystems' LSM BPF program: Not supported
+[    8.627461] systemd[1]: Applying preset policy.
+[    9.465974] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/systemd-oomd.socket' → '/usr/lib/systemd/system/systemd-oomd.socket'.
+[    9.466004] systemd[1]: Created symlink '/etc/systemd/system/sockets.target.wants/avahi-daemon.socket' → '/usr/lib/systemd/system/avahi-daemon.socket'.
+[    9.466018] systemd[1]: Populated /etc with preset unit settings.
+[   10.243382] systemd[1]: Queued start job for default target Graphical Interface.
+[   10.280284] systemd[1]: Created slice Slice /system/getty.
+[   10.283837] systemd[1]: Created slice Slice /system/modprobe.
+[   10.286100] systemd[1]: Created slice Slice /system/unudhcpd.
+[   10.287477] systemd[1]: Created slice User and Session Slice.
+[   10.287832] systemd[1]: Started Forward Password Requests to Wall Directory Watch.
+[   10.287996] systemd[1]: Starting of Arbitrary Executable File Formats File System Automount Point unsupported.
+[   10.288298] systemd[1]: Expecting device /dev/disk/by-uuid/136a0e89-1c8a-4606-ac3b-78a221bdcac6...
+[   10.288376] systemd[1]: Reached target Local dm-clone Devices.
+[   10.288499] systemd[1]: Reached target Login Prompts.
+[   10.288604] systemd[1]: Reached target Image Downloads.
+[   10.288702] systemd[1]: Reached target Local Integrity Protected Volumes.
+[   10.288951] systemd[1]: Reached target Remote Encrypted Volumes.
+[   10.289026] systemd[1]: Reached target Remote File Systems.
+[   10.289119] systemd[1]: Reached target Remote Integrity Protected Volumes.
+[   10.289211] systemd[1]: Reached target Remote Verity Protected Volumes.
+[   10.289299] systemd[1]: Reached target Slice Units.
+[   10.289545] systemd[1]: Reached target Local Verity Protected Volumes.
+[   10.296195] systemd[1]: Listening on Query the User Interactively for a Password.
+[   10.305147] systemd[1]: Listening on Process Core Dump Socket.
+[   10.310939] systemd[1]: Listening on Credential Encryption/Decryption.
+[   10.316814] systemd[1]: Listening on Disk Encryption Enrollment Service Socket.
+[   10.323345] systemd[1]: Listening on Factory Reset Management.
+[   10.323874] systemd[1]: Listening on Hostname Service Socket.
+[   10.324447] systemd[1]: Listening on Journal Socket (/dev/log).
+[   10.324927] systemd[1]: Listening on Journal Sockets.
+[   10.325469] systemd[1]: Listening on DDI File System Mounter Socket.
+[   10.336541] systemd[1]: Listening on Console Output Muting Service Socket.
+[   10.337233] systemd[1]: Listening on Namespace Resource Manager Socket.
+[   10.338002] systemd[1]: Listening on Userspace Out-Of-Memory (OOM) Killer Socket.
+[   10.338364] systemd[1]: TPM PCR Measurements skipped, unmet condition check ConditionSecurity=measured-os
+[   10.338495] systemd[1]: Make TPM PCR Policy skipped, unmet condition check ConditionSecurity=measured-uki
+[   10.344342] systemd[1]: Listening on Disk Repartitioning Service Socket.
+[   10.353166] systemd[1]: Listening on Report System Basic Metrics Socket.
+[   10.361929] systemd[1]: Listening on CGroup Report Varlink Socket.
+[   10.368187] systemd[1]: Listening on Report Files Metrics Socket.
+[   10.378558] systemd[1]: Listening on Report Signing Socket (Local Software Key).
+[   10.378742] systemd[1]: Report Signing Socket (TPM2) skipped, unmet condition check ConditionSecurity=measured-uki
+[   10.378865] systemd[1]: Report Signing Socket (configfs-tsm) skipped, unmet condition check ConditionSecurity=cvm
+[   10.384076] systemd[1]: Listening on System Report Socket.
+[   10.384563] systemd[1]: Listening on Resolve Monitor Varlink Socket.
+[   10.384907] systemd[1]: Listening on Resolve Service Varlink Socket.
+[   10.391232] systemd[1]: Listening on Simple Block Device Backed Storage Provider.
+[   10.397995] systemd[1]: Listening on Simple File System Backed Storage Provider.
+[   10.403189] systemd[1]: Listening on System Install Tool.
+[   10.403409] systemd[1]: Recompute TPM PCR Policy on Completed System Update skipped, unmet condition check ConditionSecurity=measured-uki
+[   10.410234] systemd[1]: Listening on System Updates.
+[   10.410605] systemd[1]: Listening on udev Kernel Socket.
+[   10.411062] systemd[1]: Listening on udev Varlink Socket.
+[   10.426811] systemd[1]: Mounting Huge Pages File System...
+[   10.431046] systemd[1]: Mounting POSIX Message Queue File System...
+[   10.435944] systemd[1]: Mounting Kernel Debug File System...
+[   10.442089] systemd[1]: Mounting Kernel Trace File System...
+[   10.448626] systemd[1]: Starting Create List of Static Device Nodes...
+[   10.448841] systemd[1]: Load Kernel Module configfs skipped, unmet condition check ConditionKernelModuleLoaded=!configfs
+[   10.449283] systemd[1]: Load Kernel Module drm skipped, unmet condition check ConditionKernelModuleLoaded=!drm
+[   10.449442] systemd[1]: Load Kernel Module efi_pstore skipped, unmet condition check ConditionKernelModuleLoaded=!efi_pstore
+[   10.454539] systemd[1]: Starting Load Kernel Module fuse...
+[   10.460225] systemd[1]: Starting nftables static rule set...
+[   10.464968] systemd[1]: Starting Enable compressed swap in memory using zram...
+[   10.465593] systemd[1]: Clear SysFail Entry If The Boot Is Successful skipped, unmet condition check ConditionPathExists=/sys/firmware/efi/efivars/LoaderEntrySysFail-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f
+[   10.477524] systemd[1]: Starting Journal Service...
+[   10.497834] systemd[1]: Starting Load Kernel Modules...
+[   10.497974] systemd[1]: TPM PCR Machine ID Measurement skipped, unmet condition check ConditionSecurity=measured-os
+[   10.498124] systemd[1]: TPM PCR OS Separator skipped, unmet condition check ConditionSecurity=measured-os
+[   10.502765] systemd[1]: Starting Remount Root and Kernel File Systems...
+[   10.503125] systemd[1]: Early TPM SRK Setup skipped, unmet condition check ConditionSecurity=measured-os
+[   10.503275] systemd[1]: TPM PCR NvPCR Initialization Separator skipped, unmet condition check ConditionPathExists=/etc/initrd-release
+[   10.503389] systemd[1]: TPM NvPCR Product ID Measurement skipped, unmet condition check ConditionSecurity=measured-os
+[   10.508199] systemd[1]: Starting Load udev Rules from Credentials...
+[   10.513943] systemd[1]: Starting Coldplug All udev Devices...
+[   10.527066] fuse: init (API version 7.47)
+[   10.538931] systemd[1]: Starting Virtual Console Setup...
+[   10.567557] systemd[1]: Mounted Huge Pages File System.
+[   10.568679] systemd[1]: Mounted POSIX Message Queue File System.
+[   10.569542] systemd[1]: Mounted Kernel Debug File System.
+[   10.570401] systemd[1]: Mounted Kernel Trace File System.
+[   10.571946] systemd[1]: Finished Create List of Static Device Nodes.
+[   10.598841] EXT4-fs (mmcblk0p24): re-mounted f13c89ae-c7a3-4695-acbd-544183ee16b3.
+[   10.631691] systemd[1]: modprobe@fuse.service: Deactivated successfully.
+[   10.632420] systemd[1]: Finished Load Kernel Module fuse.
+[   10.652256] systemd[1]: Finished Load Kernel Modules.
+[   10.653779] systemd[1]: Finished Remount Root and Kernel File Systems.
+[   10.657122] systemd[1]: Finished Load udev Rules from Credentials.
+[   10.660436] systemd-journald[316]: Collecting audit messages is disabled.
+[   10.691741] systemd[1]: Finished Virtual Console Setup.
+[   10.701067] systemd[1]: Mounting FUSE Control File System...
+[   10.705766] systemd[1]: Starting Rebuild Hardware Database...
+[   10.714676] systemd[1]: Starting Platform Persistent Storage Archival...
+[   10.718938] systemd[1]: Starting Load/Save OS Random Seed...
+[   10.723440] systemd[1]: Starting Apply Kernel Variables...
+[   10.733226] systemd[1]: Starting Create Static Device Nodes in /dev gracefully...
+[   10.733322] systemd[1]: TPM SRK Setup skipped, unmet condition check ConditionSecurity=measured-os
+[   10.742052] systemd[1]: Mounted FUSE Control File System.
+[   10.759421] systemd[1]: Finished Platform Persistent Storage Archival.
+[   10.777176] zram: Added device: zram0
+[   10.784459] systemd[1]: Started Journal Service.
+[   10.828058] zram0: detected capacity change from 0 to 5961728
+[   10.853938] Adding 2980860k swap on /dev/zram0.  Priority:300 extents:1 across:2980860k SS
+[   10.864940] systemd-journald[316]: Received client request to flush runtime journal.
+[   16.988387] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[   17.001211] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[   17.001722] Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[   17.007531] Bluetooth: Core ver 2.22
+[   17.007653] NET: Registered PF_BLUETOOTH protocol family
+[   17.007661] Bluetooth: HCI device and connection manager initialized
+[   17.007679] Bluetooth: HCI socket layer initialized
+[   17.007687] Bluetooth: L2CAP socket layer initialized
+[   17.007702] Bluetooth: SCO socket layer initialized
+[   17.055180] Bluetooth: HCI UART driver ver 2.3
+[   17.055200] Bluetooth: HCI UART protocol H4 registered
+[   17.055514] Bluetooth: HCI UART protocol Broadcom registered
+[   17.055559] Bluetooth: HCI UART protocol QCA registered
+[   17.060389] Bluetooth: hci0: setting up ROME/QCA6390
+[   17.183919] ath10k_sdio mmc1:0001:1: qca9377 hw1.1 sdio target 0x05020001 chip_id 0x00000000 sub 0000:0000
+[   17.183960] ath10k_sdio mmc1:0001:1: kconfig debug 0 debugfs 0 tracing 0 dfs 0 testmode 0
+[   17.184557] ath10k_sdio mmc1:0001:1: firmware ver WLAN.TF.1.1.1-00061-QCATFSWPZ-1 api 5 features ignore-otp crc32 7746e551
+[   17.270251] Bluetooth: hci0: Frame reassembly failed (-84)
+[   17.350211] ath10k_sdio mmc1:0001:1: failed to fetch board data for bus=sdio,vendor=0271,device=0701,subsystem-vendor=0000,subsystem-device=0000 from ath10k/QCA9377/hw1.0/board-2.bin
+[   17.352693] ath10k_sdio mmc1:0001:1: board_file api 1 bmi_id N/A crc32 c5caca70
+[   17.544240] Bluetooth: hci0: QCA Product ID   :0x00000008
+[   17.544284] Bluetooth: hci0: QCA SOC Version  :0x00000023
+[   17.544305] Bluetooth: hci0: QCA ROM Version  :0x00000302
+[   17.544325] Bluetooth: hci0: QCA Patch Version:0x00000111
+[   17.544389] Bluetooth: hci0: QCA controller version 0x00230302
+[   17.544577] Bluetooth: hci0: QCA Downloading qca/rampatch_00230302.bin
+[   17.638180] dwmmc_exynos 13550000.mmc: Interrupt latency, state 1 (watched 0x1)
+[   17.746769] dwmmc_exynos 13550000.mmc: Interrupt latency, state 1 (watched 0x1)
+[   17.761265] EXT4-fs (mmcblk0p20): mounting ext2 file system using the ext4 subsystem
+[   17.771720] EXT4-fs (mmcblk0p20): mounted filesystem 136a0e89-1c8a-4606-ac3b-78a221bdcac6 r/w without journal. Quota mode: none.
+[   17.855794] Bluetooth: Received HCI_IBS_WAKE_ACK in tx state 0
+[   17.978217] Bluetooth: hci0: QCA Downloading qca/nvm_00230302.bin
+[   18.178364] Bluetooth: hci0: QCA setup on UART is completed
+[   19.356797] Bluetooth: MGMT ver 1.23
+[   19.357263] Bluetooth: hci0: setting up ROME/QCA6390
+[   19.565768] Bluetooth: hci0: Frame reassembly failed (-84)
+[   19.846879] Bluetooth: hci0: QCA Product ID   :0x00000008
+[   19.846903] Bluetooth: hci0: QCA SOC Version  :0x00000023
+[   19.846912] Bluetooth: hci0: QCA ROM Version  :0x00000302
+[   19.846921] Bluetooth: hci0: QCA Patch Version:0x00000111
+[   19.846932] Bluetooth: hci0: QCA controller version 0x00230302
+[   19.846943] Bluetooth: hci0: QCA Downloading qca/rampatch_00230302.bin
+[   20.001238] dwmmc_exynos 13550000.mmc: Interrupt latency, state 1 (watched 0x1)
+[   20.254197] Bluetooth: hci0: QCA Downloading qca/nvm_00230302.bin
+[   20.343970] Bluetooth: hci0: QCA setup on UART is completed
+[   20.535418] NET: Registered PF_ALG protocol family
+[   20.997251] ath10k_sdio mmc1:0001:1: htt-ver 3.32 wmi-op 4 htt-op 3 cal otp max-sta 32 raw 0 hwcrypto 1
+[   21.014206] mmc_host mmc1: Bus speed = 49968750Hz (req 400000Hz, actual 396577HZ div = 63)
+[   21.051828] mmc1: queuing unknown CIS tuple 0x01 [d9 01 ff] (3 bytes)
+[   21.060653] mmc1: queuing unknown CIS tuple 0x1a [01 01 00 02 07] (5 bytes)
+[   21.064686] mmc1: queuing unknown CIS tuple 0x1b [c1 41 30 30 ff ff 32 00] (8 bytes)
+[   21.065440] mmc1: queuing unknown CIS tuple 0x14 [] (0 bytes)
+[   21.066619] mmc_host mmc1: Bus speed = 49968750Hz (req 50000000Hz, actual 49968750HZ div = 0)
+[   21.066787] ath: EEPROM regdomain: 0x0
+[   21.066811] ath: EEPROM indicates default country code should be used
+[   21.066826] ath: doing EEPROM country->regdmn map search
+[   21.066844] ath: country maps to regdmn code: 0x3a
+[   21.066861] ath: Country alpha2 being used: US
+[   21.066877] ath: Regpair used: 0x3a
+[   21.527203] NET: Registered PF_QIPCRTR protocol family
+[   24.908727] mmc_host mmc1: Bus speed = 49968750Hz (req 400000Hz, actual 396577HZ div = 63)
+[   24.949855] mmc1: queuing unknown CIS tuple 0x01 [d9 01 ff] (3 bytes)
+[   24.960022] mmc1: queuing unknown CIS tuple 0x1a [01 01 00 02 07] (5 bytes)
+[   24.964451] mmc1: queuing unknown CIS tuple 0x1b [c1 41 30 30 ff ff 32 00] (8 bytes)
+[   24.965371] mmc1: queuing unknown CIS tuple 0x14 [] (0 bytes)
+[   24.966756] mmc_host mmc1: Bus speed = 49968750Hz (req 50000000Hz, actual 49968750HZ div = 0)
+[   88.262608] rfkill: input handler disabled
+[   97.051312] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xdca7f00, tail=0xdca7f00
+[  103.097434] Purging 3858432 bytes
+[  103.103478] Purging 3919872 bytes
+[  103.106782] Purging 8564736 bytes
+[  103.116180] Purging 8523776 bytes
+[  103.117441] Purging 3936256 bytes
+[  103.118544] Purging 3813376 bytes
+[  103.119691] Purging 3928064 bytes
+[  103.120888] Purging 4009984 bytes
+[  103.235142] Purging 8523776 bytes
+[  103.238378] Purging 8527872 bytes
+[  108.236067] panfrost_gem_shrinker_scan: 1 callbacks suppressed
+[  108.236082] Purging 8593408 bytes
+[  108.241435] Purging 8658944 bytes
+[  108.244483] Purging 8658944 bytes
+[  108.250043] Purging 8658944 bytes
+[  108.253166] Purging 8658944 bytes
+[  108.255653] Purging 8658944 bytes
+[  108.258097] Purging 8658944 bytes
+[  108.260565] Purging 8658944 bytes
+[  108.300914] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa01bf00, tail=0xa01bf00
+[  108.308429] Purging 8658944 bytes
+[  108.314503] Purging 8658944 bytes
+[  110.573812] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xb2f5300, tail=0xb2f5300
+[  110.821954] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xcd9ccc0, tail=0xcd9ccc0
+[  110.960985] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xb2ebf40, tail=0xb2ebf40
+[  111.101232] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xb301f40, tail=0xb301f40
+[  119.337603] panfrost_gem_shrinker_scan: 69 callbacks suppressed
+[  119.337621] Purging 610304 bytes
+[  119.341393] Purging 606208 bytes
+[  119.342778] Purging 3858432 bytes
+[  119.345652] Purging 1425408 bytes
+[  119.346400] Purging 974848 bytes
+[  119.346893] Purging 634880 bytes
+[  119.347200] Purging 1081344 bytes
+[  119.351146] Purging 655360 bytes
+[  119.351896] Purging 528384 bytes
+[  119.352258] Purging 593920 bytes
+[  121.638462] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3301, status=0x8, head=0x191baa80, tail=0x191baa80, sched_job=000000004082a323
+[  121.799140] panfrost 11400000.gpu: Panfrost Dump: BO has no sgt, cannot dump
+[  122.310466] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3b00, status=0x8, head=0x2264ac00, tail=0x2264ac00, sched_job=000000008adf14ae
+[  122.854394] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3b01, status=0x8, head=0x2262ac00, tail=0x2262ac00, sched_job=000000002877408d
+[  154.204982] panfrost_gem_shrinker_scan: 134 callbacks suppressed
+[  154.204999] Purging 3764224 bytes
+[  154.208165] Purging 3538944 bytes
+[  154.209028] Purging 3878912 bytes
+[  154.210807] Purging 204800 bytes
+[  154.226508] Purging 8523776 bytes
+[  154.228287] Purging 8654848 bytes
+[  154.228536] Purging 135168 bytes
+[  154.242278] Purging 8523776 bytes
+[  154.244013] Purging 8527872 bytes
+[  154.244268] Purging 135168 bytes
+[  154.725982] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa1e40c0, tail=0xa1e40c0
+[  155.782487] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3b00, status=0x8, head=0x15f2da40, tail=0x15f2da40, sched_job=00000000e0a9ae85
+[  155.794366] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x15f4eb00, tail=0x15f4eb00
+[  155.850496] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x15fcec40, tail=0x15fcec40
+[  155.862451] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x15fedac0, tail=0x15fedac0
+[  160.447435] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x1eabdd40, tail=0x1eabdd40
+[  160.476839] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x15e6bf00, tail=0x15e6bf00
+[  160.504051] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x1ea9bf00, tail=0x1ea9bf00
+[  160.530772] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x1ea8bf00, tail=0x1ea8bf00
+[  160.561924] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xff6af00, tail=0xff6af00
+[  160.624371] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa5f4f00, tail=0xa5f4f00
+[  160.652020] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa5e4f00, tail=0xa5e4f00
+[  160.745515] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x1ea7bf00, tail=0x1ea7bf00
+[  160.772164] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x15e4bf00, tail=0x15e4bf00
+[  160.956363] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xff6af00, tail=0xff6af00
+[  160.983693] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x1eadbf00, tail=0x1eadbf00
+[  164.108613] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa5f18c0, tail=0xa5f18c0
+[  164.134989] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x1eb188c0, tail=0x1eb188c0
+[  179.587829] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xff6d240, tail=0xff6d240
+[  179.629467] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xffa3240, tail=0xffa3240
+[  182.622728] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa5717c0, tail=0xa5717c0
+[  182.773032] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xff920c0, tail=0xff920c0
+[  182.824297] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa5e8000, tail=0xa5e8000
+[  183.299337] wlan0: authenticate with d4:53:2a:b0:1a:27 (local address=7e:f7:b7:e5:6e:49)
+[  183.299380] wlan0: send auth to d4:53:2a:b0:1a:27 (try 1/3)
+[  183.320111] wlan0: authenticate with d4:53:2a:b0:1a:27 (local address=7e:f7:b7:e5:6e:49)
+[  183.320145] wlan0: send auth to d4:53:2a:b0:1a:27 (try 1/3)
+[  183.328138] wlan0: authenticated
+[  183.334358] wlan0: associate with d4:53:2a:b0:1a:27 (try 1/3)
+[  183.337810] wlan0: RX AssocResp from d4:53:2a:b0:1a:27 (capab=0x11 status=0 aid=1)
+[  183.345033] wlan0: associated
+[  183.556354] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa5714c0, tail=0xa5714c0
+[  183.590795] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x1eb0c380, tail=0x1eb0c380
+[  252.108484] Purging 3547136 bytes
+[  252.111662] Purging 4358144 bytes
+[  252.113125] Purging 1220608 bytes
+[  252.116160] Purging 3809280 bytes
+[  252.116458] Purging 262144 bytes
+[  252.119049] Purging 4096 bytes
+[  252.123428] Purging 3747840 bytes
+[  252.125157] Purging 233472 bytes
+[  252.129549] Purging 8523776 bytes
+[  252.132843] Purging 3883008 bytes
+[  253.573105] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3301, status=0x8, head=0x191daa80, tail=0x191daa80, sched_job=0000000036e9c7fa
+[  254.117101] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3b01, status=0x8, head=0xa15bc00, tail=0xa15bc00, sched_job=0000000089100d66
+[  254.693062] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3b01, status=0x8, head=0x1048ac00, tail=0x1048ac00, sched_job=000000003cf279cb
+[  259.615025] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x1bd66780, tail=0x1bd66780
+[  260.410208] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x19116500, tail=0x19116500
+[  260.495897] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa1b8600, tail=0xa1b8600
+[  260.564481] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x19116d40, tail=0x19116d40
+[  260.590124] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x191d65c0, tail=0x191d65c0
+[  260.645614] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa1b7100, tail=0xa1b7100
+[  260.666963] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x191368c0, tail=0x191368c0
+[  260.690868] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa5e1f80, tail=0xa5e1f80
+[  262.084468] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0x191d5d80, tail=0x191d5d80
+[  262.106819] panfrost 11400000.gpu: js fault, js=0, status=INSTR_INVALID_ENC, head=0xa146d80, tail=0xa146d80
+[  325.142863] panfrost_gem_shrinker_scan: 100 callbacks suppressed
+[  325.142880] Purging 1921024 bytes
+[  325.145424] Purging 3874816 bytes
+[  325.148637] Purging 8523776 bytes
+[  325.151291] Purging 4108288 bytes
+[  325.153639] Purging 8523776 bytes
+[  325.154084] Purging 331776 bytes
+[  325.163839] Purging 8523776 bytes
+[  325.166340] Purging 8658944 bytes
+[  325.167500] Purging 3883008 bytes
+[  325.167771] Purging 233472 bytes
+[  326.371437] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3301, status=0x8, head=0x226caa80, tail=0x226caa80, sched_job=000000002967ce24
+[  326.915541] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3b01, status=0x8, head=0x2279ac00, tail=0x2279ac00, sched_job=000000003164f0db
+[  327.459505] panfrost 11400000.gpu: gpu sched timeout, js=0, config=0x3b01, status=0x8, head=0x227bac00, tail=0x227bac00, sched_job=0000000086909769

@@ -1,0 +1,5 @@
+#!/bin/sh
+# usage: each <gpu-id> <outdir>  -- one process per shader_test, crash-isolated
+id=$1; out=$2; mkdir -p "$out"
+{ find /home/exylinux/Projects/exynos7870/work/notes/gpu-gsk-spill/shcap /home/exylinux/Projects/exynos7870/work/ref/shader-db/shaders -name '*.shader_test'; } | sort |
+xargs -P 8 -I{} sh -c 'f="$1"; o="$3/$(echo "$f" | sed -E "s#^.*/(shcap|shaders)/##; s#/#__#g").txt"; /home/exylinux/Projects/exynos7870/work/notes/gpu-gsk-spill/sdb "$2" "$f" > "$o" 2>&1; echo "rc=$?" >> "$o"' _ {} "$id" "$out"

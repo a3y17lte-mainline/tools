@@ -1,0 +1,64 @@
+830 files 4270 4270 bad base 0 bad new 0 newly bad [] fixed 0
+ shaders 7391 7391
+ total inst 478036 -> 484488 +1.35%
+ total bundles 215944 -> 220251 +1.99%
+ total quadwords 372526 -> 377804 +1.42%
+ total fills 1188 -> 693 -41.67%
+ files changed 294
+ quadword shrink: 3 grow: 289
+   (-1, 'godot3.4__43-47.shader_test.txt', 157, 156)
+   (-1, 'godot3.4__49-43.shader_test.txt', 132, 131)
+   (-1, 'skia__649-3.shader_test.txt', 39, 38)
+   (68, 'skia__853.shader_test.txt', 449, 517)
+   (74, '9.shader_test.txt', 528, 602)
+   (76, '4.shader_test.txt', 542, 618)
+   (97, 'skia__1009.shader_test.txt', 1224, 1321)
+   (102, '7.shader_test.txt', 791, 893)
+860 files 4270 4270 bad base 0 bad new 0 newly bad [] fixed 0
+ shaders 7391 7391
+ total inst 477844 -> 484297 +1.35%
+ total bundles 215752 -> 220060 +2.00%
+ total quadwords 372526 -> 377804 +1.42%
+ total fills 1112 -> 612 -44.96%
+ files changed 294
+ quadword shrink: 3 grow: 289
+   (-1, 'godot3.4__43-47.shader_test.txt', 157, 156)
+   (-1, 'godot3.4__49-43.shader_test.txt', 132, 131)
+   (-1, 'skia__649-3.shader_test.txt', 39, 38)
+   (68, 'skia__853.shader_test.txt', 449, 517)
+   (74, '9.shader_test.txt', 528, 602)
+   (76, '4.shader_test.txt', 542, 618)
+   (97, 'skia__1009.shader_test.txt', 1224, 1321)
+   (102, '7.shader_test.txt', 791, 893)
+720 files 4270 4270 bad base 94 bad new 94 newly bad [] fixed 0
+ shaders 817 817
+ total inst 55233 -> 55334 +0.18%
+ total bundles 25331 -> 25435 +0.41%
+ total quadwords 44804 -> 44960 +0.35%
+ total fills 0 -> 0 +0.00%
+ files changed 21
+ quadword shrink: 2 grow: 18
+   (-2, 'godot3.4__49-43.shader_test.txt', 137, 135)
+   (-1, 'godot3.4__43-47.shader_test.txt', 162, 161)
+   (0, 'chromeos__24.shader_test.txt', 53, 53)
+   (6, 'godot3.4__22-69.shader_test.txt', 110, 116)
+   (12, 'glmark__22-1.shader_test.txt', 95, 107)
+   (12, 'godot3.4__31-18.shader_test.txt', 229, 241)
+   (37, 'yofrankie__42.shader_test.txt', 302, 339)
+   (43, 'yofrankie__15.shader_test.txt', 256, 299)
+820 files 4270 4270 bad base 0 bad new 0 newly bad [] fixed 0
+ shaders 7391 7391
+ total inst 478036 -> 484488 +1.35%
+ total bundles 215944 -> 220251 +1.99%
+ total quadwords 372526 -> 377804 +1.42%
+ total fills 1188 -> 693 -41.67%
+ files changed 294
+ quadword shrink: 3 grow: 289
+   (-1, 'godot3.4__43-47.shader_test.txt', 157, 156)
+   (-1, 'godot3.4__49-43.shader_test.txt', 132, 131)
+   (-1, 'skia__649-3.shader_test.txt', 39, 38)
+   (68, 'skia__853.shader_test.txt', 449, 517)
+   (74, '9.shader_test.txt', 528, 602)
+   (76, '4.shader_test.txt', 542, 618)
+   (97, 'skia__1009.shader_test.txt', 1224, 1321)
+   (102, '7.shader_test.txt', 791, 893)

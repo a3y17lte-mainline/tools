@@ -1,0 +1,154 @@
+#!/bin/bash
+# build-pmos: build the postmarketOS images for the A3 2017 (packages from src/pmaports,
+# device samsung-a3y17lte) and export them for a3-flash:
+#
+#   out/images/pmos-boot.img   ext2 "pmOS_boot", 190 MiB  -> CACHE    (/extlinux/extlinux.conf)
+#   out/images/pmos-root.img   ext4 "pmOS_root"           -> USERDATA (grows on first boot)
+#   out/images/pmos-ram.img    the same kernel + DTB + initramfs as a boot image for
+#                              `fastboot boot` (RAM only; finds boot/root by UUID)
+#
+#   build-pmos [--no-build]     --no-build: skip the package builds, only install + export
+#   build-pmos --packages       only build the kernel and device packages (for updating an
+#                               installed phone with apk; no images)
+#
+# Kernel package notes (both bit us when building by hand, 2026-11-11):
+# - Never call `pmbootstrap build --src=src/linux` or an export that still has the kernel's
+#   .gitignore: pmbootstrap rsyncs with it as an exclude list and drops the tracked
+#   kernel/time/timeconst.bc ("No rule to make target kernel/time/timeconst.bc"). An old
+#   export with leftover build output hides this.
+# - --src builds get a date as pkgver (7.4_pYYYYMMDDhhmmss): newer than the APKBUILD's
+#   7.4_rcN, so a plain `pmbootstrap build linux-samsung-a3y17lte` is "up to date" and
+#   builds nothing. Always build the kernel through this script.
+# - The APKBUILD unsets CC: pmbootstrap exports a GCC cross CC that the kernel's tools build
+#   (resolve_btfids, for BTF) would use instead of clang.
+#
+# pmbootstrap must be initialised (pmbootstrap init; config in ~/.config/pmbootstrap_v3.cfg).
+# The user's password is read from out/pmos-password (numeric, for the Phosh lock screen).
+# Nothing here touches the phone.
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+PMA=$ROOT/src/pmaports/device/testing
+KSRC=$ROOT/out/pmos-linux-src
+FW=$ROOT/work/firmware/system
+IMG=$ROOT/out/images
+BOOT_MIB=190                       # CACHE is 200 MiB
+USERDATA_MAX=$((11 * 1024 * 1024 * 1024))
+BUILD=1
+PACKAGES_ONLY=""
+case "${1:-}" in
+--no-build) BUILD="" ;;
+--packages) PACKAGES_ONLY=1 ;;
+"") ;;
+*) echo "usage: build-pmos [--no-build | --packages]" >&2; exit 2 ;;
+esac
+
+die() { echo "build-pmos: $*" >&2; exit 1; }
+[ "$(pmbootstrap config device)" = samsung-a3y17lte ] || die "pmbootstrap device is not samsung-a3y17lte"
+[ -s "$ROOT/out/pmos-password" ] || die "no out/pmos-password"
+
+if [ -n "$BUILD" ]; then
+	# Kernel source: a clean export of the commit pinned in the APKBUILD. `pmbootstrap build
+	# --src` rsyncs with the tree's .gitignore as an exclude list, which drops
+	# kernel/time/timeconst.bc; an export without the top-level .gitignore avoids that.
+	commit=$(sed -n 's/^_commit="\(.*\)"/\1/p' "$PMA/linux-samsung-a3y17lte/APKBUILD")
+	if [ "$(cat "$KSRC/.commit" 2>/dev/null)" != "$commit" ]; then
+		rm -rf "$KSRC"; mkdir -p "$KSRC"
+		git -C "$ROOT/src/linux" archive "$commit" | tar -x -C "$KSRC"
+		rm "$KSRC/.gitignore"
+		echo "$commit" > "$KSRC/.commit"
+	fi
+	pmbootstrap build --src="$KSRC" linux-samsung-a3y17lte
+	pmbootstrap build --force device-samsung-a3y17lte
+fi
+if [ -n "$PACKAGES_ONLY" ]; then
+	ls -t ~/.local/var/pmbootstrap/packages/edge/aarch64/ | grep -E '^(linux|device)-samsung-a3y17lte-' | head -2
+	exit 0
+fi
+
+pmbootstrap install --split --no-sparse --password "$(cat "$ROOT/out/pmos-password")"
+
+SRC=~/.local/var/pmbootstrap/chroot_native/home/pmos/rootfs
+mkdir -p "$IMG"
+cp --sparse=always "$SRC/samsung-a3y17lte-boot.img" "$IMG/pmos-boot.img"
+cp --sparse=always "$SRC/samsung-a3y17lte-root.img" "$IMG/pmos-root.img"
+chmod 644 "$IMG"/pmos-{boot,root}.img
+pmbootstrap shutdown >/dev/null 2>&1 || true
+
+# pmbootstrap refuses a boot partition below 512 MiB: shrink the filesystem to fit CACHE.
+# resize2fs keeps the UUID and label that extlinux.conf and fstab refer to.
+e2fsck -fy "$IMG/pmos-boot.img" >/dev/null
+resize2fs "$IMG/pmos-boot.img" "${BOOT_MIB}M" >/dev/null 2>&1
+truncate -s "${BOOT_MIB}M" "$IMG/pmos-boot.img"
+e2fsck -fn "$IMG/pmos-boot.img" >/dev/null || die "boot image is damaged after the resize"
+
+# Proprietary Wi-Fi/BT files of this phone (work/firmware, never packaged or uploaded) go
+# into /usr/lib/firmware/updates, which the kernel searches before the packaged
+# (zstd-compressed) linux-firmware files.
+U=/usr/lib/firmware/updates
+debugfs -w "$IMG/pmos-root.img" >/dev/null 2>&1 <<EOF
+mkdir $U
+mkdir $U/ath10k
+mkdir $U/ath10k/QCA9377
+mkdir $U/ath10k/QCA9377/hw1.0
+mkdir $U/qca
+write $FW/bdwlan30.bin $U/ath10k/QCA9377/hw1.0/board.bin
+write $FW/rampatch_tlv_tf_1.1.tlv $U/qca/rampatch_00230302.bin
+write $FW/nvm_tlv_tf_1.1.bin $U/qca/nvm_00230302.bin
+EOF
+for f in ath10k/QCA9377/hw1.0/board.bin qca/rampatch_00230302.bin qca/nvm_00230302.bin; do
+	debugfs -w -R "sif $U/$f uid 0" "$IMG/pmos-root.img" >/dev/null 2>&1
+	debugfs -w -R "sif $U/$f gid 0" "$IMG/pmos-root.img" >/dev/null 2>&1
+	debugfs -w -R "sif $U/$f mode 0100644" "$IMG/pmos-root.img" >/dev/null 2>&1
+done
+e2fsck -fn "$IMG/pmos-root.img" >/dev/null || die "root image is damaged after adding the firmware"
+
+# ---- checks (all on the host) ----
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+dump() { debugfs -R "dump $2 $T/$3" "$1" >/dev/null 2>&1; [ -s "$T/$3" ] || die "$2 missing in $(basename "$1")"; }
+dump "$IMG/pmos-boot.img" /extlinux/extlinux.conf extlinux.conf
+dump "$IMG/pmos-boot.img" /vmlinuz vmlinuz
+dump "$IMG/pmos-boot.img" /initramfs initramfs
+dump "$IMG/pmos-boot.img" /exynos7870-a3y17lte.dtb dtb
+dump "$IMG/pmos-root.img" /etc/unudhcpd.conf unudhcpd.conf
+dump "$IMG/pmos-root.img" /etc/fstab fstab
+dump "$IMG/pmos-root.img" $U/ath10k/QCA9377/hw1.0/board.bin board.bin
+dump "$IMG/pmos-root.img" $U/qca/rampatch_00230302.bin rampatch.bin
+dump "$IMG/pmos-root.img" $U/qca/nvm_00230302.bin nvm.bin
+cmp -s "$T/board.bin" "$FW/bdwlan30.bin" || die "board.bin differs"
+cmp -s "$T/rampatch.bin" "$FW/rampatch_tlv_tf_1.1.tlv" || die "rampatch differs"
+cmp -s "$T/nvm.bin" "$FW/nvm_tlv_tf_1.1.bin" || die "nvm differs"
+
+boot_uuid=$(blkid -o value -s UUID "$IMG/pmos-boot.img")
+root_uuid=$(blkid -o value -s UUID "$IMG/pmos-root.img")
+grep -q "pmos_boot_uuid=$boot_uuid" "$T/extlinux.conf" || die "extlinux.conf: wrong boot UUID"
+grep -q "pmos_root_uuid=$root_uuid" "$T/extlinux.conf" || die "extlinux.conf: wrong root UUID"
+grep -q "UUID=$root_uuid / " "$T/fstab" || die "fstab: wrong root UUID"
+
+# USB network: 10.78.70.0/24 in the initramfs and in the rootfs; 172.16.42.x is the home LAN.
+for k in unudhcpd_host_ip UNUDHCPD_SERVER; do
+	grep -qx "$k=10.78.70.1" "$T/unudhcpd.conf" || die "/etc/unudhcpd.conf: $k is not 10.78.70.1"
+done
+mkdir "$T/initfs"
+gzip -dc "$T/initramfs" | (cd "$T/initfs" && cpio -id --quiet --no-absolute-filenames etc/unudhcpd.conf 2>/dev/null)
+grep -qx "unudhcpd_host_ip=10.78.70.1" "$T/initfs/etc/unudhcpd.conf" || die "initramfs has no 10.78.70.1 unudhcpd.conf"
+
+[ "$(stat -c %s "$IMG/pmos-boot.img")" -le $((200 * 1024 * 1024)) ] || die "boot image exceeds CACHE"
+[ "$(stat -c %s "$IMG/pmos-root.img")" -le $USERDATA_MAX ] || die "root image exceeds USERDATA"
+if git -C "$ROOT/src/pmaports" status --porcelain --untracked-files=all | grep -Ei '\.(bin|tlv|fw)$'; then
+	die "firmware-like files in the pmaports tree"
+fi
+
+# ---- RAM-boot image: same addresses as build-kernel-img, command line from extlinux.conf
+# without "quiet splash" so a failing first boot shows its messages ----
+cmdline=$(sed -n 's/^\tappend //p' "$T/extlinux.conf" | sed 's/\bquiet \|\bsplash //g')
+mkbootimg --header_version 2 \
+	--base 0x40000000 --kernel_offset 0x00200000 \
+	--dtb_offset 0x08000000 --ramdisk_offset 0x09000000 \
+	--tags_offset 0x00000100 --second_offset 0x00f00000 \
+	--kernel "$T/vmlinuz" --dtb "$T/dtb" --ramdisk "$T/initramfs" \
+	--cmdline "$cmdline" \
+	-o "$IMG/pmos-ram.img"
+
+echo "checks passed"
+echo "extlinux: $(sed -n 's/^\tappend //p' "$T/extlinux.conf")"
+ls -l "$IMG"/pmos-{boot,root,ram}.img

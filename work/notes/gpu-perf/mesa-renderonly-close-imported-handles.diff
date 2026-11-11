@@ -1,0 +1,26 @@
+--- a/src/gallium/auxiliary/renderonly/renderonly.c	2026-11-11 00:03:48.842742037 +0100
++++ b/src/gallium/auxiliary/renderonly/renderonly.c	2026-11-11 00:03:57.865375399 +0100
+@@ -41,8 +41,6 @@
+ renderonly_scanout_destroy(struct renderonly_scanout *scanout,
+ 			   struct renderonly *ro)
+ {
+-   struct drm_mode_destroy_dumb destroy_dumb = {0};
+-
+    assert(p_atomic_read(&scanout->refcnt) > 0);
+    if (p_atomic_dec_return(&scanout->refcnt))
+       return;
+@@ -53,10 +51,12 @@
+     * lock, let's make sure it's still not referenced before freeing it.
+     */
+    if (p_atomic_read(&scanout->refcnt) == 0 && ro->kms_fd != -1) {
+-      destroy_dumb.handle = scanout->handle;
++      /* The handle is either a dumb buffer or a PRIME import. Close it as a
++       * GEM handle: that frees both, and unlike DESTROY_DUMB it is allowed on
++       * render nodes, where an import would otherwise never be released. */
++      drmCloseBufferHandle(ro->kms_fd, scanout->handle);
+       scanout->handle = 0;
+       scanout->stride = 0;
+-      drmIoctl(ro->kms_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_dumb);
+    }
+ 
+    simple_mtx_unlock(&ro->bo_map_lock);

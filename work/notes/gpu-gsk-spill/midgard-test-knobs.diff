@@ -1,0 +1,39 @@
+
+--- a/src/panfrost/compiler/midgard/midgard_compile.c	2026-11-10 21:22:17.576625244 +0100
++++ b/src/panfrost/compiler/midgard/midgard_compile.c	2026-11-10 21:22:17.578870579 +0100
+@@ -466,9 +466,10 @@
+       NIR_PASS(progress, nir, nir_opt_dead_cf);
+       NIR_PASS(progress, nir, nir_opt_cse);
+ 
++      /* TEST KNOBS (not for upstream): MDG_PEEPHOLE_LIMIT, MDG_EXPENSIVE_OK */
+       nir_opt_peephole_select_options peephole_select_options = {
+-         .limit = 64,
+-         .expensive_alu_ok = false,
++         .limit = debug_get_num_option("MDG_PEEPHOLE_LIMIT", 64),
++         .expensive_alu_ok = debug_get_bool_option("MDG_EXPENSIVE_OK", false),
+       };
+       NIR_PASS(progress, nir, nir_opt_peephole_select, &peephole_select_options);
+       NIR_PASS(progress, nir, nir_opt_algebraic);
+
+--- a/src/panfrost/compiler/midgard/midgard_ra.c	2026-11-10 21:22:17.577339213 +0100
++++ b/src/panfrost/compiler/midgard/midgard_ra.c	2026-11-10 21:22:17.578945880 +0100
+@@ -4,6 +4,7 @@
+  * SPDX-License-Identifier: MIT
+  */
+ 
++#include "util/u_debug.h"
+ #include "util/u_math.h"
+ #include "util/u_memory.h"
+ #include "compiler.h"
+@@ -762,6 +763,11 @@
+    unsigned rmu_vec4 = ctx->info->fau.count / 4;
+    unsigned max_work_registers = (rmu_vec4 >= 8) ? (24 - rmu_vec4) : 16;
+ 
++   /* TEST KNOB (not for upstream): cap the work registers of fragment shaders */
++   if (ctx->stage == MESA_SHADER_FRAGMENT)
++      max_work_registers = MIN2(max_work_registers,
++                                debug_get_num_option("MDG_WORK_MAX", 16));
++
+    if (needs_contiguous_workgroup(ctx)) {
+       unsigned threads = max_threads_per_workgroup(ctx);
+       assert(threads <= 128 && "maximum threads in ABI exceeded");

@@ -1,0 +1,6 @@
+#!/bin/sh
+# usage: time-run <w> <h> <css-background|-> [ENV=val ...]
+# Redraw a WxH CSS box every frame for 6 s on the phone (gradtime.py); print ms/frame and new GPU faults/timeouts.
+w=$1; h=$2; bg=$3; shift 3
+[ "$bg" = - ] && bg="linear-gradient(to right, red, yellow, blue)"
+exec "$(dirname "$0")/pm" "f0=\$(dmesg | grep -c 'js fault'); t0=\$(dmesg | grep -c 'sched timeout'); env XDG_RUNTIME_DIR=/run/user/\$(id -u) WAYLAND_DISPLAY=wayland-0 MESA_SHADER_CACHE_DISABLE=true $* timeout 12 python3 /home/user/mesa-test/gradtime.py $w $h '$bg' > /tmp/gradtime.log 2>&1; echo \"faults=\$((\$(dmesg | grep -c 'js fault')-f0)) timeouts=\$((\$(dmesg | grep -c 'sched timeout')-t0)) \$(grep -v '^\$' /tmp/gradtime.log | tail -1 | cut -c1-120)\""

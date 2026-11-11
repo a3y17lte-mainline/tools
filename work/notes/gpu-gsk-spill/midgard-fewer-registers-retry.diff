@@ -1,0 +1,228 @@
+--- a/src/panfrost/compiler/midgard/compiler.h	2026-11-10 21:48:14.751672280 +0100
++++ b/src/panfrost/compiler/midgard/compiler.h	2026-11-10 21:54:49.665523576 +0100
+@@ -259,6 +259,10 @@
+    unsigned spills;
+    unsigned fills;
+ 
++   /* Upper bound on work registers for this compile, see
++    * midgard_compile_shader_nir() */
++   unsigned max_work;
++
+    /* Current NIR function */
+    nir_function *func;
+ 
+@@ -677,7 +681,7 @@
+ 
+ void midgard_schedule_program(compiler_context *ctx);
+ 
+-void mir_ra(compiler_context *ctx);
++bool mir_ra(compiler_context *ctx);
+ void mir_squeeze_index(compiler_context *ctx);
+ void mir_lower_special_reads(compiler_context *ctx);
+ void mir_liveness_ins_update(uint16_t *live, const midgard_instruction *ins,
+--- a/src/panfrost/compiler/midgard/midgard_compile.c	2026-11-10 21:48:14.797605608 +0100
++++ b/src/panfrost/compiler/midgard/midgard_compile.c	2026-11-10 22:05:58.535670343 +0100
+@@ -42,6 +42,7 @@
+    {"inorder", MIDGARD_DBG_INORDER, "Disables out-of-order scheduling"},
+    {"verbose", MIDGARD_DBG_VERBOSE, "Dump shaders verbosely"},
+    {"internal", MIDGARD_DBG_INTERNAL, "Dump internal shaders"},
++   {"noregretry", MIDGARD_DBG_NO_REG_RETRY, "Do not retry fragment shaders with 8 work registers"},
+    DEBUG_NAMED_VALUE_END};
+ 
+ DEBUG_GET_ONCE_FLAGS_OPTION(midgard_debug, "MIDGARD_MESA_DEBUG",
+@@ -2948,16 +2949,16 @@
+    }
+ }
+ 
+-void
+-midgard_compile_shader_nir(nir_shader *nir,
+-                           const struct pan_compile_inputs *inputs,
+-                           struct util_dynarray *binary,
+-                           struct pan_shader_info *info)
++static bool
++midgard_compile_shader_nir_impl(nir_shader *nir,
++                                const struct pan_compile_inputs *inputs,
++                                struct util_dynarray *binary,
++                                struct pan_shader_info *info,
++                                unsigned max_work)
+ {
+-   midgard_debug = debug_get_option_midgard_debug();
+-
+    /* TODO: Bound against what? */
+    compiler_context *ctx = rzalloc(NULL, compiler_context);
++   ctx->max_work = max_work;
+ 
+    ctx->inputs = inputs;
+    ctx->nir = nir;
+@@ -3065,7 +3066,11 @@
+ 
+    /* Schedule! */
+    midgard_schedule_program(ctx);
+-   mir_ra(ctx);
++   if (!mir_ra(ctx)) {
++      _mesa_hash_table_u64_destroy(ctx->ssa_constants);
++      ralloc_free(ctx);
++      return false;
++   }
+ 
+    if (midgard_debug & MIDGARD_DBG_SHADERS && !skip_internal)
+       mir_print_shader(ctx);
+@@ -3161,11 +3166,69 @@
+    info->stats.isa = PAN_STAT_MIDGARD;
+    info->stats.midgard = stats;
+ 
+-   if ((midgard_debug & MIDGARD_DBG_SHADERDB) && !nir->info.internal) {
+-      const char *prefix = _mesa_shader_stage_to_abbrev(ctx->stage);
+-      midgard_stats_fprintf(stderr, prefix, &stats);
+-   }
+-
+    _mesa_hash_table_u64_destroy(ctx->ssa_constants);
+    ralloc_free(ctx);
++   return true;
++}
++
++/* Relative time per bundle at a given thread count. A shader core keeps more
++ * threads in flight when each uses fewer work registers (up to 4: 4x, up to
++ * 8: 2x), which hides more latency. Measured on Mali-T830 with GTK gradient
++ * shaders: at 2x the threads each bundle took 0.47x to 0.55x the time. The
++ * 4x value is an extrapolation. */
++static unsigned
++mir_bundle_cost(const struct midgard_stats *stats)
++{
++   static const unsigned cost_per_bundle[] = {[1] = 100, [2] = 55, [4] = 35};
++
++   return stats->bundles * cost_per_bundle[stats->threads];
++}
++
++void
++midgard_compile_shader_nir(nir_shader *nir,
++                           const struct pan_compile_inputs *inputs,
++                           struct util_dynarray *binary,
++                           struct pan_shader_info *info)
++{
++   midgard_debug = debug_get_option_midgard_debug();
++
++   /* Fragment shaders that need more than 8 work registers run at the lowest
++    * thread count. Compile them again limited to 8 and keep whichever is
++    * expected to run faster: the extra spill code is often cheaper than the
++    * lost latency hiding. */
++   bool try_fewer_registers = nir->info.stage == MESA_SHADER_FRAGMENT &&
++                              !inputs->is_blend &&
++                              !(midgard_debug & MIDGARD_DBG_NO_REG_RETRY);
++
++   nir_shader *retry_nir =
++      try_fewer_registers ? nir_shader_clone(NULL, nir) : NULL;
++   struct pan_shader_info retry_info = *info;
++   unsigned binary_start = binary->size;
++
++   midgard_compile_shader_nir_impl(nir, inputs, binary, info, 16);
++
++   if (retry_nir && info->work_reg_count > 8) {
++      struct util_dynarray retry_binary;
++      util_dynarray_init(&retry_binary, NULL);
++
++      bool ok = midgard_compile_shader_nir_impl(retry_nir, inputs,
++                                                &retry_binary, &retry_info, 8);
++
++      if (ok && mir_bundle_cost(&retry_info.stats.midgard) <
++                   mir_bundle_cost(&info->stats.midgard)) {
++         binary->size = binary_start;
++         util_dynarray_append_array(binary, uint8_t, retry_binary.data,
++                                    retry_binary.size);
++         *info = retry_info;
++      }
++
++      util_dynarray_fini(&retry_binary);
++   }
++
++   ralloc_free(retry_nir);
++
++   if ((midgard_debug & MIDGARD_DBG_SHADERDB) && !nir->info.internal) {
++      const char *prefix = _mesa_shader_stage_to_abbrev(nir->info.stage);
++      midgard_stats_fprintf(stderr, prefix, &info->stats.midgard);
++   }
+ }
+--- a/src/panfrost/compiler/midgard/midgard.h	2026-11-10 21:48:14.758407224 +0100
++++ b/src/panfrost/compiler/midgard/midgard.h	2026-11-10 21:54:49.666834250 +0100
+@@ -16,6 +16,7 @@
+ #define MIDGARD_DBG_INORDER  0x0008
+ #define MIDGARD_DBG_VERBOSE  0x0010
+ #define MIDGARD_DBG_INTERNAL 0x0020
++#define MIDGARD_DBG_NO_REG_RETRY 0x0040
+ 
+ extern int midgard_debug;
+ 
+--- a/src/panfrost/compiler/midgard/midgard_ra.c	2026-11-10 21:48:14.799406143 +0100
++++ b/src/panfrost/compiler/midgard/midgard_ra.c	2026-11-10 21:54:49.670646731 +0100
+@@ -4,7 +4,6 @@
+  * SPDX-License-Identifier: MIT
+  */
+ 
+-#include "util/u_debug.h"
+ #include "util/u_math.h"
+ #include "util/u_memory.h"
+ #include "compiler.h"
+@@ -763,10 +762,7 @@
+    unsigned rmu_vec4 = ctx->info->fau.count / 4;
+    unsigned max_work_registers = (rmu_vec4 >= 8) ? (24 - rmu_vec4) : 16;
+ 
+-   /* TEST KNOB (not for upstream): cap the work registers of fragment shaders */
+-   if (ctx->stage == MESA_SHADER_FRAGMENT)
+-      max_work_registers = MIN2(max_work_registers,
+-                                debug_get_num_option("MDG_WORK_MAX", 16));
++   max_work_registers = MIN2(max_work_registers, ctx->max_work);
+ 
+    if (needs_contiguous_workgroup(ctx)) {
+       unsigned threads = max_threads_per_workgroup(ctx);
+@@ -1596,12 +1592,17 @@
+ 
+ /* Run register allocation in a loop, spilling until we succeed */
+ 
+-void
++bool
+ mir_ra(compiler_context *ctx)
+ {
+    struct lcra_state *l = NULL;
+    bool spilled = false;
+-   int iter_count = 1000; /* max iterations */
++
++   /* A compile with a lowered register limit is only an attempt (see
++    * midgard_compile_shader_nir): give up early and quietly, the caller keeps
++    * the full-limit result. */
++   bool attempt = ctx->max_work < 16;
++   int iter_count = attempt ? 100 : 1000; /* max iterations */
+ 
+    /* Number of 128-bit slots in memory we've spilled into */
+    unsigned spill_count = DIV_ROUND_UP(ctx->info->tls_size, 16);
+@@ -1618,9 +1619,11 @@
+          if (l->spill_class == REG_CLASS_WORK && uniforms > 8) {
+             mir_demote_uniforms(ctx, MAX2(uniforms - 4, 8));
+          } else if (spill_node == -1) {
+-            fprintf(stderr, "ERROR: Failed to choose spill node\n");
+             lcra_free(l);
+-            return;
++            if (attempt)
++               return false;
++            fprintf(stderr, "ERROR: Failed to choose spill node\n");
++            return true;
+          } else {
+             mir_spill_register(ctx, spill_node, l->spill_class, &spill_count);
+          }
+@@ -1635,6 +1638,11 @@
+       l = allocate_registers(ctx, &spilled);
+    } while (spilled && ((iter_count--) > 0));
+ 
++   if (iter_count <= 0 && attempt) {
++      lcra_free(l);
++      return false;
++   }
++
+    if (iter_count <= 0) {
+       fprintf(
+          stderr,
+@@ -1650,4 +1658,5 @@
+    install_registers(ctx, l);
+ 
+    lcra_free(l);
++   return true;
+ }

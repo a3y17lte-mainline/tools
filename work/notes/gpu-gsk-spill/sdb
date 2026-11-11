@@ -1,0 +1,16 @@
+#!/bin/sh
+# Compile the captured GSK shaders with the host-built Mesa (panfrost on the
+# no-op drm-shim), pretending to be a given Mali GPU.
+# usage: sdb <gpu-id, e.g. 830> [shader_test files or dirs...]   (env: MIDGARD_MESA_DEBUG etc.)
+here=$(cd "$(dirname "$0")" && pwd)
+ref=$(cd "$here/../../ref" && pwd)
+b=$ref/mesa-26.2.6/build-host
+id=$1; shift
+[ $# -gt 0 ] || set -- "$here/shcap"
+export LD_LIBRARY_PATH=$b/src/gallium/targets/dri:$b/src/gbm:$b/src/egl
+export GBM_BACKENDS_PATH=$b/src/gbm/backends/dri
+export __EGL_VENDOR_LIBRARY_FILENAMES=$b/src/egl/devenv_glvnd_egl.json
+export MESA_SHADER_CACHE_DISABLE=true
+export PAN_GPU_ID=$id MESA_LOADER_DRIVER_OVERRIDE=panfrost
+export LD_PRELOAD=$b/src/panfrost/drm-shim/libpanfrost_noop_drm_shim.so
+exec $SDB_WRAP "$ref/shader-db/run" -j "${SDB_J:-1}" "$@"

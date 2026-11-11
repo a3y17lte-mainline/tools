@@ -1,0 +1,108 @@
+--- a/src/panfrost/compiler/midgard/midgard_ra.c	2026-11-10 21:36:29.923291686 +0100
++++ b/src/panfrost/compiler/midgard/midgard_ra.c	2026-11-10 21:36:09.524408932 +0100
+@@ -1240,6 +1240,90 @@
+ 
+ /* Once we've chosen a spill node, spill it */
+ 
++/* A value written once by a varying load without register sources can be
++ * loaded again right before each use instead of going through TLS: that
++ * needs no spill store and no scratch memory. Returns the load, or NULL. */
++
++static midgard_instruction *
++mir_rematerializable_def(compiler_context *ctx, unsigned node)
++{
++   midgard_instruction *def = NULL;
++
++   if (ctx->stage != MESA_SHADER_FRAGMENT)
++      return NULL;
++
++   mir_foreach_instr_global(ctx, ins) {
++      if (ins->dest != node)
++         continue;
++      if (def)
++         return NULL;
++      def = ins;
++   }
++
++   if (!def || def->type != TAG_LOAD_STORE_4 || def->compact_branch)
++      return NULL;
++
++   switch (def->op) {
++   case midgard_op_ld_vary_32:
++   case midgard_op_ld_vary_16:
++   case midgard_op_ld_vary_32u:
++   case midgard_op_ld_vary_32i:
++      break;
++   default:
++      return NULL;
++   }
++
++   mir_foreach_src(def, s) {
++      if (def->src[s] != ~0)
++         return NULL;
++   }
++
++   /* A use in the bundle of the load itself would need the value in the
++    * pipeline already */
++   mir_foreach_instr_global(ctx, ins) {
++      if (ins != def && ins->bundle_id == def->bundle_id &&
++          mir_has_arg(ins, node))
++         return NULL;
++   }
++
++   return def;
++}
++
++static void
++mir_rematerialize(compiler_context *ctx, midgard_instruction *def,
++                  unsigned node)
++{
++   unsigned index = ctx->temp_count;
++   midgard_block *last_block = NULL;
++   unsigned last_bundle = ~0;
++   unsigned last_index = ~0;
++
++   midgard_instruction copy = *def;
++   copy.no_spill |= (1 << REG_CLASS_WORK);
++
++   mir_foreach_block(ctx, _block) {
++      midgard_block *block = (midgard_block *)_block;
++      mir_foreach_instr_in_block(block, ins) {
++         if (ins == def || !mir_has_arg(ins, node))
++            continue;
++
++         /* One load per bundle is enough for every use in it */
++         if (block != last_block || ins->bundle_id != last_bundle) {
++            copy.dest = ++index;
++            mir_insert_instruction_before_scheduled(ctx, block, ins, &copy);
++            last_block = block;
++            last_bundle = ins->bundle_id;
++            last_index = copy.dest;
++         }
++
++         mir_rewrite_index_src_single(ins, node, last_index);
++      }
++   }
++
++   /* The original load has no uses left. Don't pick it again. */
++   def->no_spill |= (1 << REG_CLASS_WORK);
++}
++
+ static void
+ mir_spill_register(compiler_context *ctx, unsigned spill_node,
+                    unsigned spill_class, unsigned *spill_count)
+@@ -1249,6 +1333,14 @@
+ 
+    unsigned spill_index = ctx->temp_count;
+ 
++   if (spill_class == REG_CLASS_WORK) {
++      midgard_instruction *def = mir_rematerializable_def(ctx, spill_node);
++      if (def) {
++         mir_rematerialize(ctx, def, spill_node);
++         return;
++      }
++   }
++
+    /* We have a spill node, so check the class. Work registers
+     * legitimately spill to TLS, but special registers just spill to work
+     * registers */

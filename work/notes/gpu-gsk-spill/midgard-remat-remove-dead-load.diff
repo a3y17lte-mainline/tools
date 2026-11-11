@@ -1,0 +1,44 @@
+--- a/src/panfrost/compiler/midgard/midgard_ra.c	2026-11-10 22:45:32.047378196 +0100
++++ b/src/panfrost/compiler/midgard/midgard_ra.c	2026-11-10 22:45:32.032866839 +0100
+@@ -1316,8 +1316,39 @@
+       }
+    }
+ 
+-   /* The original load has no uses left. Don't pick it again. */
+-   def->no_spill |= (1 << REG_CLASS_WORK);
++   /* The original load has no uses left: remove it from its bundle (dropping
++    * the bundle if it is now empty) and from the program. */
++   mir_foreach_block(ctx, _block) {
++      midgard_block *block = (midgard_block *)_block;
++      midgard_bundle *bundles = (midgard_bundle *)block->bundles.data;
++      unsigned count = util_dynarray_num_elements(&block->bundles, midgard_bundle);
++
++      for (unsigned i = 0; i < count; ++i) {
++         midgard_bundle *bundle = &bundles[i];
++
++         for (unsigned j = 0; j < bundle->instruction_count; ++j) {
++            if (bundle->instructions[j] != def)
++               continue;
++
++            if (bundle->instruction_count == 1) {
++               block->quadword_count -= midgard_tag_props[bundle->tag].size;
++               memmove(bundle, bundle + 1,
++                       (count - i - 1) * sizeof(midgard_bundle));
++               block->bundles.size -= sizeof(midgard_bundle);
++            } else {
++               memmove(&bundle->instructions[j], &bundle->instructions[j + 1],
++                       (bundle->instruction_count - j - 1) *
++                          sizeof(bundle->instructions[0]));
++               bundle->instruction_count--;
++            }
++
++            mir_remove_instruction(def);
++            return;
++         }
++      }
++   }
++
++   UNREACHABLE("Rematerialized load not scheduled");
+ }
+ 
+ static void

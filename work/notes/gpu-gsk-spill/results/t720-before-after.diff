@@ -1,0 +1,12 @@
+60,61c60
+< glmark__10-2.shader_test: MESA_SHADER_VERTEX shader: 96 inst, 46 bundles, 0 registers, 4 threads, 67 quadwords, 0 loops, 0:0 spills:fills
+< glmark__10-2.shader_test.txt:ERROR: Failed to choose spill node
+---
+> glmark__10-2.shader_test: MESA_SHADER_VERTEX shader: 98 inst, 48 bundles, 13 registers, 1 threads, 67 quadwords, 0 loops, 0:0 spills:fills
+669,671c668,669
+< unity__64-DeferredPointShadows.shader_test.txt:ERROR: Failed to choose spill node
+< unity__64-DeferredPointShadows.shader_test.txt:rc=255
+< unity__64-DeferredPointShadows.shader_test.txt:run: ../src/panfrost/compiler/midgard/helpers.h:330: midgard_ldst_comp: Assertion `(reg & ~1) == 0' failed.
+---
+> unity__64-DeferredPointShadows.shader_test: MESA_SHADER_FRAGMENT shader: 152 inst, 73 bundles, 7 registers, 2 threads, 120 quadwords, 0 loops, 0:0 spills:fills
+> unity__64-DeferredPointShadows.shader_test: MESA_SHADER_VERTEX shader: 43 inst, 25 bundles, 4 registers, 4 threads, 38 quadwords, 0 loops, 0:0 spills:fills

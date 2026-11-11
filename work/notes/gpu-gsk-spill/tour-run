@@ -1,0 +1,3 @@
+#!/bin/sh
+# usage: tour-run [ENV=val ...]   run phosh-tour for 12 s on the phone, print spill errors and new GPU faults/timeouts
+exec "$(dirname "$0")/pm" "f0=\$(dmesg | grep -c 'js fault'); t0=\$(dmesg | grep -c 'sched timeout'); env XDG_RUNTIME_DIR=/run/user/\$(id -u) WAYLAND_DISPLAY=wayland-0 MESA_SHADER_CACHE_DISABLE=true $* timeout 12 phosh-tour > /tmp/tour.log 2>&1; echo \"spill errors=\$(grep -c 'spill node' /tmp/tour.log) new faults=\$((\$(dmesg | grep -c 'js fault')-f0)) new timeouts=\$((\$(dmesg | grep -c 'sched timeout')-t0))\""

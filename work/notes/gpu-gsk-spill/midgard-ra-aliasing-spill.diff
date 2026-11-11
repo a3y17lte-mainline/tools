@@ -1,0 +1,44 @@
+diff --git a/src/panfrost/compiler/midgard/midgard_ra.c b/src/panfrost/compiler/midgard/midgard_ra.c
+index 80ddc4a41..5f53b8d44 100644
+--- a/src/panfrost/compiler/midgard/midgard_ra.c
++++ b/src/panfrost/compiler/midgard/midgard_ra.c
+@@ -1190,7 +1190,7 @@ install_registers(compiler_context *ctx, struct lcra_state *l)
+ /* If register allocation fails, find the best spill node */
+ 
+ static signed
+-mir_choose_spill_node(compiler_context *ctx, struct lcra_state *l)
++mir_choose_spill_node_in_class(compiler_context *ctx, struct lcra_state *l)
+ {
+    /* We can't spill a previously spilled value or an unspill */
+ 
+@@ -1208,6 +1208,30 @@ mir_choose_spill_node(compiler_context *ctx, struct lcra_state *l)
+    return lcra_get_best_spill_node(l);
+ }
+ 
++static signed
++mir_choose_spill_node(compiler_context *ctx, struct lcra_state *l)
++{
++   signed spill_node = mir_choose_spill_node_in_class(ctx, l);
++
++   if (spill_node >= 0 || !(ctx->quirks & MIDGARD_INTERPIPE_REG_ALIASING))
++      return spill_node;
++
++   /* With interpipe aliasing, texture sources live in the load/store
++    * registers. The class that ran out of registers may then have nothing
++    * left to spill while long-lived values of the other class hold both
++    * registers. Spill one of those instead: that leaves it in a work
++    * register and copies it right before each use. */
++
++   if (l->spill_class == REG_CLASS_LDST)
++      l->spill_class = REG_CLASS_TEXR;
++   else if (l->spill_class == REG_CLASS_TEXR)
++      l->spill_class = REG_CLASS_LDST;
++   else
++      return spill_node;
++
++   return mir_choose_spill_node_in_class(ctx, l);
++}
++
+ /* Once we've chosen a spill node, spill it */
+ 
+ static void

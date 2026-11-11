@@ -1,6 +1,6 @@
 # Exynos 7870 mainline bring-up: Galaxy A3 2017 (SM-A320F, a3y17lte)
 
-## Start here (fresh chat orientation, as of 2026-11-09)
+## Start here (fresh chat orientation, as of 2026-11-11)
 
 Goal: mainline Linux on the Galaxy A3 2017 (Exynos 7870), then Android 17 on that kernel, upstreaming
 everything along the way. The A3 is a J5 2017 (already upstream in 7.4-rc1) with four different parts:
@@ -42,19 +42,22 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
   256 calibrated brightness levels, blank/unblank. See the Display section.
 - Power: S2MU004 fuel gauge + charger (watchdog kick), thermal, cpufreq 343–1586 MHz with per-chip
   ASV voltages, and cpuidle (core power-down; cluster power-down not done).
+- GPU (2026-11-11): Panfrost on Mali-T830 with DVFS 343–1001 MHz (worst-case voltages, GPU cooling),
+  patched Mesa + GTK on the installed postmarketOS (Phosh). See the GPU section.
 
 Not done, roughly in planned order:
 - U-Boot paths not tested yet: the Volume Down menu, "Boot Previous Kernel" and the fallback to
   fastboot (the user considers the boot loop finished).
-- NEXT: postmarketOS device package (testing) with a desktop (battery, Wi-Fi, BT, touch, panel).
-  Phase 2 is closed (2026-11-09); the panel works (2026-11-09).
+- postmarketOS (device package in testing, Phosh) is installed and in daily use on the phone
+  (2026-11-11); see the GPU and postmarketOS section. Phase 2 closed 2026-11-09.
 - Then Phase 3, after the panel: the TCPM USB-C/PD driver at i2c0 0x3c (host/OTG, role switching) and
   S2MU004 "proper charging" (MUIC charger detection, higher input current: a charger write, needs the
   user's approval).
 - Suspend: needs the PMU sleep sequences from the vendor kernel.
 - SPI port config + STM32 sensor hub → IIO (large).
 - PDMA, ADC (battery thermistor), PWM.
-- Audio COD3026X (shared with every 7870 phone). GPU: Panfrost, Mali-T830.
+- Audio COD3026X (shared with every 7870 phone).
+- GPU follow-ups: per-chip GPU voltages (exynos-asv G3D), sending the Mesa/GTK patches (see GPU section).
 - Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.
 - Upstreaming: wave 1 is ready to prepare once the user wants to send.
 
@@ -319,6 +322,30 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
   CPUn_CONFIGURATION[3:0] (0x10482000 + ((cluster<<2)|cpu)*0x80) first: exynos-pmu does it from a
   CPU PM notifier. Without it the board resets within seconds of boot. Check with
   .../cpuN/cpuidle/state1/usage; PMU STATUS (+4) low nibble 0 = core powered off.
+
+## GPU and postmarketOS (as of 2026-11-11)
+
+- The phone runs postmarketOS (Phosh) from eMMC. ssh: `work/notes/gpu-gsk-spill/pm 'cmd'` (user
+  `user` @10.78.70.1, key ~/.ssh/a3y17lte_ed25519, known_hosts_a3pmos). Root: `sudo -S` with
+  `out/pmos-password` on stdin (the user is fine with that).
+- Build pmOS kernel/device packages ONLY with `tools/build-pmos --packages` (full images: no
+  argument). Its header lists the traps: `--src` drops kernel/time/timeconst.bc via .gitignore,
+  dated pkgver, GCC `CC` leaking into resolve_btfids (the APKBUILD unsets CC). Install on the phone:
+  copy the .apk over ssh, `sudo apk add --allow-untrusted ./x.apk` (kernel install rewrites /boot via
+  boot-deploy). The pmaports kernel APKBUILD `_commit` must be a commit pushed to the gh fork.
+- GPU DVFS: kernel groups S (G3D PLL clk) and T (OPP table, cooling, GPU supply), installed. BUCK2
+  feeds G3D + MIF/INT/DISP/CAM; the bootloader leaves it at 750 mV and nothing votes for the
+  buses, so no GPU voltage may go below 750 mV. Check: /sys/class/devfreq/11400000.gpu/trans_stat.
+- Userspace: pmaports forks `temp/mesa` (999926.2.6: Midgard compiler fixes + renderonly leak fix;
+  aarch64 only, rusticl/NVK off) and `temp/gtk4.0` (99994.24.1: adaptive gradient supersampling),
+  9999 version prefix so Alpine cannot replace them: rebase on every Alpine mesa/gtk4.0 upgrade.
+  The user wants stable releases on the phone; Mesa/GTK main only for preparing MRs.
+- Clean Mesa series: branch `a3-26.2.6` in work/ref/mesa-26.2.6-series; GTK: work/ref/gtk-4.24.1
+  (commit a8decab). Mesa main checkout: work/ref/mesa-main. Upstream groups U, V, W in the tracker.
+- After a Mesa change, check for buffer leaks: `sudo cat /sys/kernel/debug/dma_buf/bufinfo | tail -1`
+  before/after a short client run. Phosh/phoc only pick up new Mesa after logout/login.
+- Notes: work/notes/gpu-perf/README.md (state, results, open items), work/notes/gpu-gsk-spill/ (compiler,
+  shader-db helpers `sdb`/`sdb-each`, phone timing `time-run`/`tour-run`).
 
 ## Phone-side helpers
 

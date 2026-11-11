@@ -1,0 +1,2657 @@
+[require]
+GLSL >= 0.00
+
+[vertex shader]
+#version 310 es
+#extension GL_EXT_blend_func_extended : require
+#define GSK_GLES 1
+#define GSK_VERTEX_SHADER 1
+#define GSK_FLAGS 0u
+#define GSK_COLOR_STATES 4u
+#define GSK_VARIATION 0u
+
+#define GSK_N_TEXTURES 1
+//#undef GSK_DUAL_BLEND 1
+
+#ifndef _COMMON_
+#define _COMMON_
+
+void            main_clip_none                  (void);
+void            main_clip_rect                  (void);
+void            main_clip_rounded               (void);
+
+#ifndef _ENUMS_
+#define _ENUMS_
+
+#define GSK_GPU_PATTERN_STACK_SIZE 16
+
+#define GSK_GPU_SHADER_CLIP_NONE 0u
+#define GSK_GPU_SHADER_CLIP_RECT 1u
+#define GSK_GPU_SHADER_CLIP_ROUNDED 2u
+
+#define GDK_SHADER_DEFAULT 0u
+#define GDK_SHADER_STRAIGHT 1u
+#define GDK_SHADER_2_PLANES 2u
+#define GDK_SHADER_3_PLANES 3u
+#define GDK_SHADER_3_PLANES_10BIT_LSB 4u
+#define GDK_SHADER_3_PLANES_12BIT_LSB 5u
+
+#define GSK_GPU_PATTERN_DONE 0u
+#define GSK_GPU_PATTERN_COLOR 1u
+#define GSK_GPU_PATTERN_OPACITY 2u
+#define GSK_GPU_PATTERN_TEXTURE 3u
+#define GSK_GPU_PATTERN_STRAIGHT_ALPHA 4u
+#define GSK_GPU_PATTERN_COLOR_MATRIX 5u
+#define GSK_GPU_PATTERN_GLYPHS 6u
+#define GSK_GPU_PATTERN_LINEAR_GRADIENT 7u
+#define GSK_GPU_PATTERN_REPEATING_LINEAR_GRADIENT 8u
+#define GSK_GPU_PATTERN_RADIAL_GRADIENT 9u
+#define GSK_GPU_PATTERN_REPEATING_RADIAL_GRADIENT 10u
+#define GSK_GPU_PATTERN_CONIC_GRADIENT 11u
+#define GSK_GPU_PATTERN_CLIP 12u
+#define GSK_GPU_PATTERN_ROUNDED_CLIP 13u
+#define GSK_GPU_PATTERN_REPEAT_PUSH 14u
+#define GSK_GPU_PATTERN_POSITION_POP 15u
+#define GSK_GPU_PATTERN_PUSH_COLOR 16u
+#define GSK_GPU_PATTERN_POP_CROSS_FADE 17u
+#define GSK_GPU_PATTERN_POP_MASK_ALPHA 18u
+#define GSK_GPU_PATTERN_POP_MASK_INVERTED_ALPHA 19u
+#define GSK_GPU_PATTERN_POP_MASK_LUMINANCE 20u
+#define GSK_GPU_PATTERN_POP_MASK_INVERTED_LUMINANCE 21u
+#define GSK_GPU_PATTERN_AFFINE 22u
+#define GSK_GPU_PATTERN_BLEND_DEFAULT 23u
+#define GSK_GPU_PATTERN_BLEND_MULTIPLY 24u
+#define GSK_GPU_PATTERN_BLEND_SCREEN 25u
+#define GSK_GPU_PATTERN_BLEND_OVERLAY 26u
+#define GSK_GPU_PATTERN_BLEND_DARKEN 27u
+#define GSK_GPU_PATTERN_BLEND_LIGHTEN 28u
+#define GSK_GPU_PATTERN_BLEND_COLOR_DODGE 29u
+#define GSK_GPU_PATTERN_BLEND_COLOR_BURN 30u
+#define GSK_GPU_PATTERN_BLEND_HARD_LIGHT 31u
+#define GSK_GPU_PATTERN_BLEND_SOFT_LIGHT 32u
+#define GSK_GPU_PATTERN_BLEND_DIFFERENCE 33u
+#define GSK_GPU_PATTERN_BLEND_EXCLUSION 34u
+#define GSK_GPU_PATTERN_BLEND_COLOR 35u
+#define GSK_GPU_PATTERN_BLEND_HUE 36u
+#define GSK_GPU_PATTERN_BLEND_SATURATION 37u
+#define GSK_GPU_PATTERN_BLEND_LUMINOSITY 38u
+
+#define GSK_MASK_MODE_ALPHA 0u
+#define GSK_MASK_MODE_INVERTED_ALPHA 1u
+#define GSK_MASK_MODE_LUMINANCE 2u
+#define GSK_MASK_MODE_INVERTED_LUMINANCE 3u
+
+#define GSK_PORTER_DUFF_SOURCE 0u
+#define GSK_PORTER_DUFF_DEST 1u
+#define GSK_PORTER_DUFF_SOURCE_OVER_DEST 2u
+#define GSK_PORTER_DUFF_DEST_OVER_SOURCE 3u
+#define GSK_PORTER_DUFF_SOURCE_IN_DEST 4u
+#define GSK_PORTER_DUFF_DEST_IN_SOURCE 5u
+#define GSK_PORTER_DUFF_SOURCE_OUT_DEST 6u
+#define GSK_PORTER_DUFF_DEST_OUT_SOURCE 7u
+#define GSK_PORTER_DUFF_SOURCE_ATOP_DEST 8u
+#define GSK_PORTER_DUFF_DEST_ATOP_SOURCE 9u
+#define GSK_PORTER_DUFF_XOR 10u
+#define GSK_PORTER_DUFF_CLEAR 11u
+
+#define GDK_COLOR_STATE_ID_SRGB 0u
+#define GDK_COLOR_STATE_ID_SRGB_LINEAR 1u
+#define GDK_COLOR_STATE_ID_REC2100_PQ 2u
+#define GDK_COLOR_STATE_ID_REC2100_LINEAR 3u
+
+#define GDK_BUILTIN_COLOR_STATE_ID_OKLAB 0u
+#define GDK_BUILTIN_COLOR_STATE_ID_OKLCH 1u
+
+#define TOP 0u
+#define RIGHT 1u
+#define BOTTOM 2u
+#define LEFT 3u
+
+#define TOP_LEFT 0u
+#define TOP_RIGHT 1u
+#define BOTTOM_RIGHT 2u
+#define BOTTOM_LEFT 3u
+
+#define SLICE_TOP_LEFT 0u
+#define SLICE_TOP 1u
+#define SLICE_TOP_RIGHT 2u
+#define SLICE_RIGHT 3u
+#define SLICE_BOTTOM_RIGHT 4u
+#define SLICE_BOTTOM 5u
+#define SLICE_BOTTOM_LEFT 6u
+#define SLICE_LEFT 7u
+
+#define GSK_REPEAT_NONE 0u
+#define GSK_REPEAT_PAD 1u
+#define GSK_REPEAT_REPEAT 2u
+#define GSK_REPEAT_REFLECT 3u
+#define GSK_REPEAT_MASK 3u
+
+#define GSK_SNAP_NONE 0u
+#define GSK_SNAP_FLOOR 1u
+#define GSK_SNAP_CEIL 2u
+#define GSK_SNAP_ROUND 3u
+
+#endif
+
+/* Needs to be exactly like this and not use #else
+ * because our include script is too dumb
+ */
+#ifndef VULKAN
+precision highp float;
+
+#if __VERSION__ < 420 || (defined(GSK_GLES) && __VERSION__ < 310)
+layout(std140)
+#else
+layout(std140, binding = 0)
+#endif
+uniform PushConstants
+{
+    mat4 mvp;
+    vec2 scale;
+    vec2 color_volume1;
+    vec2 color_volume2;
+    vec2 color_volume3;
+    vec4 clip_mask_rect;
+    mat3x4 clip;
+} push;
+
+#define GSK_GLOBAL_MVP push.mvp
+#define GSK_GLOBAL_CLIP push.clip
+#define GSK_GLOBAL_CLIP_RECT push.clip[0]
+#define GSK_GLOBAL_SCALE push.scale
+
+#define GSK_VERTEX_INDEX gl_VertexID
+
+#ifndef _RECT_
+#define _RECT_
+
+#ifndef _SNAP_
+#define _SNAP_
+
+#define GskSnapDirection uint
+
+float
+gsk_snap (float            value,
+          GskSnapDirection snap)
+{
+  switch (snap)
+    {
+    case GSK_SNAP_FLOOR:
+      return floor (value);
+    case GSK_SNAP_CEIL:
+      return ceil (value);
+    case GSK_SNAP_ROUND:
+      return round (value);
+    case GSK_SNAP_NONE:
+    default:
+      return value;
+    }
+}
+
+#endif
+
+/* x,y and y,w make up the 2 points of this rect,
+   note that this is not containing width or height */
+#define Rect vec4[1]
+
+/* each bytes contains a GskSnapDirection, see the C one */
+#define GskRectSnap uint
+
+GskSnapDirection
+gsk_rect_snap_get_direction (GskRectSnap snap,
+                             uint        dir)
+{ 
+  return ((snap >> (8u * dir)) & 0xFFu);
+}
+
+GskRectSnap
+gsk_rect_snap_new (GskSnapDirection top,
+                   GskSnapDirection right,
+                   GskSnapDirection bottom,
+                   GskSnapDirection left)
+{
+  return (((((left << 8u) | bottom) << 8u) | right) << 8u) | top;
+}
+
+#define GSK_RECT_SNAP_GROW gsk_rect_snap_new (GSK_SNAP_FLOOR, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_FLOOR)
+#define GSK_RECT_SNAP_SHRINK gsk_rect_snap_new (GSK_SNAP_CEIL, GSK_SNAP_FLOOR, GSK_SNAP_FLOOR, GSK_SNAP_CEIL)
+#define GSK_RECT_SNAP_SHRINK_GROW gsk_rect_snap_new (GSK_SNAP_FLOOR, GSK_SNAP_FLOOR, GSK_SNAP_CEIL, GSK_SNAP_CEIL)
+#define GSK_RECT_SNAP_GROW_SHRINK gsk_rect_snap_new (GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_FLOOR, GSK_SNAP_FLOOR)
+#define GSK_RECT_SNAP_ROUND gsk_rect_snap_new (GSK_SNAP_ROUND, GSK_SNAP_ROUND, GSK_SNAP_ROUND, GSK_SNAP_ROUND)
+
+vec4
+rect_bounds (Rect r)
+{
+  return r[0];
+}
+
+Rect
+rect_snap (Rect        src,
+           GskRectSnap snap)
+{
+  float x, y;
+
+  if (snap == 0u)
+    return src;
+
+  vec4 bounds = rect_bounds (src);
+
+  return Rect (vec4 (gsk_snap (bounds.x, gsk_rect_snap_get_direction (snap, 3u)),
+                     gsk_snap (bounds.y, gsk_rect_snap_get_direction (snap, 0u)),
+                     gsk_snap (bounds.z, gsk_rect_snap_get_direction (snap, 1u)),
+                     gsk_snap (bounds.w, gsk_rect_snap_get_direction (snap, 2u))));
+}
+
+Rect
+rect_new_size (vec4 coords)
+{
+  return Rect (coords + vec4 (0.0, 0.0, coords.xy));
+}
+
+Rect
+rect_from_gsk (vec4 coords)
+{
+  Rect result = rect_new_size (coords);
+  return Rect (rect_bounds(result) * GSK_GLOBAL_SCALE.xyxy);
+}
+
+float
+rect_distance (Rect r, vec2 p)
+{
+  vec4 distance = (rect_bounds (r) - p.xyxy) * vec4(1.0, 1.0, -1.0, -1.0);
+  vec2 max2 = max (distance.xy, distance.zw);
+  return length (max (max2, 0.0)) + min (max(max2.x, max2.y), 0.0);
+}
+
+vec2
+rect_pos (Rect r)
+{
+  return rect_bounds (r).xy;
+}
+
+vec2
+rect_size (Rect r)
+{
+  return rect_bounds (r).zw - rect_bounds (r).xy;
+}
+
+Rect
+rect_intersect (Rect a, Rect b)
+{
+  vec4 result = vec4(max(rect_bounds (a).xy, rect_bounds (b).xy), min(rect_bounds (a).zw, rect_bounds (b).zw));
+  if (any (greaterThanEqual (result.xy, result.zw)))
+    return Rect (vec4(0.0));
+  return Rect(result);
+}
+
+Rect
+rect_union (Rect a, Rect b)
+{
+  return Rect (vec4 (min (rect_bounds (a).xy, rect_bounds (b).xy), max (rect_bounds (a).zw, rect_bounds (b).zw)));
+}
+
+vec2
+rect_get_coord (Rect r, vec2 pt)
+{
+  return (pt - rect_pos (r)) / rect_size (r);
+}
+
+#ifdef GSK_FRAGMENT_SHADER
+
+float
+rect_coverage (Rect r,
+               vec2 p,
+               vec2 dFdp)
+{
+  Rect prect = Rect(vec4(p - 0.5 * dFdp, p + 0.5 * dFdp));
+  Rect coverect = rect_intersect (r, prect);
+  vec2 coverage = rect_size(coverect) / dFdp;
+  return coverage.x * coverage.y;
+}
+
+float
+rect_coverage (Rect r, vec2 p)
+{
+  return rect_coverage (r, p, fwidth (p));
+}
+
+
+#endif
+
+#endif
+
+#ifdef GSK_VERTEX_SHADER
+#define IN(_loc) in
+#define PASS(_loc) out
+#define PASS_FLAT(_loc) flat out
+#endif
+
+#ifdef GSK_FRAGMENT_SHADER
+#define PASS(_loc) in
+#define PASS_FLAT(_loc) flat in
+
+#if GSK_N_TEXTURES > 0
+
+#ifdef GSK_TEXTURE0_IS_EXTERNAL
+uniform samplerExternalOES GSK_TEXTURE0;
+#define GSK_TEXTURE0_1 GSK_TEXTURE0
+#define GSK_TEXTURE0_2 GSK_TEXTURE0
+#define HAS_EXTERNAL_TEXTURES
+#else
+uniform sampler2D GSK_TEXTURE0;
+uniform sampler2D GSK_TEXTURE0_1;
+uniform sampler2D GSK_TEXTURE0_2;
+#endif
+
+#if GSK_N_TEXTURES > 1
+
+#ifdef GSK_TEXTURE1_IS_EXTERNAL
+uniform samplerExternalOES GSK_TEXTURE1;
+#define GSK_TEXTURE1_1 GSK_TEXTURE1
+#define GSK_TEXTURE1_2 GSK_TEXTURE1
+#ifndef HAS_EXTERNAL_TEXTURES
+#define HAS_EXTERNAL_TEXTURES
+#endif
+#else
+uniform sampler2D GSK_TEXTURE1;
+uniform sampler2D GSK_TEXTURE1_1;
+uniform sampler2D GSK_TEXTURE1_2;
+#endif
+
+#endif
+#endif
+
+#ifdef GSK_GL_HAS_CLIP_MASK
+uniform sampler2D GSK_TEXTURE_MASK;
+
+float
+gsk_clip_mask_coverage (void)
+{
+  vec2 coord = rect_get_coord (rect_new_size (push.clip_mask_rect), gl_FragCoord.xy);
+  return texture (GSK_TEXTURE_MASK, coord).a;
+}
+#else
+float
+gsk_clip_mask_coverage (void)
+{
+  return 1.0;
+}
+#endif
+
+#ifdef HAS_EXTERNAL_TEXTURES
+vec4
+gsk_texture_straight_alpha (samplerExternalOES tex,
+                            vec2               pos)
+{
+  vec2 size = vec2 (textureSize (tex, 0));
+  pos *= size;
+  size -= vec2 (1.0);
+  /* GL_CLAMP_TO_EDGE */
+  pos = clamp (pos - 0.5, vec2 (0.0), size);
+  ivec2 ipos = ivec2 (pos);
+  pos = fract (pos);
+  vec4 tl = texelFetch (tex, ipos, 0);
+  tl.rgb *= tl.a;
+  vec4 tr = texelFetch (tex, ipos + ivec2(1, 0), 0);
+  tr.rgb *= tr.a;
+  vec4 bl = texelFetch (tex, ipos + ivec2(0, 1), 0);
+  bl.rgb *= bl.a;
+  vec4 br = texelFetch (tex, ipos + ivec2(1, 1), 0);
+  br.rgb *= br.a;
+  return mix (mix (tl, tr, pos.x), mix (bl, br, pos.x), pos.y);
+}
+#endif
+
+layout(location = 0) out vec4 out_color;
+void
+gsk_set_output_color (vec4 color)
+{
+  out_color = color;
+}
+
+#ifdef GSK_DUAL_BLEND
+layout(location = 0, index = 1) out vec4 out_mask;
+void
+gsk_set_output_mask (vec4 mask)
+{
+  out_mask = mask;
+}
+#endif
+
+#endif
+#endif
+
+#define GSK_SHADER_CLIP (GSK_FLAGS & 3u)
+/* Defined by the shader compilers directly */
+/* #define GSK_TEXTURE0_IS_EXTERNAL ((GSK_FLAGS >> 4u) & 1u) */
+/* #define GSK_TEXTURE1_IS_EXTERNAL ((GSK_FLAGS >> 5u) & 1u) */
+#define GSK_TEXTURE0_SAMPLE_OP ((GSK_FLAGS >> 6u) & 7u)
+#define GSK_TEXTURE1_SAMPLE_OP ((GSK_FLAGS >> 10u) & 7u)
+
+#ifndef _COLOR_
+#define _COLOR_
+
+#define COLOR_SPACE_OUTPUT_PREMULTIPLIED (1u << 2)
+#define COLOR_SPACE_ALT_PREMULTIPLIED    (1u << 3)
+#define COLOR_SPACE_OUTPUT_SHIFT 8u
+#define COLOR_SPACE_ALT_SHIFT 16u
+#define COLOR_SPACE_COLOR_STATE_MASK 0xFFu
+
+#define OUTPUT_COLOR_SPACE ((GSK_COLOR_STATES >> COLOR_SPACE_OUTPUT_SHIFT) & COLOR_SPACE_COLOR_STATE_MASK)
+#define ALT_COLOR_SPACE ((GSK_COLOR_STATES >> COLOR_SPACE_ALT_SHIFT) & COLOR_SPACE_COLOR_STATE_MASK)
+#define OUTPUT_PREMULTIPLIED ((GSK_COLOR_STATES & COLOR_SPACE_OUTPUT_PREMULTIPLIED) == COLOR_SPACE_OUTPUT_PREMULTIPLIED)
+#define ALT_PREMULTIPLIED ((GSK_COLOR_STATES & COLOR_SPACE_ALT_PREMULTIPLIED) == COLOR_SPACE_ALT_PREMULTIPLIED)
+
+vec4
+color_premultiply (vec4 color)
+{
+  return vec4 (color.rgb, 1.0) * color.a;
+}
+
+vec4
+color_unpremultiply (vec4 color)
+{
+  return color.a > 0.0 ? color / vec4 (color.aaa, 1.0) : color;
+}
+
+float
+luminance (vec3 color)
+{
+  return dot (vec3 (0.2126, 0.7152, 0.0722), color);
+}
+
+vec4
+alt_color_alpha (vec4  color,
+                 float alpha)
+{
+  if (ALT_PREMULTIPLIED)
+    return color * alpha;
+  else
+    return vec4 (color.rgb, color.a * alpha);
+}
+
+vec4
+output_color_alpha (vec4  color,
+                    float alpha)
+{
+  if (OUTPUT_PREMULTIPLIED)
+    return color * alpha;
+  else
+    return vec4 (color.rgb, color.a * alpha);
+}
+
+vec3
+srgb_eotf (vec3 v)
+{
+  vec3 lo = v / 12.92;
+  vec3 hi = sign (v) * pow (((abs (v) + 0.055) / (1.0 + 0.055)), vec3 (2.4));
+  return mix (lo, hi, greaterThanEqual (abs (v), vec3 (0.04045)));
+}
+
+vec3
+srgb_oetf (vec3 v)
+{
+  vec3 lo = 12.92 * v;
+  vec3 hi = sign (v) * (1.055 * pow (abs (v), vec3 (1.0 / 2.4)) - 0.055);
+  return mix (lo, hi, greaterThan (abs (v), vec3 (0.0031308)));
+}
+
+vec3
+pq_eotf (vec3 v)
+{
+  const float ninv = 16384.0 / 2610.0;
+  const float minv = 32.0 / 2523.0;
+  const float c1 = 3424.0 / 4096.0;
+  const float c2 = 2413.0 / 128.0;
+  const float c3 = 2392.0 / 128.0;
+
+  vec3 x = pow (abs (v), vec3 (minv));
+  x = pow (max (x - c1, 0.0) / (c2 - (c3 * x)), vec3 (ninv));
+
+  return sign (v) * x * 10000.0 / 203.0;
+}
+
+vec3
+pq_oetf (vec3 v)
+{
+  const float n = 2610.0 / 16384.0;
+  const float m = 2523.0 / 32.0;
+  const float c1 = 3424.0 / 4096.0;
+  const float c2 = 2413.0 / 128.0;
+  const float c3 = 2392.0 / 128.0;
+
+  vec3 x = pow (abs (v) * 203.0 / 10000.0, vec3 (n));
+
+  return sign (v) * pow (((c1 + (c2 * x)) / (1.0 + (c3 * x))), vec3 (m));
+}
+
+/* Note that these matrices are transposed from the C version */
+
+const mat3 srgb_from_rec2020 = mat3(
+  1.660227, -0.124553, -0.018155,
+ -0.587548,  1.132926, -0.100603,
+ -0.072838, -0.008350, 1.118998
+);
+
+const mat3 rec2020_from_srgb = mat3(
+  0.627504, 0.069108, 0.016394,
+  0.329275, 0.919519, 0.088011,
+  0.043303, 0.011360, 0.895380
+);
+
+vec3
+apply_eotf (vec3 color,
+            uint cs)
+{
+  switch (cs)
+    {
+    case GDK_COLOR_STATE_ID_SRGB:
+      return srgb_eotf (color);
+
+    case GDK_COLOR_STATE_ID_REC2100_PQ:
+      return pq_eotf (color);
+
+    case GDK_COLOR_STATE_ID_SRGB_LINEAR:
+    case GDK_COLOR_STATE_ID_REC2100_LINEAR:
+      return color;
+
+    default:
+      return vec3(1.0, 0.0, 0.8);
+    }
+}
+
+vec3
+apply_oetf (vec3 color,
+            uint cs)
+{
+  switch (cs)
+    {
+    case GDK_COLOR_STATE_ID_SRGB:
+      return srgb_oetf (color);
+
+    case GDK_COLOR_STATE_ID_REC2100_PQ:
+      return pq_oetf (color);
+
+    case GDK_COLOR_STATE_ID_SRGB_LINEAR:
+    case GDK_COLOR_STATE_ID_REC2100_LINEAR:
+      return color;
+
+    default:
+      return vec3(0.0, 1.0, 0.8);
+    }
+}
+
+vec3
+convert_linear (vec3 color,
+                uint from,
+                uint to)
+{
+  if (to == GDK_COLOR_STATE_ID_REC2100_LINEAR && from == GDK_COLOR_STATE_ID_SRGB_LINEAR)
+    return rec2020_from_srgb * color;
+  else if (to == GDK_COLOR_STATE_ID_SRGB_LINEAR && from == GDK_COLOR_STATE_ID_REC2100_LINEAR)
+    return srgb_from_rec2020 * color;
+  else
+    return vec3(0.8, 1.0, 0.0);
+}
+
+uint
+linear_color_space (uint cs)
+{
+  switch (cs)
+    {
+    case GDK_COLOR_STATE_ID_SRGB:           return GDK_COLOR_STATE_ID_SRGB_LINEAR;
+    case GDK_COLOR_STATE_ID_SRGB_LINEAR:    return GDK_COLOR_STATE_ID_SRGB_LINEAR;
+    case GDK_COLOR_STATE_ID_REC2100_PQ:     return GDK_COLOR_STATE_ID_REC2100_LINEAR;
+    case GDK_COLOR_STATE_ID_REC2100_LINEAR: return GDK_COLOR_STATE_ID_REC2100_LINEAR;
+    default:                                return 0u;
+  };
+}
+
+vec4
+convert_color (vec4 color,
+               uint from,
+               bool from_premul,
+               uint to,
+               bool to_premul)
+{
+  if (from_premul && (!to_premul || from != to))
+    color = color_unpremultiply (color);
+
+  if (from != to)
+    {
+      uint from_linear = linear_color_space (from);
+      uint to_linear = linear_color_space (to);
+
+      if (from_linear != from)
+        color.rgb = apply_eotf (color.rgb, from);
+
+      if (from_linear != to_linear)
+        color.rgb = convert_linear (color.rgb, from_linear, to_linear);
+
+      if (to_linear != to)
+        color.rgb = apply_oetf (color.rgb, to);
+    }
+
+  if (to_premul && (!from_premul || from != to))
+    color = color_premultiply (color);
+
+  return color;
+}
+
+vec4
+alt_color_from_output (vec4 color)
+{
+  return convert_color (color,
+                        OUTPUT_COLOR_SPACE, OUTPUT_PREMULTIPLIED,
+                        ALT_COLOR_SPACE, ALT_PREMULTIPLIED);
+}
+
+vec4
+output_color_from_alt (vec4 color)
+{
+  return convert_color (color,
+                        ALT_COLOR_SPACE, ALT_PREMULTIPLIED,
+                        OUTPUT_COLOR_SPACE, OUTPUT_PREMULTIPLIED);
+}
+
+#endif /* _COLOR_ */
+#ifndef _ROUNDED_RECT_
+#define _ROUNDED_RECT_
+
+#ifndef _ELLIPSE_
+#define _ELLIPSE_
+
+struct Ellipse
+{
+  vec2 center;
+  vec2 radius;
+};
+
+float
+ellipse_distance (Ellipse r, vec2 p)
+{
+  vec2 e = r.radius;
+  p = p - r.center;
+
+  if (e.x == e.y)
+    return length (p) - e.x;
+
+  /* from https://www.shadertoy.com/view/tt3yz7 */
+  vec2 pAbs = abs(p);
+  vec2 ei = 1.0 / e;
+  vec2 e2 = e*e;
+  vec2 ve = ei * vec2(e2.x - e2.y, e2.y - e2.x);
+  
+  vec2 t = vec2(0.70710678118654752, 0.70710678118654752);
+  for (int i = 0; i < 3; i++) {
+      vec2 v = ve*t*t*t;
+      vec2 u = normalize(pAbs - v) * length(t * e - v);
+      vec2 w = ei * (v + u);
+      t = normalize(clamp(w, 0.0, 1.0));
+  }
+  
+  vec2 nearestAbs = t * e;
+  float dist = length(pAbs - nearestAbs);
+  return dot(pAbs, pAbs) < dot(nearestAbs, nearestAbs) ? -dist : dist;
+}
+
+#endif
+
+#define RoundedRect vec4[3]
+
+RoundedRect
+rounded_rect_from_rect (Rect r)
+{
+  return RoundedRect (rect_bounds(r), vec4 (0.0), vec4 (0.0));
+}
+
+RoundedRect
+rounded_rect_from_gsk (mat3x4 gsk_rounded_rect)
+{
+  return RoundedRect ((gsk_rounded_rect[0].xyxy + vec4 (0.0, 0.0, gsk_rounded_rect[0].zw)) * GSK_GLOBAL_SCALE.xyxy,
+                      gsk_rounded_rect[1] * GSK_GLOBAL_SCALE.xxxx,
+                      gsk_rounded_rect[2] * GSK_GLOBAL_SCALE.yyyy);
+}
+
+vec4
+rounded_rect_bounds (RoundedRect r)
+{
+  return r[0];
+}
+
+vec4
+rounded_rect_corner_widths (RoundedRect r)
+{
+  return r[1];
+}
+
+vec4
+rounded_rect_corner_heights (RoundedRect r)
+{
+  return r[2];
+}
+
+vec2
+rounded_rect_corner (RoundedRect r, const uint corner)
+{
+  return vec2 (
+    rounded_rect_corner_widths (r)[corner],
+    rounded_rect_corner_heights (r)[corner]
+  );
+}
+
+float
+rounded_rect_corner_width (RoundedRect r, const uint corner)
+{
+  return rounded_rect_corner_widths (r)[corner];
+}
+
+float
+rounded_rect_corner_height (RoundedRect r, const uint corner)
+{
+  return rounded_rect_corner_heights (r)[corner];
+}
+
+float
+rounded_rect_distance (RoundedRect r, vec2 p)
+{
+  float bounds_distance = rect_distance (Rect (rounded_rect_bounds (r)), p);
+                      
+  Ellipse tl = Ellipse (rounded_rect_bounds (r).xy + vec2( 1.,  1.)*rounded_rect_corner (r, TOP_LEFT),
+                        rounded_rect_corner (r, TOP_LEFT));
+  Ellipse tr = Ellipse (rounded_rect_bounds (r).zy + vec2(-1.,  1.)*rounded_rect_corner (r, TOP_RIGHT),
+                        rounded_rect_corner (r, TOP_RIGHT));
+  Ellipse br = Ellipse (rounded_rect_bounds (r).zw + vec2(-1., -1.)*rounded_rect_corner (r, BOTTOM_RIGHT),
+                        rounded_rect_corner (r, BOTTOM_RIGHT));
+  Ellipse bl = Ellipse (rounded_rect_bounds (r).xw + vec2( 1., -1.)*rounded_rect_corner (r, BOTTOM_LEFT),
+                        rounded_rect_corner (r, BOTTOM_LEFT));
+
+ vec4 distances = vec4(ellipse_distance (tl, p),
+                       ellipse_distance (tr, p),
+                       ellipse_distance (br, p),
+                       ellipse_distance (bl, p));
+
+  bvec4 is_out = bvec4(p.x < tl.center.x && p.y < tl.center.y,
+                       p.x > tr.center.x && p.y < tr.center.y,
+                       p.x > br.center.x && p.y > br.center.y,
+                       p.x < bl.center.x && p.y > bl.center.y);
+  distances = mix (vec4(bounds_distance), distances, is_out);
+
+  vec2 max2 = max (distances.xy, distances.zw);
+  return max (max2.x, max2.y);
+}
+
+RoundedRect
+rounded_rect_shrink (RoundedRect r, vec4 amount)
+{
+  vec4 new_bounds = rounded_rect_bounds (r) + vec4(1.0,1.0,-1.0,-1.0) * amount.wxyz;
+  vec4 new_widths = max (rounded_rect_corner_widths (r) - sign (rounded_rect_corner_widths (r)) * amount.wyyw, 0.0);
+  vec4 new_heights = max (rounded_rect_corner_heights (r) - sign (rounded_rect_corner_heights (r)) * amount.xxzz, 0.0);
+  new_widths = min (new_widths, new_bounds.z - new_bounds.x);
+  new_heights = min (new_heights, new_bounds.w - new_bounds.y);
+              
+  return RoundedRect (new_bounds, new_widths, new_heights);
+}
+
+void
+rounded_rect_scale (inout RoundedRect r,
+                    vec2              scale)
+{
+  r = RoundedRect (
+    rounded_rect_bounds (r) * scale.xyxy,
+    rounded_rect_corner_widths (r) * scale.xxxx,
+    rounded_rect_corner_heights (r) * scale.yyyy
+  );
+}
+
+void
+rounded_rect_offset (inout RoundedRect r,
+                     vec2              offset)
+{
+  r = RoundedRect (
+    rounded_rect_bounds (r) + offset.xyxy,
+    rounded_rect_corner_widths (r),
+    rounded_rect_corner_heights (r)
+  );
+}
+
+bool
+rounded_rect_is_slicable (RoundedRect r)
+{
+  vec2 size = rect_size (Rect (rounded_rect_bounds (r)));
+  return any (lessThanEqual (rounded_rect_corner (r, TOP_LEFT) + rounded_rect_corner (r, BOTTOM_RIGHT), size))
+      && any (lessThanEqual (rounded_rect_corner (r, BOTTOM_LEFT) + rounded_rect_corner (r, TOP_RIGHT), size));
+}
+
+Rect
+rounded_rect_intersection_fallback_slice (RoundedRect outside,
+                                          RoundedRect inside,
+                                          uint        slice,
+                                          bool        snap)
+{
+  Rect r;
+
+  switch (slice)
+    {
+    default:
+    case SLICE_TOP:
+    case SLICE_RIGHT:
+    case SLICE_BOTTOM:
+    case SLICE_LEFT:
+      return Rect (vec4 (0.0));
+
+    case SLICE_TOP_LEFT:
+      r = Rect (vec4 (rounded_rect_bounds (outside).xy, 0.5 * (rounded_rect_bounds (outside).xy + rounded_rect_bounds (outside).zw)));
+      if (snap)
+        r = rect_snap (r, gsk_rect_snap_new (GSK_SNAP_FLOOR, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_FLOOR));
+      return r;
+
+    case SLICE_TOP_RIGHT:
+      r = Rect (vec4 (0.5 * (rounded_rect_bounds (outside).x + rounded_rect_bounds (outside).z), rounded_rect_bounds (outside).y,
+                      rounded_rect_bounds (outside).z, 0.5 * (rounded_rect_bounds (outside).y + rounded_rect_bounds (outside).w)));
+      if (snap)
+        r = rect_snap (r, gsk_rect_snap_new (GSK_SNAP_FLOOR, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_CEIL));
+      return r;
+
+    case SLICE_BOTTOM_RIGHT:
+      r = Rect (vec4 (0.5 * (rounded_rect_bounds (outside).xy + rounded_rect_bounds (outside).zw), rounded_rect_bounds (outside).zw));
+      if (snap)
+        r = rect_snap (r, gsk_rect_snap_new (GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_CEIL));
+      return r;
+
+    case SLICE_BOTTOM_LEFT:
+      r = Rect (vec4 (rounded_rect_bounds (outside).x, 0.5 * (rounded_rect_bounds (outside).y + rounded_rect_bounds (outside).w),
+                      0.5 * (rounded_rect_bounds (outside).x + rounded_rect_bounds (outside).z), rounded_rect_bounds (outside).w));
+      if (snap)
+        r = rect_snap (r, gsk_rect_snap_new (GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_FLOOR));
+      return r;
+    }
+}
+
+Rect
+rounded_rect_intersection_slice (RoundedRect outside,
+                                 RoundedRect inside,
+                                 uint        slice,
+                                 bool        snap)
+{
+  float x[4], y[4];
+
+  if (!rounded_rect_is_slicable (outside) ||
+      !rounded_rect_is_slicable (inside))
+    {
+      return rounded_rect_intersection_fallback_slice (outside, inside, slice, snap);
+    }
+
+  x[0] = rounded_rect_bounds (outside).x;
+  x[3] = rounded_rect_bounds (outside).z;
+  
+  switch (slice)
+    {
+    case SLICE_TOP_LEFT:
+    case SLICE_TOP:
+    case SLICE_TOP_RIGHT:
+      x[1] = max (rounded_rect_bounds (outside).x + rounded_rect_corner_width (outside, TOP_LEFT),
+                  rounded_rect_bounds (inside).x + rounded_rect_corner_width (inside, TOP_LEFT));
+      x[2] = min (rounded_rect_bounds (outside).z - rounded_rect_corner_width (outside, TOP_RIGHT),
+                  rounded_rect_bounds (inside).z - rounded_rect_corner_width (inside, TOP_RIGHT));
+      break;
+
+    case SLICE_LEFT:
+    case SLICE_RIGHT:
+    default:
+      x[1] = max (rounded_rect_bounds (outside).x, rounded_rect_bounds (inside).x);
+      x[2] = max (rounded_rect_bounds (outside).z, rounded_rect_bounds (inside).z);
+
+    case SLICE_BOTTOM_LEFT:
+    case SLICE_BOTTOM:
+    case SLICE_BOTTOM_RIGHT:
+      x[1] = max (rounded_rect_bounds (outside).x + rounded_rect_corner_width (outside, BOTTOM_LEFT),
+                  rounded_rect_bounds (inside).x + rounded_rect_corner_width (inside, BOTTOM_LEFT));
+      x[2] = min (rounded_rect_bounds (outside).z - rounded_rect_corner_width (outside, BOTTOM_RIGHT),
+                  rounded_rect_bounds (inside).z - rounded_rect_corner_width (inside, BOTTOM_RIGHT));
+      break;
+    }
+
+  if (snap)
+    {
+      x[0] = floor (x[0]);
+      x[1] = ceil (x[1]);
+      x[2] = floor (x[2]);
+      x[2] = max (x[1], x[2]);
+      x[3] = ceil (x[3]);
+    }
+
+  y[0] = rounded_rect_bounds (outside).y;
+  y[3] = rounded_rect_bounds (outside).w;
+  
+  switch (slice)
+    {
+    case SLICE_TOP_LEFT:
+    case SLICE_LEFT:
+    case SLICE_BOTTOM_LEFT:
+      y[1] = max (rounded_rect_bounds (outside).y + rounded_rect_corner_height (outside, TOP_LEFT),
+                  rounded_rect_bounds (inside).y + rounded_rect_corner_height (inside, TOP_LEFT));
+      y[2] = min (rounded_rect_bounds (outside).w - rounded_rect_corner_height (outside, BOTTOM_LEFT),
+                  rounded_rect_bounds (inside).w - rounded_rect_corner_height (inside, BOTTOM_LEFT));
+      break;
+
+    case SLICE_TOP:
+    case SLICE_BOTTOM:
+    default:
+      y[1] = max (rounded_rect_bounds (outside).y, rounded_rect_bounds (inside).y);
+      y[2] = max (rounded_rect_bounds (outside).w, rounded_rect_bounds (inside).w);
+
+    case SLICE_TOP_RIGHT:
+    case SLICE_RIGHT:
+    case SLICE_BOTTOM_RIGHT:
+      y[1] = max (rounded_rect_bounds (outside).y + rounded_rect_corner_height (outside, TOP_RIGHT),
+                  rounded_rect_bounds (inside).y + rounded_rect_corner_height (inside, TOP_RIGHT));
+      y[2] = min (rounded_rect_bounds (outside).w - rounded_rect_corner_height (outside, BOTTOM_RIGHT),
+                  rounded_rect_bounds (inside).w - rounded_rect_corner_height (inside, BOTTOM_RIGHT));
+      break;
+    }
+
+  if (snap)
+    {
+      y[0] = floor (y[0]);
+      y[1] = ceil (y[1]);
+      y[2] = floor (y[2]);
+      y[2] = max (y[1], y[2]);
+      y[3] = ceil (y[3]);
+    }
+
+  switch (slice)
+    {
+    case SLICE_TOP_LEFT:
+      return Rect (vec4 (x[0], y[0], x[1], y[1]));
+    case SLICE_TOP:
+      return Rect (vec4 (x[1], y[0], x[2], y[1]));
+    case SLICE_TOP_RIGHT:
+      return Rect (vec4 (x[2], y[0], x[3], y[1]));
+    case SLICE_LEFT:
+      return Rect (vec4 (x[0], y[1], x[1], y[2]));
+    case SLICE_RIGHT:
+      return Rect (vec4 (x[2], y[1], x[3], y[2]));
+    case SLICE_BOTTOM_LEFT:
+      return Rect (vec4 (x[0], y[2], x[1], y[3]));
+    case SLICE_BOTTOM:
+      return Rect (vec4 (x[1], y[2], x[2], y[3]));
+    case SLICE_BOTTOM_RIGHT:
+      return Rect (vec4 (x[2], y[2], x[3], y[3]));
+    default:
+      return Rect (vec4 (0.0));
+    }
+}
+
+#ifdef GSK_FRAGMENT_SHADER
+
+float
+rounded_rect_coverage (RoundedRect r, vec2 p)
+{
+  vec2 fw = fwidth (p);
+  float distance_scale = max (fw.x, fw.y);
+  float distance = rounded_rect_distance (r, p) / distance_scale;
+  float coverage = 0.5 - distance;
+
+  return clamp (coverage, 0.0, 1.0);
+}
+
+#endif
+
+#endif
+
+#define PI 3.1415926535897932384626433832795
+#define SQRT1_2 1.4142135623730951
+
+Rect
+rect_clip (Rect r)
+{
+  if (GSK_SHADER_CLIP == GSK_GPU_SHADER_CLIP_NONE)
+    return r;
+  else
+    return rect_intersect (r, rect_from_gsk (GSK_GLOBAL_CLIP_RECT));
+}
+
+#ifdef GSK_VERTEX_SHADER
+
+const vec2 offsets[6] = vec2[6](vec2(0.0, 0.0),
+                                vec2(1.0, 0.0),
+                                vec2(0.0, 1.0),
+                                vec2(0.0, 1.0),
+                                vec2(1.0, 0.0),
+                                vec2(1.0, 1.0));
+
+void
+gsk_set_position (vec2 pos)
+{
+  gl_Position = GSK_GLOBAL_MVP * vec4 (pos, 0.0, 1.0);
+}
+
+vec2
+rect_get_position (Rect rect)
+{
+  Rect r = rect_snap (rect_clip (rect), GSK_RECT_SNAP_GROW);
+
+  vec2 pos = mix (rect_bounds (r).xy, rect_bounds (r).zw, offsets[GSK_VERTEX_INDEX]);
+
+  return pos;
+}
+
+vec2
+border_get_position (RoundedRect outside,
+                     RoundedRect inside)
+{
+  uint slice_index = uint (GSK_VERTEX_INDEX) / 6u;
+  uint vert_index = uint (GSK_VERTEX_INDEX) % 6u;
+
+  Rect rect = rounded_rect_intersection_slice (outside, inside, slice_index, true);
+
+  switch (slice_index)
+    {
+    case SLICE_TOP_LEFT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW);
+      rect = Rect (rect_bounds (rect).xwzy);
+      break;
+    case SLICE_TOP:
+      rect = rect_snap (rect, GSK_RECT_SNAP_SHRINK_GROW);
+      break;
+    case SLICE_TOP_RIGHT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW);
+      break;
+    case SLICE_RIGHT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW_SHRINK);
+      break;
+    case SLICE_BOTTOM_RIGHT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW);
+      rect = Rect (rect_bounds (rect).zyxw);
+      break;
+    case SLICE_BOTTOM:
+      rect = rect_snap (rect, GSK_RECT_SNAP_SHRINK_GROW);
+      break;
+    case SLICE_BOTTOM_LEFT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW);
+      rect = Rect (rect_bounds (rect).zwxy);
+      break;
+    case SLICE_LEFT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW_SHRINK);
+      break;
+    }
+
+  vec2 pos = mix (rect_bounds (rect).xy, rect_bounds (rect).zw, offsets[vert_index]);
+
+  return pos;
+}
+
+vec2
+scale_tex_coord (vec2 in_pos,
+                 Rect in_rect,
+                 vec4 tex_rect)
+{
+  return tex_rect.xy + (in_pos - rect_pos (in_rect)) / rect_size (in_rect) * tex_rect.zw;
+}
+
+void            run                             (out vec2 pos);
+
+void
+main (void)
+{
+  vec2 pos;
+
+  run (pos);
+
+  gsk_set_position (pos);
+}
+
+#endif /* GSK_VERTEX_SHADER */
+
+
+#ifdef GSK_FRAGMENT_SHADER
+
+vec4
+gsk_texture_straight_alpha (sampler2D tex,
+                            vec2      pos)
+{
+  vec2 size = vec2 (textureSize (tex, 0));
+  pos *= size;
+  size -= vec2 (1.0);
+  /* GL_CLAMP_TO_EDGE */
+  pos = clamp (pos - 0.5, vec2 (0.0), size);
+  ivec2 ipos = ivec2 (pos);
+  pos = fract (pos);
+  vec4 tl = texelFetch (tex, ipos, 0);
+  tl.rgb *= tl.a;
+  vec4 tr = texelFetch (tex, ipos + ivec2(1, 0), 0);
+  tr.rgb *= tr.a;
+  vec4 bl = texelFetch (tex, ipos + ivec2(0, 1), 0);
+  bl.rgb *= bl.a;
+  vec4 br = texelFetch (tex, ipos + ivec2(1, 1), 0);
+  br.rgb *= br.a;
+  return mix (mix (tl, tr, pos.x), mix (bl, br, pos.x), pos.y);
+}
+
+#if GSK_N_TEXTURES > 0
+vec4
+gsk_texture0 (vec2 pos)
+{
+  if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_DEFAULT)
+    return texture (GSK_TEXTURE0, pos);
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_STRAIGHT)
+    return gsk_texture_straight_alpha (GSK_TEXTURE0, pos);
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_2_PLANES)
+    return vec4 (texture (GSK_TEXTURE0, pos).x, texture (GSK_TEXTURE0_1, pos).xy, 1.0).brga;
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_3_PLANES)
+    return vec4 (texture (GSK_TEXTURE0_2, pos).x, texture (GSK_TEXTURE0, pos).x, texture (GSK_TEXTURE0_1, pos).x, 1.0);
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_3_PLANES_10BIT_LSB)
+    /* 65535.0 / 1023.0 ~= 64.061583578 */
+    return vec4 (clamp (texture (GSK_TEXTURE0_2, pos).x * 64.061583578, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE0, pos).x * 64.061583578, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE0_1, pos).x * 64.061583578, 0.0, 1.0),
+                 1.0);
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_3_PLANES_12BIT_LSB)
+    /* 65535.0 / 4095.0 ~= 16.003663004 */
+    return vec4 (clamp (texture (GSK_TEXTURE0_2, pos).x * 16.003663004, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE0, pos).x * 16.003663004, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE0_1, pos).x * 16.003663004, 0.0, 1.0),
+                 1.0);
+}
+#endif
+
+#if GSK_N_TEXTURES > 1
+vec4
+gsk_texture1 (vec2 pos)
+{
+  if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_DEFAULT)
+    return texture (GSK_TEXTURE1, pos);
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_STRAIGHT)
+    return gsk_texture_straight_alpha (GSK_TEXTURE1, pos);
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_2_PLANES)
+    return vec4 (texture (GSK_TEXTURE1, pos).x, texture (GSK_TEXTURE1_1, pos).xy, 1.0).brga;
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_3_PLANES)
+    return vec4 (texture (GSK_TEXTURE1_2, pos).x, texture (GSK_TEXTURE1, pos).x, texture (GSK_TEXTURE1_1, pos).x, 1.0);
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_3_PLANES_10BIT_LSB)
+    /* 65535.0 / 1023.0 ~= 64.061583578 */
+    return vec4 (clamp (texture (GSK_TEXTURE1_2, pos).x * 64.061583578, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE1, pos).x * 64.061583578, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE1_1, pos).x * 64.061583578, 0.0, 1.0),
+                 1.0);
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_3_PLANES_12BIT_LSB)
+    /* 65535.0 / 4095.0 ~= 16.003663004 */
+    return vec4 (clamp (texture (GSK_TEXTURE1_2, pos).x * 16.003663004, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE1, pos).x * 16.003663004, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE1_1, pos).x * 16.003663004, 0.0, 1.0),
+                 1.0);
+}
+#endif
+
+void            run                             (out vec4 color,
+#ifdef GSK_DUAL_BLEND
+                                                 out vec4 mask,
+#endif
+                                                 out vec2 pos);
+
+void
+main_clip_none (void)
+{
+  vec4 color;
+#ifdef GSK_DUAL_BLEND
+  vec4 mask;
+#endif
+  vec2 pos;
+
+#ifdef GSK_DUAL_BLEND
+  run (color, mask, pos);
+#else
+  run (color, pos);
+#endif
+
+  float coverage = gsk_clip_mask_coverage ();
+  color *= coverage;
+
+  gsk_set_output_color (color);
+#ifdef GSK_DUAL_BLEND
+  gsk_set_output_mask (mask);
+#endif
+}
+
+void
+main_clip_rect (void)
+{
+  vec4 color;
+#ifdef GSK_DUAL_BLEND
+  vec4 mask;
+#endif
+  vec2 pos;
+
+#ifdef GSK_DUAL_BLEND
+  run (color, mask, pos);
+#else
+  run (color, pos);
+#endif
+
+  Rect clip = rect_from_gsk (GSK_GLOBAL_CLIP_RECT);
+
+  float coverage = rect_coverage (clip, pos) * gsk_clip_mask_coverage ();
+  color *= coverage;
+
+  gsk_set_output_color (color);
+#ifdef GSK_DUAL_BLEND
+  mask *= coverage;
+  gsk_set_output_mask (mask);
+#endif
+}
+
+void
+main_clip_rounded (void)
+{
+  vec4 color;
+#ifdef GSK_DUAL_BLEND
+  vec4 mask;
+#endif
+  vec2 pos;
+
+#ifdef GSK_DUAL_BLEND
+  run (color, mask, pos);
+#else
+  run (color, pos);
+#endif
+
+  RoundedRect clip = rounded_rect_from_gsk (GSK_GLOBAL_CLIP);
+
+  float coverage = rounded_rect_coverage (clip, pos) * gsk_clip_mask_coverage ();
+  color *= coverage;
+
+  gsk_set_output_color (color);
+#ifdef GSK_DUAL_BLEND
+  mask *= coverage;
+  gsk_set_output_mask (mask);
+#endif
+}
+
+void
+main (void)
+{
+  if (GSK_SHADER_CLIP == GSK_GPU_SHADER_CLIP_NONE)
+    main_clip_none ();
+  else if (GSK_SHADER_CLIP == GSK_GPU_SHADER_CLIP_RECT)
+    main_clip_rect ();
+  else if (GSK_SHADER_CLIP == GSK_GPU_SHADER_CLIP_ROUNDED)
+    main_clip_rounded ();
+}
+
+#endif /* GSK_FRAGMENT_SHADER */
+
+#endif
+
+
+#ifdef GSK_VERTEX_SHADER
+IN(0) vec4 in_bounds;
+IN(1) vec4 in_tex_rect;
+IN(2) vec4 in_color;
+#endif
+
+PASS(0) vec2 _pos;
+PASS_FLAT(1) Rect _bounds;
+PASS_FLAT(2) vec4 _color;
+PASS(3) vec2 _tex_coord;
+
+
+#ifdef GSK_VERTEX_SHADER
+
+void
+run (out vec2 pos)
+{
+  Rect b = rect_from_gsk (in_bounds);
+  
+  pos = rect_get_position (b);
+
+  _pos = pos;
+  _bounds = b;
+  _color = output_color_from_alt (in_color);
+  _tex_coord = rect_get_coord (rect_from_gsk (in_tex_rect), pos);
+}
+
+#endif
+
+
+
+#ifdef GSK_FRAGMENT_SHADER
+
+void
+run (out vec4 color,
+     out vec2 position)
+{
+  float alpha = texture (GSK_TEXTURE0, _tex_coord).a * rect_coverage (_bounds, _pos);
+  color = output_color_alpha (_color, alpha);
+  position = _pos;
+}
+
+#endif
+
+[fragment shader]
+#version 310 es
+#extension GL_EXT_blend_func_extended : require
+#define GSK_GLES 1
+#define GSK_FRAGMENT_SHADER 1
+#define GSK_FLAGS 0u
+#define GSK_COLOR_STATES 4u
+#define GSK_VARIATION 0u
+
+#define GSK_N_TEXTURES 1
+//#undef GSK_DUAL_BLEND 1
+
+#ifndef _COMMON_
+#define _COMMON_
+
+void            main_clip_none                  (void);
+void            main_clip_rect                  (void);
+void            main_clip_rounded               (void);
+
+#ifndef _ENUMS_
+#define _ENUMS_
+
+#define GSK_GPU_PATTERN_STACK_SIZE 16
+
+#define GSK_GPU_SHADER_CLIP_NONE 0u
+#define GSK_GPU_SHADER_CLIP_RECT 1u
+#define GSK_GPU_SHADER_CLIP_ROUNDED 2u
+
+#define GDK_SHADER_DEFAULT 0u
+#define GDK_SHADER_STRAIGHT 1u
+#define GDK_SHADER_2_PLANES 2u
+#define GDK_SHADER_3_PLANES 3u
+#define GDK_SHADER_3_PLANES_10BIT_LSB 4u
+#define GDK_SHADER_3_PLANES_12BIT_LSB 5u
+
+#define GSK_GPU_PATTERN_DONE 0u
+#define GSK_GPU_PATTERN_COLOR 1u
+#define GSK_GPU_PATTERN_OPACITY 2u
+#define GSK_GPU_PATTERN_TEXTURE 3u
+#define GSK_GPU_PATTERN_STRAIGHT_ALPHA 4u
+#define GSK_GPU_PATTERN_COLOR_MATRIX 5u
+#define GSK_GPU_PATTERN_GLYPHS 6u
+#define GSK_GPU_PATTERN_LINEAR_GRADIENT 7u
+#define GSK_GPU_PATTERN_REPEATING_LINEAR_GRADIENT 8u
+#define GSK_GPU_PATTERN_RADIAL_GRADIENT 9u
+#define GSK_GPU_PATTERN_REPEATING_RADIAL_GRADIENT 10u
+#define GSK_GPU_PATTERN_CONIC_GRADIENT 11u
+#define GSK_GPU_PATTERN_CLIP 12u
+#define GSK_GPU_PATTERN_ROUNDED_CLIP 13u
+#define GSK_GPU_PATTERN_REPEAT_PUSH 14u
+#define GSK_GPU_PATTERN_POSITION_POP 15u
+#define GSK_GPU_PATTERN_PUSH_COLOR 16u
+#define GSK_GPU_PATTERN_POP_CROSS_FADE 17u
+#define GSK_GPU_PATTERN_POP_MASK_ALPHA 18u
+#define GSK_GPU_PATTERN_POP_MASK_INVERTED_ALPHA 19u
+#define GSK_GPU_PATTERN_POP_MASK_LUMINANCE 20u
+#define GSK_GPU_PATTERN_POP_MASK_INVERTED_LUMINANCE 21u
+#define GSK_GPU_PATTERN_AFFINE 22u
+#define GSK_GPU_PATTERN_BLEND_DEFAULT 23u
+#define GSK_GPU_PATTERN_BLEND_MULTIPLY 24u
+#define GSK_GPU_PATTERN_BLEND_SCREEN 25u
+#define GSK_GPU_PATTERN_BLEND_OVERLAY 26u
+#define GSK_GPU_PATTERN_BLEND_DARKEN 27u
+#define GSK_GPU_PATTERN_BLEND_LIGHTEN 28u
+#define GSK_GPU_PATTERN_BLEND_COLOR_DODGE 29u
+#define GSK_GPU_PATTERN_BLEND_COLOR_BURN 30u
+#define GSK_GPU_PATTERN_BLEND_HARD_LIGHT 31u
+#define GSK_GPU_PATTERN_BLEND_SOFT_LIGHT 32u
+#define GSK_GPU_PATTERN_BLEND_DIFFERENCE 33u
+#define GSK_GPU_PATTERN_BLEND_EXCLUSION 34u
+#define GSK_GPU_PATTERN_BLEND_COLOR 35u
+#define GSK_GPU_PATTERN_BLEND_HUE 36u
+#define GSK_GPU_PATTERN_BLEND_SATURATION 37u
+#define GSK_GPU_PATTERN_BLEND_LUMINOSITY 38u
+
+#define GSK_MASK_MODE_ALPHA 0u
+#define GSK_MASK_MODE_INVERTED_ALPHA 1u
+#define GSK_MASK_MODE_LUMINANCE 2u
+#define GSK_MASK_MODE_INVERTED_LUMINANCE 3u
+
+#define GSK_PORTER_DUFF_SOURCE 0u
+#define GSK_PORTER_DUFF_DEST 1u
+#define GSK_PORTER_DUFF_SOURCE_OVER_DEST 2u
+#define GSK_PORTER_DUFF_DEST_OVER_SOURCE 3u
+#define GSK_PORTER_DUFF_SOURCE_IN_DEST 4u
+#define GSK_PORTER_DUFF_DEST_IN_SOURCE 5u
+#define GSK_PORTER_DUFF_SOURCE_OUT_DEST 6u
+#define GSK_PORTER_DUFF_DEST_OUT_SOURCE 7u
+#define GSK_PORTER_DUFF_SOURCE_ATOP_DEST 8u
+#define GSK_PORTER_DUFF_DEST_ATOP_SOURCE 9u
+#define GSK_PORTER_DUFF_XOR 10u
+#define GSK_PORTER_DUFF_CLEAR 11u
+
+#define GDK_COLOR_STATE_ID_SRGB 0u
+#define GDK_COLOR_STATE_ID_SRGB_LINEAR 1u
+#define GDK_COLOR_STATE_ID_REC2100_PQ 2u
+#define GDK_COLOR_STATE_ID_REC2100_LINEAR 3u
+
+#define GDK_BUILTIN_COLOR_STATE_ID_OKLAB 0u
+#define GDK_BUILTIN_COLOR_STATE_ID_OKLCH 1u
+
+#define TOP 0u
+#define RIGHT 1u
+#define BOTTOM 2u
+#define LEFT 3u
+
+#define TOP_LEFT 0u
+#define TOP_RIGHT 1u
+#define BOTTOM_RIGHT 2u
+#define BOTTOM_LEFT 3u
+
+#define SLICE_TOP_LEFT 0u
+#define SLICE_TOP 1u
+#define SLICE_TOP_RIGHT 2u
+#define SLICE_RIGHT 3u
+#define SLICE_BOTTOM_RIGHT 4u
+#define SLICE_BOTTOM 5u
+#define SLICE_BOTTOM_LEFT 6u
+#define SLICE_LEFT 7u
+
+#define GSK_REPEAT_NONE 0u
+#define GSK_REPEAT_PAD 1u
+#define GSK_REPEAT_REPEAT 2u
+#define GSK_REPEAT_REFLECT 3u
+#define GSK_REPEAT_MASK 3u
+
+#define GSK_SNAP_NONE 0u
+#define GSK_SNAP_FLOOR 1u
+#define GSK_SNAP_CEIL 2u
+#define GSK_SNAP_ROUND 3u
+
+#endif
+
+/* Needs to be exactly like this and not use #else
+ * because our include script is too dumb
+ */
+#ifndef VULKAN
+precision highp float;
+
+#if __VERSION__ < 420 || (defined(GSK_GLES) && __VERSION__ < 310)
+layout(std140)
+#else
+layout(std140, binding = 0)
+#endif
+uniform PushConstants
+{
+    mat4 mvp;
+    vec2 scale;
+    vec2 color_volume1;
+    vec2 color_volume2;
+    vec2 color_volume3;
+    vec4 clip_mask_rect;
+    mat3x4 clip;
+} push;
+
+#define GSK_GLOBAL_MVP push.mvp
+#define GSK_GLOBAL_CLIP push.clip
+#define GSK_GLOBAL_CLIP_RECT push.clip[0]
+#define GSK_GLOBAL_SCALE push.scale
+
+#define GSK_VERTEX_INDEX gl_VertexID
+
+#ifndef _RECT_
+#define _RECT_
+
+#ifndef _SNAP_
+#define _SNAP_
+
+#define GskSnapDirection uint
+
+float
+gsk_snap (float            value,
+          GskSnapDirection snap)
+{
+  switch (snap)
+    {
+    case GSK_SNAP_FLOOR:
+      return floor (value);
+    case GSK_SNAP_CEIL:
+      return ceil (value);
+    case GSK_SNAP_ROUND:
+      return round (value);
+    case GSK_SNAP_NONE:
+    default:
+      return value;
+    }
+}
+
+#endif
+
+/* x,y and y,w make up the 2 points of this rect,
+   note that this is not containing width or height */
+#define Rect vec4[1]
+
+/* each bytes contains a GskSnapDirection, see the C one */
+#define GskRectSnap uint
+
+GskSnapDirection
+gsk_rect_snap_get_direction (GskRectSnap snap,
+                             uint        dir)
+{ 
+  return ((snap >> (8u * dir)) & 0xFFu);
+}
+
+GskRectSnap
+gsk_rect_snap_new (GskSnapDirection top,
+                   GskSnapDirection right,
+                   GskSnapDirection bottom,
+                   GskSnapDirection left)
+{
+  return (((((left << 8u) | bottom) << 8u) | right) << 8u) | top;
+}
+
+#define GSK_RECT_SNAP_GROW gsk_rect_snap_new (GSK_SNAP_FLOOR, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_FLOOR)
+#define GSK_RECT_SNAP_SHRINK gsk_rect_snap_new (GSK_SNAP_CEIL, GSK_SNAP_FLOOR, GSK_SNAP_FLOOR, GSK_SNAP_CEIL)
+#define GSK_RECT_SNAP_SHRINK_GROW gsk_rect_snap_new (GSK_SNAP_FLOOR, GSK_SNAP_FLOOR, GSK_SNAP_CEIL, GSK_SNAP_CEIL)
+#define GSK_RECT_SNAP_GROW_SHRINK gsk_rect_snap_new (GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_FLOOR, GSK_SNAP_FLOOR)
+#define GSK_RECT_SNAP_ROUND gsk_rect_snap_new (GSK_SNAP_ROUND, GSK_SNAP_ROUND, GSK_SNAP_ROUND, GSK_SNAP_ROUND)
+
+vec4
+rect_bounds (Rect r)
+{
+  return r[0];
+}
+
+Rect
+rect_snap (Rect        src,
+           GskRectSnap snap)
+{
+  float x, y;
+
+  if (snap == 0u)
+    return src;
+
+  vec4 bounds = rect_bounds (src);
+
+  return Rect (vec4 (gsk_snap (bounds.x, gsk_rect_snap_get_direction (snap, 3u)),
+                     gsk_snap (bounds.y, gsk_rect_snap_get_direction (snap, 0u)),
+                     gsk_snap (bounds.z, gsk_rect_snap_get_direction (snap, 1u)),
+                     gsk_snap (bounds.w, gsk_rect_snap_get_direction (snap, 2u))));
+}
+
+Rect
+rect_new_size (vec4 coords)
+{
+  return Rect (coords + vec4 (0.0, 0.0, coords.xy));
+}
+
+Rect
+rect_from_gsk (vec4 coords)
+{
+  Rect result = rect_new_size (coords);
+  return Rect (rect_bounds(result) * GSK_GLOBAL_SCALE.xyxy);
+}
+
+float
+rect_distance (Rect r, vec2 p)
+{
+  vec4 distance = (rect_bounds (r) - p.xyxy) * vec4(1.0, 1.0, -1.0, -1.0);
+  vec2 max2 = max (distance.xy, distance.zw);
+  return length (max (max2, 0.0)) + min (max(max2.x, max2.y), 0.0);
+}
+
+vec2
+rect_pos (Rect r)
+{
+  return rect_bounds (r).xy;
+}
+
+vec2
+rect_size (Rect r)
+{
+  return rect_bounds (r).zw - rect_bounds (r).xy;
+}
+
+Rect
+rect_intersect (Rect a, Rect b)
+{
+  vec4 result = vec4(max(rect_bounds (a).xy, rect_bounds (b).xy), min(rect_bounds (a).zw, rect_bounds (b).zw));
+  if (any (greaterThanEqual (result.xy, result.zw)))
+    return Rect (vec4(0.0));
+  return Rect(result);
+}
+
+Rect
+rect_union (Rect a, Rect b)
+{
+  return Rect (vec4 (min (rect_bounds (a).xy, rect_bounds (b).xy), max (rect_bounds (a).zw, rect_bounds (b).zw)));
+}
+
+vec2
+rect_get_coord (Rect r, vec2 pt)
+{
+  return (pt - rect_pos (r)) / rect_size (r);
+}
+
+#ifdef GSK_FRAGMENT_SHADER
+
+float
+rect_coverage (Rect r,
+               vec2 p,
+               vec2 dFdp)
+{
+  Rect prect = Rect(vec4(p - 0.5 * dFdp, p + 0.5 * dFdp));
+  Rect coverect = rect_intersect (r, prect);
+  vec2 coverage = rect_size(coverect) / dFdp;
+  return coverage.x * coverage.y;
+}
+
+float
+rect_coverage (Rect r, vec2 p)
+{
+  return rect_coverage (r, p, fwidth (p));
+}
+
+
+#endif
+
+#endif
+
+#ifdef GSK_VERTEX_SHADER
+#define IN(_loc) in
+#define PASS(_loc) out
+#define PASS_FLAT(_loc) flat out
+#endif
+
+#ifdef GSK_FRAGMENT_SHADER
+#define PASS(_loc) in
+#define PASS_FLAT(_loc) flat in
+
+#if GSK_N_TEXTURES > 0
+
+#ifdef GSK_TEXTURE0_IS_EXTERNAL
+uniform samplerExternalOES GSK_TEXTURE0;
+#define GSK_TEXTURE0_1 GSK_TEXTURE0
+#define GSK_TEXTURE0_2 GSK_TEXTURE0
+#define HAS_EXTERNAL_TEXTURES
+#else
+uniform sampler2D GSK_TEXTURE0;
+uniform sampler2D GSK_TEXTURE0_1;
+uniform sampler2D GSK_TEXTURE0_2;
+#endif
+
+#if GSK_N_TEXTURES > 1
+
+#ifdef GSK_TEXTURE1_IS_EXTERNAL
+uniform samplerExternalOES GSK_TEXTURE1;
+#define GSK_TEXTURE1_1 GSK_TEXTURE1
+#define GSK_TEXTURE1_2 GSK_TEXTURE1
+#ifndef HAS_EXTERNAL_TEXTURES
+#define HAS_EXTERNAL_TEXTURES
+#endif
+#else
+uniform sampler2D GSK_TEXTURE1;
+uniform sampler2D GSK_TEXTURE1_1;
+uniform sampler2D GSK_TEXTURE1_2;
+#endif
+
+#endif
+#endif
+
+#ifdef GSK_GL_HAS_CLIP_MASK
+uniform sampler2D GSK_TEXTURE_MASK;
+
+float
+gsk_clip_mask_coverage (void)
+{
+  vec2 coord = rect_get_coord (rect_new_size (push.clip_mask_rect), gl_FragCoord.xy);
+  return texture (GSK_TEXTURE_MASK, coord).a;
+}
+#else
+float
+gsk_clip_mask_coverage (void)
+{
+  return 1.0;
+}
+#endif
+
+#ifdef HAS_EXTERNAL_TEXTURES
+vec4
+gsk_texture_straight_alpha (samplerExternalOES tex,
+                            vec2               pos)
+{
+  vec2 size = vec2 (textureSize (tex, 0));
+  pos *= size;
+  size -= vec2 (1.0);
+  /* GL_CLAMP_TO_EDGE */
+  pos = clamp (pos - 0.5, vec2 (0.0), size);
+  ivec2 ipos = ivec2 (pos);
+  pos = fract (pos);
+  vec4 tl = texelFetch (tex, ipos, 0);
+  tl.rgb *= tl.a;
+  vec4 tr = texelFetch (tex, ipos + ivec2(1, 0), 0);
+  tr.rgb *= tr.a;
+  vec4 bl = texelFetch (tex, ipos + ivec2(0, 1), 0);
+  bl.rgb *= bl.a;
+  vec4 br = texelFetch (tex, ipos + ivec2(1, 1), 0);
+  br.rgb *= br.a;
+  return mix (mix (tl, tr, pos.x), mix (bl, br, pos.x), pos.y);
+}
+#endif
+
+layout(location = 0) out vec4 out_color;
+void
+gsk_set_output_color (vec4 color)
+{
+  out_color = color;
+}
+
+#ifdef GSK_DUAL_BLEND
+layout(location = 0, index = 1) out vec4 out_mask;
+void
+gsk_set_output_mask (vec4 mask)
+{
+  out_mask = mask;
+}
+#endif
+
+#endif
+#endif
+
+#define GSK_SHADER_CLIP (GSK_FLAGS & 3u)
+/* Defined by the shader compilers directly */
+/* #define GSK_TEXTURE0_IS_EXTERNAL ((GSK_FLAGS >> 4u) & 1u) */
+/* #define GSK_TEXTURE1_IS_EXTERNAL ((GSK_FLAGS >> 5u) & 1u) */
+#define GSK_TEXTURE0_SAMPLE_OP ((GSK_FLAGS >> 6u) & 7u)
+#define GSK_TEXTURE1_SAMPLE_OP ((GSK_FLAGS >> 10u) & 7u)
+
+#ifndef _COLOR_
+#define _COLOR_
+
+#define COLOR_SPACE_OUTPUT_PREMULTIPLIED (1u << 2)
+#define COLOR_SPACE_ALT_PREMULTIPLIED    (1u << 3)
+#define COLOR_SPACE_OUTPUT_SHIFT 8u
+#define COLOR_SPACE_ALT_SHIFT 16u
+#define COLOR_SPACE_COLOR_STATE_MASK 0xFFu
+
+#define OUTPUT_COLOR_SPACE ((GSK_COLOR_STATES >> COLOR_SPACE_OUTPUT_SHIFT) & COLOR_SPACE_COLOR_STATE_MASK)
+#define ALT_COLOR_SPACE ((GSK_COLOR_STATES >> COLOR_SPACE_ALT_SHIFT) & COLOR_SPACE_COLOR_STATE_MASK)
+#define OUTPUT_PREMULTIPLIED ((GSK_COLOR_STATES & COLOR_SPACE_OUTPUT_PREMULTIPLIED) == COLOR_SPACE_OUTPUT_PREMULTIPLIED)
+#define ALT_PREMULTIPLIED ((GSK_COLOR_STATES & COLOR_SPACE_ALT_PREMULTIPLIED) == COLOR_SPACE_ALT_PREMULTIPLIED)
+
+vec4
+color_premultiply (vec4 color)
+{
+  return vec4 (color.rgb, 1.0) * color.a;
+}
+
+vec4
+color_unpremultiply (vec4 color)
+{
+  return color.a > 0.0 ? color / vec4 (color.aaa, 1.0) : color;
+}
+
+float
+luminance (vec3 color)
+{
+  return dot (vec3 (0.2126, 0.7152, 0.0722), color);
+}
+
+vec4
+alt_color_alpha (vec4  color,
+                 float alpha)
+{
+  if (ALT_PREMULTIPLIED)
+    return color * alpha;
+  else
+    return vec4 (color.rgb, color.a * alpha);
+}
+
+vec4
+output_color_alpha (vec4  color,
+                    float alpha)
+{
+  if (OUTPUT_PREMULTIPLIED)
+    return color * alpha;
+  else
+    return vec4 (color.rgb, color.a * alpha);
+}
+
+vec3
+srgb_eotf (vec3 v)
+{
+  vec3 lo = v / 12.92;
+  vec3 hi = sign (v) * pow (((abs (v) + 0.055) / (1.0 + 0.055)), vec3 (2.4));
+  return mix (lo, hi, greaterThanEqual (abs (v), vec3 (0.04045)));
+}
+
+vec3
+srgb_oetf (vec3 v)
+{
+  vec3 lo = 12.92 * v;
+  vec3 hi = sign (v) * (1.055 * pow (abs (v), vec3 (1.0 / 2.4)) - 0.055);
+  return mix (lo, hi, greaterThan (abs (v), vec3 (0.0031308)));
+}
+
+vec3
+pq_eotf (vec3 v)
+{
+  const float ninv = 16384.0 / 2610.0;
+  const float minv = 32.0 / 2523.0;
+  const float c1 = 3424.0 / 4096.0;
+  const float c2 = 2413.0 / 128.0;
+  const float c3 = 2392.0 / 128.0;
+
+  vec3 x = pow (abs (v), vec3 (minv));
+  x = pow (max (x - c1, 0.0) / (c2 - (c3 * x)), vec3 (ninv));
+
+  return sign (v) * x * 10000.0 / 203.0;
+}
+
+vec3
+pq_oetf (vec3 v)
+{
+  const float n = 2610.0 / 16384.0;
+  const float m = 2523.0 / 32.0;
+  const float c1 = 3424.0 / 4096.0;
+  const float c2 = 2413.0 / 128.0;
+  const float c3 = 2392.0 / 128.0;
+
+  vec3 x = pow (abs (v) * 203.0 / 10000.0, vec3 (n));
+
+  return sign (v) * pow (((c1 + (c2 * x)) / (1.0 + (c3 * x))), vec3 (m));
+}
+
+/* Note that these matrices are transposed from the C version */
+
+const mat3 srgb_from_rec2020 = mat3(
+  1.660227, -0.124553, -0.018155,
+ -0.587548,  1.132926, -0.100603,
+ -0.072838, -0.008350, 1.118998
+);
+
+const mat3 rec2020_from_srgb = mat3(
+  0.627504, 0.069108, 0.016394,
+  0.329275, 0.919519, 0.088011,
+  0.043303, 0.011360, 0.895380
+);
+
+vec3
+apply_eotf (vec3 color,
+            uint cs)
+{
+  switch (cs)
+    {
+    case GDK_COLOR_STATE_ID_SRGB:
+      return srgb_eotf (color);
+
+    case GDK_COLOR_STATE_ID_REC2100_PQ:
+      return pq_eotf (color);
+
+    case GDK_COLOR_STATE_ID_SRGB_LINEAR:
+    case GDK_COLOR_STATE_ID_REC2100_LINEAR:
+      return color;
+
+    default:
+      return vec3(1.0, 0.0, 0.8);
+    }
+}
+
+vec3
+apply_oetf (vec3 color,
+            uint cs)
+{
+  switch (cs)
+    {
+    case GDK_COLOR_STATE_ID_SRGB:
+      return srgb_oetf (color);
+
+    case GDK_COLOR_STATE_ID_REC2100_PQ:
+      return pq_oetf (color);
+
+    case GDK_COLOR_STATE_ID_SRGB_LINEAR:
+    case GDK_COLOR_STATE_ID_REC2100_LINEAR:
+      return color;
+
+    default:
+      return vec3(0.0, 1.0, 0.8);
+    }
+}
+
+vec3
+convert_linear (vec3 color,
+                uint from,
+                uint to)
+{
+  if (to == GDK_COLOR_STATE_ID_REC2100_LINEAR && from == GDK_COLOR_STATE_ID_SRGB_LINEAR)
+    return rec2020_from_srgb * color;
+  else if (to == GDK_COLOR_STATE_ID_SRGB_LINEAR && from == GDK_COLOR_STATE_ID_REC2100_LINEAR)
+    return srgb_from_rec2020 * color;
+  else
+    return vec3(0.8, 1.0, 0.0);
+}
+
+uint
+linear_color_space (uint cs)
+{
+  switch (cs)
+    {
+    case GDK_COLOR_STATE_ID_SRGB:           return GDK_COLOR_STATE_ID_SRGB_LINEAR;
+    case GDK_COLOR_STATE_ID_SRGB_LINEAR:    return GDK_COLOR_STATE_ID_SRGB_LINEAR;
+    case GDK_COLOR_STATE_ID_REC2100_PQ:     return GDK_COLOR_STATE_ID_REC2100_LINEAR;
+    case GDK_COLOR_STATE_ID_REC2100_LINEAR: return GDK_COLOR_STATE_ID_REC2100_LINEAR;
+    default:                                return 0u;
+  };
+}
+
+vec4
+convert_color (vec4 color,
+               uint from,
+               bool from_premul,
+               uint to,
+               bool to_premul)
+{
+  if (from_premul && (!to_premul || from != to))
+    color = color_unpremultiply (color);
+
+  if (from != to)
+    {
+      uint from_linear = linear_color_space (from);
+      uint to_linear = linear_color_space (to);
+
+      if (from_linear != from)
+        color.rgb = apply_eotf (color.rgb, from);
+
+      if (from_linear != to_linear)
+        color.rgb = convert_linear (color.rgb, from_linear, to_linear);
+
+      if (to_linear != to)
+        color.rgb = apply_oetf (color.rgb, to);
+    }
+
+  if (to_premul && (!from_premul || from != to))
+    color = color_premultiply (color);
+
+  return color;
+}
+
+vec4
+alt_color_from_output (vec4 color)
+{
+  return convert_color (color,
+                        OUTPUT_COLOR_SPACE, OUTPUT_PREMULTIPLIED,
+                        ALT_COLOR_SPACE, ALT_PREMULTIPLIED);
+}
+
+vec4
+output_color_from_alt (vec4 color)
+{
+  return convert_color (color,
+                        ALT_COLOR_SPACE, ALT_PREMULTIPLIED,
+                        OUTPUT_COLOR_SPACE, OUTPUT_PREMULTIPLIED);
+}
+
+#endif /* _COLOR_ */
+#ifndef _ROUNDED_RECT_
+#define _ROUNDED_RECT_
+
+#ifndef _ELLIPSE_
+#define _ELLIPSE_
+
+struct Ellipse
+{
+  vec2 center;
+  vec2 radius;
+};
+
+float
+ellipse_distance (Ellipse r, vec2 p)
+{
+  vec2 e = r.radius;
+  p = p - r.center;
+
+  if (e.x == e.y)
+    return length (p) - e.x;
+
+  /* from https://www.shadertoy.com/view/tt3yz7 */
+  vec2 pAbs = abs(p);
+  vec2 ei = 1.0 / e;
+  vec2 e2 = e*e;
+  vec2 ve = ei * vec2(e2.x - e2.y, e2.y - e2.x);
+  
+  vec2 t = vec2(0.70710678118654752, 0.70710678118654752);
+  for (int i = 0; i < 3; i++) {
+      vec2 v = ve*t*t*t;
+      vec2 u = normalize(pAbs - v) * length(t * e - v);
+      vec2 w = ei * (v + u);
+      t = normalize(clamp(w, 0.0, 1.0));
+  }
+  
+  vec2 nearestAbs = t * e;
+  float dist = length(pAbs - nearestAbs);
+  return dot(pAbs, pAbs) < dot(nearestAbs, nearestAbs) ? -dist : dist;
+}
+
+#endif
+
+#define RoundedRect vec4[3]
+
+RoundedRect
+rounded_rect_from_rect (Rect r)
+{
+  return RoundedRect (rect_bounds(r), vec4 (0.0), vec4 (0.0));
+}
+
+RoundedRect
+rounded_rect_from_gsk (mat3x4 gsk_rounded_rect)
+{
+  return RoundedRect ((gsk_rounded_rect[0].xyxy + vec4 (0.0, 0.0, gsk_rounded_rect[0].zw)) * GSK_GLOBAL_SCALE.xyxy,
+                      gsk_rounded_rect[1] * GSK_GLOBAL_SCALE.xxxx,
+                      gsk_rounded_rect[2] * GSK_GLOBAL_SCALE.yyyy);
+}
+
+vec4
+rounded_rect_bounds (RoundedRect r)
+{
+  return r[0];
+}
+
+vec4
+rounded_rect_corner_widths (RoundedRect r)
+{
+  return r[1];
+}
+
+vec4
+rounded_rect_corner_heights (RoundedRect r)
+{
+  return r[2];
+}
+
+vec2
+rounded_rect_corner (RoundedRect r, const uint corner)
+{
+  return vec2 (
+    rounded_rect_corner_widths (r)[corner],
+    rounded_rect_corner_heights (r)[corner]
+  );
+}
+
+float
+rounded_rect_corner_width (RoundedRect r, const uint corner)
+{
+  return rounded_rect_corner_widths (r)[corner];
+}
+
+float
+rounded_rect_corner_height (RoundedRect r, const uint corner)
+{
+  return rounded_rect_corner_heights (r)[corner];
+}
+
+float
+rounded_rect_distance (RoundedRect r, vec2 p)
+{
+  float bounds_distance = rect_distance (Rect (rounded_rect_bounds (r)), p);
+                      
+  Ellipse tl = Ellipse (rounded_rect_bounds (r).xy + vec2( 1.,  1.)*rounded_rect_corner (r, TOP_LEFT),
+                        rounded_rect_corner (r, TOP_LEFT));
+  Ellipse tr = Ellipse (rounded_rect_bounds (r).zy + vec2(-1.,  1.)*rounded_rect_corner (r, TOP_RIGHT),
+                        rounded_rect_corner (r, TOP_RIGHT));
+  Ellipse br = Ellipse (rounded_rect_bounds (r).zw + vec2(-1., -1.)*rounded_rect_corner (r, BOTTOM_RIGHT),
+                        rounded_rect_corner (r, BOTTOM_RIGHT));
+  Ellipse bl = Ellipse (rounded_rect_bounds (r).xw + vec2( 1., -1.)*rounded_rect_corner (r, BOTTOM_LEFT),
+                        rounded_rect_corner (r, BOTTOM_LEFT));
+
+ vec4 distances = vec4(ellipse_distance (tl, p),
+                       ellipse_distance (tr, p),
+                       ellipse_distance (br, p),
+                       ellipse_distance (bl, p));
+
+  bvec4 is_out = bvec4(p.x < tl.center.x && p.y < tl.center.y,
+                       p.x > tr.center.x && p.y < tr.center.y,
+                       p.x > br.center.x && p.y > br.center.y,
+                       p.x < bl.center.x && p.y > bl.center.y);
+  distances = mix (vec4(bounds_distance), distances, is_out);
+
+  vec2 max2 = max (distances.xy, distances.zw);
+  return max (max2.x, max2.y);
+}
+
+RoundedRect
+rounded_rect_shrink (RoundedRect r, vec4 amount)
+{
+  vec4 new_bounds = rounded_rect_bounds (r) + vec4(1.0,1.0,-1.0,-1.0) * amount.wxyz;
+  vec4 new_widths = max (rounded_rect_corner_widths (r) - sign (rounded_rect_corner_widths (r)) * amount.wyyw, 0.0);
+  vec4 new_heights = max (rounded_rect_corner_heights (r) - sign (rounded_rect_corner_heights (r)) * amount.xxzz, 0.0);
+  new_widths = min (new_widths, new_bounds.z - new_bounds.x);
+  new_heights = min (new_heights, new_bounds.w - new_bounds.y);
+              
+  return RoundedRect (new_bounds, new_widths, new_heights);
+}
+
+void
+rounded_rect_scale (inout RoundedRect r,
+                    vec2              scale)
+{
+  r = RoundedRect (
+    rounded_rect_bounds (r) * scale.xyxy,
+    rounded_rect_corner_widths (r) * scale.xxxx,
+    rounded_rect_corner_heights (r) * scale.yyyy
+  );
+}
+
+void
+rounded_rect_offset (inout RoundedRect r,
+                     vec2              offset)
+{
+  r = RoundedRect (
+    rounded_rect_bounds (r) + offset.xyxy,
+    rounded_rect_corner_widths (r),
+    rounded_rect_corner_heights (r)
+  );
+}
+
+bool
+rounded_rect_is_slicable (RoundedRect r)
+{
+  vec2 size = rect_size (Rect (rounded_rect_bounds (r)));
+  return any (lessThanEqual (rounded_rect_corner (r, TOP_LEFT) + rounded_rect_corner (r, BOTTOM_RIGHT), size))
+      && any (lessThanEqual (rounded_rect_corner (r, BOTTOM_LEFT) + rounded_rect_corner (r, TOP_RIGHT), size));
+}
+
+Rect
+rounded_rect_intersection_fallback_slice (RoundedRect outside,
+                                          RoundedRect inside,
+                                          uint        slice,
+                                          bool        snap)
+{
+  Rect r;
+
+  switch (slice)
+    {
+    default:
+    case SLICE_TOP:
+    case SLICE_RIGHT:
+    case SLICE_BOTTOM:
+    case SLICE_LEFT:
+      return Rect (vec4 (0.0));
+
+    case SLICE_TOP_LEFT:
+      r = Rect (vec4 (rounded_rect_bounds (outside).xy, 0.5 * (rounded_rect_bounds (outside).xy + rounded_rect_bounds (outside).zw)));
+      if (snap)
+        r = rect_snap (r, gsk_rect_snap_new (GSK_SNAP_FLOOR, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_FLOOR));
+      return r;
+
+    case SLICE_TOP_RIGHT:
+      r = Rect (vec4 (0.5 * (rounded_rect_bounds (outside).x + rounded_rect_bounds (outside).z), rounded_rect_bounds (outside).y,
+                      rounded_rect_bounds (outside).z, 0.5 * (rounded_rect_bounds (outside).y + rounded_rect_bounds (outside).w)));
+      if (snap)
+        r = rect_snap (r, gsk_rect_snap_new (GSK_SNAP_FLOOR, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_CEIL));
+      return r;
+
+    case SLICE_BOTTOM_RIGHT:
+      r = Rect (vec4 (0.5 * (rounded_rect_bounds (outside).xy + rounded_rect_bounds (outside).zw), rounded_rect_bounds (outside).zw));
+      if (snap)
+        r = rect_snap (r, gsk_rect_snap_new (GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_CEIL));
+      return r;
+
+    case SLICE_BOTTOM_LEFT:
+      r = Rect (vec4 (rounded_rect_bounds (outside).x, 0.5 * (rounded_rect_bounds (outside).y + rounded_rect_bounds (outside).w),
+                      0.5 * (rounded_rect_bounds (outside).x + rounded_rect_bounds (outside).z), rounded_rect_bounds (outside).w));
+      if (snap)
+        r = rect_snap (r, gsk_rect_snap_new (GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_CEIL, GSK_SNAP_FLOOR));
+      return r;
+    }
+}
+
+Rect
+rounded_rect_intersection_slice (RoundedRect outside,
+                                 RoundedRect inside,
+                                 uint        slice,
+                                 bool        snap)
+{
+  float x[4], y[4];
+
+  if (!rounded_rect_is_slicable (outside) ||
+      !rounded_rect_is_slicable (inside))
+    {
+      return rounded_rect_intersection_fallback_slice (outside, inside, slice, snap);
+    }
+
+  x[0] = rounded_rect_bounds (outside).x;
+  x[3] = rounded_rect_bounds (outside).z;
+  
+  switch (slice)
+    {
+    case SLICE_TOP_LEFT:
+    case SLICE_TOP:
+    case SLICE_TOP_RIGHT:
+      x[1] = max (rounded_rect_bounds (outside).x + rounded_rect_corner_width (outside, TOP_LEFT),
+                  rounded_rect_bounds (inside).x + rounded_rect_corner_width (inside, TOP_LEFT));
+      x[2] = min (rounded_rect_bounds (outside).z - rounded_rect_corner_width (outside, TOP_RIGHT),
+                  rounded_rect_bounds (inside).z - rounded_rect_corner_width (inside, TOP_RIGHT));
+      break;
+
+    case SLICE_LEFT:
+    case SLICE_RIGHT:
+    default:
+      x[1] = max (rounded_rect_bounds (outside).x, rounded_rect_bounds (inside).x);
+      x[2] = max (rounded_rect_bounds (outside).z, rounded_rect_bounds (inside).z);
+
+    case SLICE_BOTTOM_LEFT:
+    case SLICE_BOTTOM:
+    case SLICE_BOTTOM_RIGHT:
+      x[1] = max (rounded_rect_bounds (outside).x + rounded_rect_corner_width (outside, BOTTOM_LEFT),
+                  rounded_rect_bounds (inside).x + rounded_rect_corner_width (inside, BOTTOM_LEFT));
+      x[2] = min (rounded_rect_bounds (outside).z - rounded_rect_corner_width (outside, BOTTOM_RIGHT),
+                  rounded_rect_bounds (inside).z - rounded_rect_corner_width (inside, BOTTOM_RIGHT));
+      break;
+    }
+
+  if (snap)
+    {
+      x[0] = floor (x[0]);
+      x[1] = ceil (x[1]);
+      x[2] = floor (x[2]);
+      x[2] = max (x[1], x[2]);
+      x[3] = ceil (x[3]);
+    }
+
+  y[0] = rounded_rect_bounds (outside).y;
+  y[3] = rounded_rect_bounds (outside).w;
+  
+  switch (slice)
+    {
+    case SLICE_TOP_LEFT:
+    case SLICE_LEFT:
+    case SLICE_BOTTOM_LEFT:
+      y[1] = max (rounded_rect_bounds (outside).y + rounded_rect_corner_height (outside, TOP_LEFT),
+                  rounded_rect_bounds (inside).y + rounded_rect_corner_height (inside, TOP_LEFT));
+      y[2] = min (rounded_rect_bounds (outside).w - rounded_rect_corner_height (outside, BOTTOM_LEFT),
+                  rounded_rect_bounds (inside).w - rounded_rect_corner_height (inside, BOTTOM_LEFT));
+      break;
+
+    case SLICE_TOP:
+    case SLICE_BOTTOM:
+    default:
+      y[1] = max (rounded_rect_bounds (outside).y, rounded_rect_bounds (inside).y);
+      y[2] = max (rounded_rect_bounds (outside).w, rounded_rect_bounds (inside).w);
+
+    case SLICE_TOP_RIGHT:
+    case SLICE_RIGHT:
+    case SLICE_BOTTOM_RIGHT:
+      y[1] = max (rounded_rect_bounds (outside).y + rounded_rect_corner_height (outside, TOP_RIGHT),
+                  rounded_rect_bounds (inside).y + rounded_rect_corner_height (inside, TOP_RIGHT));
+      y[2] = min (rounded_rect_bounds (outside).w - rounded_rect_corner_height (outside, BOTTOM_RIGHT),
+                  rounded_rect_bounds (inside).w - rounded_rect_corner_height (inside, BOTTOM_RIGHT));
+      break;
+    }
+
+  if (snap)
+    {
+      y[0] = floor (y[0]);
+      y[1] = ceil (y[1]);
+      y[2] = floor (y[2]);
+      y[2] = max (y[1], y[2]);
+      y[3] = ceil (y[3]);
+    }
+
+  switch (slice)
+    {
+    case SLICE_TOP_LEFT:
+      return Rect (vec4 (x[0], y[0], x[1], y[1]));
+    case SLICE_TOP:
+      return Rect (vec4 (x[1], y[0], x[2], y[1]));
+    case SLICE_TOP_RIGHT:
+      return Rect (vec4 (x[2], y[0], x[3], y[1]));
+    case SLICE_LEFT:
+      return Rect (vec4 (x[0], y[1], x[1], y[2]));
+    case SLICE_RIGHT:
+      return Rect (vec4 (x[2], y[1], x[3], y[2]));
+    case SLICE_BOTTOM_LEFT:
+      return Rect (vec4 (x[0], y[2], x[1], y[3]));
+    case SLICE_BOTTOM:
+      return Rect (vec4 (x[1], y[2], x[2], y[3]));
+    case SLICE_BOTTOM_RIGHT:
+      return Rect (vec4 (x[2], y[2], x[3], y[3]));
+    default:
+      return Rect (vec4 (0.0));
+    }
+}
+
+#ifdef GSK_FRAGMENT_SHADER
+
+float
+rounded_rect_coverage (RoundedRect r, vec2 p)
+{
+  vec2 fw = fwidth (p);
+  float distance_scale = max (fw.x, fw.y);
+  float distance = rounded_rect_distance (r, p) / distance_scale;
+  float coverage = 0.5 - distance;
+
+  return clamp (coverage, 0.0, 1.0);
+}
+
+#endif
+
+#endif
+
+#define PI 3.1415926535897932384626433832795
+#define SQRT1_2 1.4142135623730951
+
+Rect
+rect_clip (Rect r)
+{
+  if (GSK_SHADER_CLIP == GSK_GPU_SHADER_CLIP_NONE)
+    return r;
+  else
+    return rect_intersect (r, rect_from_gsk (GSK_GLOBAL_CLIP_RECT));
+}
+
+#ifdef GSK_VERTEX_SHADER
+
+const vec2 offsets[6] = vec2[6](vec2(0.0, 0.0),
+                                vec2(1.0, 0.0),
+                                vec2(0.0, 1.0),
+                                vec2(0.0, 1.0),
+                                vec2(1.0, 0.0),
+                                vec2(1.0, 1.0));
+
+void
+gsk_set_position (vec2 pos)
+{
+  gl_Position = GSK_GLOBAL_MVP * vec4 (pos, 0.0, 1.0);
+}
+
+vec2
+rect_get_position (Rect rect)
+{
+  Rect r = rect_snap (rect_clip (rect), GSK_RECT_SNAP_GROW);
+
+  vec2 pos = mix (rect_bounds (r).xy, rect_bounds (r).zw, offsets[GSK_VERTEX_INDEX]);
+
+  return pos;
+}
+
+vec2
+border_get_position (RoundedRect outside,
+                     RoundedRect inside)
+{
+  uint slice_index = uint (GSK_VERTEX_INDEX) / 6u;
+  uint vert_index = uint (GSK_VERTEX_INDEX) % 6u;
+
+  Rect rect = rounded_rect_intersection_slice (outside, inside, slice_index, true);
+
+  switch (slice_index)
+    {
+    case SLICE_TOP_LEFT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW);
+      rect = Rect (rect_bounds (rect).xwzy);
+      break;
+    case SLICE_TOP:
+      rect = rect_snap (rect, GSK_RECT_SNAP_SHRINK_GROW);
+      break;
+    case SLICE_TOP_RIGHT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW);
+      break;
+    case SLICE_RIGHT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW_SHRINK);
+      break;
+    case SLICE_BOTTOM_RIGHT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW);
+      rect = Rect (rect_bounds (rect).zyxw);
+      break;
+    case SLICE_BOTTOM:
+      rect = rect_snap (rect, GSK_RECT_SNAP_SHRINK_GROW);
+      break;
+    case SLICE_BOTTOM_LEFT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW);
+      rect = Rect (rect_bounds (rect).zwxy);
+      break;
+    case SLICE_LEFT:
+      rect = rect_snap (rect, GSK_RECT_SNAP_GROW_SHRINK);
+      break;
+    }
+
+  vec2 pos = mix (rect_bounds (rect).xy, rect_bounds (rect).zw, offsets[vert_index]);
+
+  return pos;
+}
+
+vec2
+scale_tex_coord (vec2 in_pos,
+                 Rect in_rect,
+                 vec4 tex_rect)
+{
+  return tex_rect.xy + (in_pos - rect_pos (in_rect)) / rect_size (in_rect) * tex_rect.zw;
+}
+
+void            run                             (out vec2 pos);
+
+void
+main (void)
+{
+  vec2 pos;
+
+  run (pos);
+
+  gsk_set_position (pos);
+}
+
+#endif /* GSK_VERTEX_SHADER */
+
+
+#ifdef GSK_FRAGMENT_SHADER
+
+vec4
+gsk_texture_straight_alpha (sampler2D tex,
+                            vec2      pos)
+{
+  vec2 size = vec2 (textureSize (tex, 0));
+  pos *= size;
+  size -= vec2 (1.0);
+  /* GL_CLAMP_TO_EDGE */
+  pos = clamp (pos - 0.5, vec2 (0.0), size);
+  ivec2 ipos = ivec2 (pos);
+  pos = fract (pos);
+  vec4 tl = texelFetch (tex, ipos, 0);
+  tl.rgb *= tl.a;
+  vec4 tr = texelFetch (tex, ipos + ivec2(1, 0), 0);
+  tr.rgb *= tr.a;
+  vec4 bl = texelFetch (tex, ipos + ivec2(0, 1), 0);
+  bl.rgb *= bl.a;
+  vec4 br = texelFetch (tex, ipos + ivec2(1, 1), 0);
+  br.rgb *= br.a;
+  return mix (mix (tl, tr, pos.x), mix (bl, br, pos.x), pos.y);
+}
+
+#if GSK_N_TEXTURES > 0
+vec4
+gsk_texture0 (vec2 pos)
+{
+  if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_DEFAULT)
+    return texture (GSK_TEXTURE0, pos);
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_STRAIGHT)
+    return gsk_texture_straight_alpha (GSK_TEXTURE0, pos);
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_2_PLANES)
+    return vec4 (texture (GSK_TEXTURE0, pos).x, texture (GSK_TEXTURE0_1, pos).xy, 1.0).brga;
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_3_PLANES)
+    return vec4 (texture (GSK_TEXTURE0_2, pos).x, texture (GSK_TEXTURE0, pos).x, texture (GSK_TEXTURE0_1, pos).x, 1.0);
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_3_PLANES_10BIT_LSB)
+    /* 65535.0 / 1023.0 ~= 64.061583578 */
+    return vec4 (clamp (texture (GSK_TEXTURE0_2, pos).x * 64.061583578, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE0, pos).x * 64.061583578, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE0_1, pos).x * 64.061583578, 0.0, 1.0),
+                 1.0);
+  else if (GSK_TEXTURE0_SAMPLE_OP == GDK_SHADER_3_PLANES_12BIT_LSB)
+    /* 65535.0 / 4095.0 ~= 16.003663004 */
+    return vec4 (clamp (texture (GSK_TEXTURE0_2, pos).x * 16.003663004, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE0, pos).x * 16.003663004, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE0_1, pos).x * 16.003663004, 0.0, 1.0),
+                 1.0);
+}
+#endif
+
+#if GSK_N_TEXTURES > 1
+vec4
+gsk_texture1 (vec2 pos)
+{
+  if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_DEFAULT)
+    return texture (GSK_TEXTURE1, pos);
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_STRAIGHT)
+    return gsk_texture_straight_alpha (GSK_TEXTURE1, pos);
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_2_PLANES)
+    return vec4 (texture (GSK_TEXTURE1, pos).x, texture (GSK_TEXTURE1_1, pos).xy, 1.0).brga;
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_3_PLANES)
+    return vec4 (texture (GSK_TEXTURE1_2, pos).x, texture (GSK_TEXTURE1, pos).x, texture (GSK_TEXTURE1_1, pos).x, 1.0);
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_3_PLANES_10BIT_LSB)
+    /* 65535.0 / 1023.0 ~= 64.061583578 */
+    return vec4 (clamp (texture (GSK_TEXTURE1_2, pos).x * 64.061583578, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE1, pos).x * 64.061583578, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE1_1, pos).x * 64.061583578, 0.0, 1.0),
+                 1.0);
+  else if (GSK_TEXTURE1_SAMPLE_OP == GDK_SHADER_3_PLANES_12BIT_LSB)
+    /* 65535.0 / 4095.0 ~= 16.003663004 */
+    return vec4 (clamp (texture (GSK_TEXTURE1_2, pos).x * 16.003663004, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE1, pos).x * 16.003663004, 0.0, 1.0),
+                 clamp (texture (GSK_TEXTURE1_1, pos).x * 16.003663004, 0.0, 1.0),
+                 1.0);
+}
+#endif
+
+void            run                             (out vec4 color,
+#ifdef GSK_DUAL_BLEND
+                                                 out vec4 mask,
+#endif
+                                                 out vec2 pos);
+
+void
+main_clip_none (void)
+{
+  vec4 color;
+#ifdef GSK_DUAL_BLEND
+  vec4 mask;
+#endif
+  vec2 pos;
+
+#ifdef GSK_DUAL_BLEND
+  run (color, mask, pos);
+#else
+  run (color, pos);
+#endif
+
+  float coverage = gsk_clip_mask_coverage ();
+  color *= coverage;
+
+  gsk_set_output_color (color);
+#ifdef GSK_DUAL_BLEND
+  gsk_set_output_mask (mask);
+#endif
+}
+
+void
+main_clip_rect (void)
+{
+  vec4 color;
+#ifdef GSK_DUAL_BLEND
+  vec4 mask;
+#endif
+  vec2 pos;
+
+#ifdef GSK_DUAL_BLEND
+  run (color, mask, pos);
+#else
+  run (color, pos);
+#endif
+
+  Rect clip = rect_from_gsk (GSK_GLOBAL_CLIP_RECT);
+
+  float coverage = rect_coverage (clip, pos) * gsk_clip_mask_coverage ();
+  color *= coverage;
+
+  gsk_set_output_color (color);
+#ifdef GSK_DUAL_BLEND
+  mask *= coverage;
+  gsk_set_output_mask (mask);
+#endif
+}
+
+void
+main_clip_rounded (void)
+{
+  vec4 color;
+#ifdef GSK_DUAL_BLEND
+  vec4 mask;
+#endif
+  vec2 pos;
+
+#ifdef GSK_DUAL_BLEND
+  run (color, mask, pos);
+#else
+  run (color, pos);
+#endif
+
+  RoundedRect clip = rounded_rect_from_gsk (GSK_GLOBAL_CLIP);
+
+  float coverage = rounded_rect_coverage (clip, pos) * gsk_clip_mask_coverage ();
+  color *= coverage;
+
+  gsk_set_output_color (color);
+#ifdef GSK_DUAL_BLEND
+  mask *= coverage;
+  gsk_set_output_mask (mask);
+#endif
+}
+
+void
+main (void)
+{
+  if (GSK_SHADER_CLIP == GSK_GPU_SHADER_CLIP_NONE)
+    main_clip_none ();
+  else if (GSK_SHADER_CLIP == GSK_GPU_SHADER_CLIP_RECT)
+    main_clip_rect ();
+  else if (GSK_SHADER_CLIP == GSK_GPU_SHADER_CLIP_ROUNDED)
+    main_clip_rounded ();
+}
+
+#endif /* GSK_FRAGMENT_SHADER */
+
+#endif
+
+
+#ifdef GSK_VERTEX_SHADER
+IN(0) vec4 in_bounds;
+IN(1) vec4 in_tex_rect;
+IN(2) vec4 in_color;
+#endif
+
+PASS(0) vec2 _pos;
+PASS_FLAT(1) Rect _bounds;
+PASS_FLAT(2) vec4 _color;
+PASS(3) vec2 _tex_coord;
+
+
+#ifdef GSK_VERTEX_SHADER
+
+void
+run (out vec2 pos)
+{
+  Rect b = rect_from_gsk (in_bounds);
+  
+  pos = rect_get_position (b);
+
+  _pos = pos;
+  _bounds = b;
+  _color = output_color_from_alt (in_color);
+  _tex_coord = rect_get_coord (rect_from_gsk (in_tex_rect), pos);
+}
+
+#endif
+
+
+
+#ifdef GSK_FRAGMENT_SHADER
+
+void
+run (out vec4 color,
+     out vec2 position)
+{
+  float alpha = texture (GSK_TEXTURE0, _tex_coord).a * rect_coverage (_bounds, _pos);
+  color = output_color_alpha (_color, alpha);
+  position = _pos;
+}
+
+#endif
+

@@ -1,0 +1,3 @@
+#!/bin/sh
+# usage: gcc-run [ENV=val ...]   launch Settings for 20 s on the phone, report new GPU faults/timeouts
+exec "$(dirname "$0")/pm" "pkill -x gnome-control-c; f0=\$(dmesg | grep -c 'js fault'); t0=\$(dmesg | grep -c 'sched timeout'); env XDG_RUNTIME_DIR=/run/user/\$(id -u) WAYLAND_DISPLAY=wayland-0 XDG_CURRENT_DESKTOP=Phosh:GNOME DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$(id -u)/bus $* timeout 20 gnome-control-center 2>&1 | grep -v '^\$' | tail -3; echo \"new faults=\$((\$(dmesg | grep -c 'js fault')-f0)) new timeouts=\$((\$(dmesg | grep -c 'sched timeout')-t0))\""

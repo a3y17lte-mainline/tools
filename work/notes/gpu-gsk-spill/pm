@@ -1,0 +1,3 @@
+#!/bin/sh
+# ssh to the pmOS install (user account); usage: pm 'cmd'
+exec ssh -T -o ConnectTimeout=5 -o UserKnownHostsFile=$HOME/.ssh/known_hosts_a3pmos -i $HOME/.ssh/a3y17lte_ed25519 user@10.78.70.1 "$@"

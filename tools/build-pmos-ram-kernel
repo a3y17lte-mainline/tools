@@ -1,0 +1,49 @@
+#!/bin/bash
+# build-pmos-ram-kernel: build the working tree of src/linux with the postmarketOS kernel
+# config and pack it with the pmOS initramfs and command line (taken from
+# out/images/pmos-boot.img) as out/images/pmos-ram-test.img for `fastboot boot`.
+# For RAM tests of kernel changes on the installed pmOS: nothing is written to the phone,
+# and a reset boots the installed kernel again. The release string matches the packaged
+# kernel, so the installed modules load.
+#
+#   build-pmos-ram-kernel [-e OPTION | -d OPTION | -m OPTION ...]   extra scripts/config args
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+SRC=$ROOT/src/linux
+O=$ROOT/out/linux-pmos
+IMG=$ROOT/out/images
+CFG=$ROOT/src/pmaports/device/testing/linux-samsung-a3y17lte/config-samsung-a3y17lte.aarch64
+# LOCALVERSION= keeps "+" (uncommitted changes) out of the release string.
+K=(make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1 LOCALVERSION=)
+
+mkdir -p "$O"
+cp "$CFG" "$O/.config"
+# No debug info: the build is much faster and nothing on the phone needs BTF.
+"$SRC/scripts/config" --file "$O/.config" \
+	-d DEBUG_INFO_BTF -d DEBUG_INFO_BTF_MODULES -d DEBUG_INFO_DWARF5 \
+	-d DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT -e DEBUG_INFO_NONE "$@"
+"${K[@]}" olddefconfig
+grep -q '^CONFIG_LOCALVERSION="-samsung-a3y17lte"' "$O/.config" || { echo "unexpected LOCALVERSION" >&2; exit 1; }
+
+nice "${K[@]}" CC="ccache clang" -j"$(nproc)" Image dtbs \
+	> "$ROOT/out/pmos-ram-kernel-build.log" 2>&1 || { tail -20 "$ROOT/out/pmos-ram-kernel-build.log"; exit 1; }
+
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+debugfs -R "dump /initramfs $T/initramfs" "$IMG/pmos-boot.img" >/dev/null 2>&1
+debugfs -R "dump /extlinux/extlinux.conf $T/extlinux.conf" "$IMG/pmos-boot.img" >/dev/null 2>&1
+[ -s "$T/initramfs" ] && [ -s "$T/extlinux.conf" ] || { echo "no initramfs/extlinux.conf in pmos-boot.img" >&2; exit 1; }
+cmdline=$(sed -n 's/^\tappend //p' "$T/extlinux.conf" | sed 's/\bquiet \|\bsplash //g')
+
+# Same load addresses as build-kernel-img.
+mkbootimg --header_version 2 \
+	--base 0x40000000 --kernel_offset 0x00200000 \
+	--dtb_offset 0x08000000 --ramdisk_offset 0x09000000 \
+	--tags_offset 0x00000100 --second_offset 0x00f00000 \
+	--kernel "$O/arch/arm64/boot/Image" \
+	--dtb "$O/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dtb" \
+	--ramdisk "$T/initramfs" \
+	--cmdline "$cmdline" \
+	-o "$IMG/pmos-ram-test.img"
+echo "release: $(cat "$O/include/config/kernel.release")"
+echo "cmdline: $cmdline"
+ls -l "$IMG/pmos-ram-test.img" "$O/arch/arm64/boot/Image"

@@ -1,0 +1,42 @@
+linear-gradient {
+  bounds: 0 0 360 60;
+  start: 0 0;
+  end: 360 0;
+  stops: 0 red, 0.5 yellow, 1 blue;
+}
+linear-gradient {
+  bounds: 0 64 360 60;
+  start: 0 64;
+  end: 360 124;
+  stops: 0 rgb(0,0,0), 0.25 rgb(255,0,0), 0.25 rgb(0,255,0), 0.5 rgb(0,0,255), 0.5 white, 1 rgba(0,0,0,0.3);
+}
+repeating-linear-gradient {
+  bounds: 0 128 360 60;
+  start: 0 128;
+  end: 7 135;
+  stops: 0 black, 0.5 black, 0.5 white, 1 white;
+}
+repeating-linear-gradient {
+  bounds: 0 192 360 60;
+  start: 0 192;
+  end: 90 192;
+  stops: 0 rgb(30,60,90), 0.3 rgb(200,100,0), 1 rgb(30,60,90);
+}
+linear-gradient {
+  bounds: 0 256 360 60;
+  start: 300 316;
+  end: 60 256;
+  stops: 0 rgba(255,0,0,0.5), 1 rgba(0,0,255,1);
+}
+linear-gradient {
+  bounds: 0 320 360 60;
+  start: 100 320;
+  end: 101 320;
+  stops: 0 white, 1 black;
+}
+linear-gradient {
+  bounds: 0.5 384.25 359 59.5;
+  start: 0 384;
+  end: 0 444;
+  stops: 0 rgb(10,20,30), 0.2 rgb(240,240,240), 0.21 rgb(0,128,0), 1 rgb(250,250,0);
+}

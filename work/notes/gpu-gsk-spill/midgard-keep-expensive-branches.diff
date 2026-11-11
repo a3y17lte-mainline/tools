@@ -1,0 +1,13 @@
+diff --git a/src/panfrost/compiler/midgard/midgard_compile.c b/src/panfrost/compiler/midgard/midgard_compile.c
+index a338a7628..06eeeebd6 100644
+--- a/src/panfrost/compiler/midgard/midgard_compile.c
++++ b/src/panfrost/compiler/midgard/midgard_compile.c
+@@ -468,7 +468,7 @@ optimise_nir(nir_shader *nir, unsigned quirks, bool is_blend)
+ 
+       nir_opt_peephole_select_options peephole_select_options = {
+          .limit = 64,
+-         .expensive_alu_ok = true,
++         .expensive_alu_ok = false,
+       };
+       NIR_PASS(progress, nir, nir_opt_peephole_select, &peephole_select_options);
+       NIR_PASS(progress, nir, nir_opt_algebraic);

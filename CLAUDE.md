@@ -46,6 +46,15 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
   patched Mesa + GTK on the installed postmarketOS (Phosh). See the GPU section.
 
 Not done, roughly in planned order:
+- FIX FIRST (blocks upstreaming the panel driver, tracker Q parked; P/R too): display re-enable
+  fails intermittently on pmOS (2026-11-11, 3 times in ~4 min; f0 5a 5a is the first command of
+  the panel power-on sequence, so these are unblanks, presumably screen-on in Phosh):
+  "exynos-dsi: PLL failed to stabilize" -> "failed to configure DSI PLL" -> DCS f0 5a 5a xfer
+  timeout (-110) -> vblank wait / flip_done timeouts in phoc's atomic commits, then "Skipping
+  unprepare of already unprepared panel". Log: work/notes/dsi-pll-unblank-dmesg-20261111.txt.
+  Suspects: DSIM PLL lock/stable timer or PHY reference clock/power on re-enable (first enable at
+  boot works), samsung-dsim PLL timeout handling on 7870, our command-mode DSIM/DECON changes.
+  Do not send groups P, Q, R before this is understood and fixed.
 - U-Boot paths not tested yet: the Volume Down menu, "Boot Previous Kernel" and the fallback to
   fastboot (the user considers the boot loop finished).
 - postmarketOS (device package in testing, Phosh) is installed and in daily use on the phone
@@ -142,6 +151,8 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - Brightness: /sys/class/backlight/14800000.dsi.0 (0-255, non-linear like Samsung's UI scale). Gamma for
   74 steps is computed from the panel's MTP at first prepare; per level a step + AOR + ELVSS is sent.
 - Panel safety: only volatile registers are written. Never send OTP/MTP program commands.
+- OPEN BUG (2026-11-11): re-enabling the display after blank sometimes fails with "PLL failed to
+  stabilize" in exynos-dsi; see "Not done" (FIX FIRST) and work/notes/dsi-pll-unblank-dmesg-20261111.txt.
 - A "white" screen at AOR 0 is the panel's stale frame memory, NOT our data. To test whether pixels
   arrive, fill the framebuffer black/with a pattern and see whether the screen changes.
 - Useful state: DCS 0x0A (0x9C ok), 0x0D bit 3 (all pixels off), 0x0E (0x80 TE on, bit 0 DSI error),

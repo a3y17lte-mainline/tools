@@ -1,0 +1,113 @@
+[    0.567996] exynos-dsi 14800000.dsi: supply vddcore not found, using dummy regulator
+[    0.568119] exynos-dsi 14800000.dsi: supply vddio not found, using dummy regulator
+[    0.620851] exynos-dsi 14800000.dsi: Failed to create device link (0x180) with supplier 4-0066 for /soc@0/dsi@14800000/panel@0
+[    0.632229] device-mapper: ioctl: 4.50.0-ioctl (2025-04-28) initialised: dm-devel@lists.linux.dev
+[    0.734532] exynos-drm exynos-drm: bound 14830000.display-controller (ops decon_component_ops)
+[    0.735314] exynos-dsi 14800000.dsi: [drm:samsung_dsim_host_attach] Attached s6e3aa2-ams474mm01 device (lanes:4 bpp:24 mode-flags:0x400)
+[    0.735430] exynos-drm exynos-drm: bound 14800000.dsi (ops exynos_dsi_component_ops)
+[    0.738268] exynos-drm exynos-drm: [drm] [PLANE:35:plane-0] pixel format with alpha exposed but blend mode not setup. Please fix.
+[    0.738286] exynos-drm exynos-drm: [drm] [PLANE:38:plane-1] pixel format with alpha exposed but blend mode not setup. Please fix.
+[    0.738969] [drm] Initialized exynos 1.1.0 for exynos-drm on minor 1
+[    0.849638] panel-samsung-s6e3aa2 14800000.dsi.0: panel ID 460002
+[    1.019196] exynos-drm exynos-drm: [drm] fb0: exynosdrmfb frame buffer device
+[    1.117928]  mmcblk2: p1
+[    1.422000]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15 p16 p17 p18 p19 p20 p21 p22 p23 p24
+[  249.160345] exynos-dsi 14800000.dsi: PLL failed to stabilize
+[  249.160373] exynos-dsi 14800000.dsi: failed to configure DSI PLL
+[  249.347098] exynos-dsi 14800000.dsi: xfer timed out: 39 03 00 00 f0 5a 5a
+[  249.347168] panel-samsung-s6e3aa2 14800000.dsi.0: sending dcs data f0 5a 5a failed: -110
+[  250.371127] ------------[ cut here ]------------
+[  250.371161] [CRTC:41:crtc-0] vblank wait timed out
+[  250.371394] WARNING: drivers/gpu/drm/drm_atomic_helper.c:1928 at drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c, CPU#6: phoc/2507
+[  250.371945] pc : drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c
+[  250.371982] lr : drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c
+[  250.372569] Call trace:
+[  250.372585]  drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c (P)
+[  250.372629]  drm_atomic_helper_commit_tail_rpm+0xd8/0x14c
+[  250.372669]  commit_tail+0xa8/0x168
+[  250.372706]  drm_atomic_helper_commit+0x244/0x25c
+[  250.372745]  drm_atomic_commit+0xac/0xd8
+[  250.372780]  drm_mode_atomic_ioctl+0x568/0xba4
+[  250.372816]  drm_ioctl_kernel+0xc4/0x10c
+[  250.372863]  drm_ioctl+0x268/0x3d0
+[  250.372906]  __arm64_sys_ioctl+0x88/0xd0
+[  250.372941]  invoke_syscall+0x44/0xe8
+[  250.372979]  el0_svc_common+0x8c/0xd4
+[  250.373015]  do_el0_svc+0x1c/0x28
+[  250.373049]  el0_svc+0x3c/0x94
+[  250.373091]  el0t_64_sync_handler+0x68/0xdc
+[  250.373132]  el0t_64_sync+0x198/0x19c
+[  250.373168] ---[ end trace 0000000000000000 ]---
+[  260.579114] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  260.579182] exynos-drm exynos-drm: [drm] *ERROR* [CRTC:41:crtc-0] commit wait timed out
+[  270.821235] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  270.821299] exynos-drm exynos-drm: [drm] *ERROR* [CONNECTOR:43:DSI-1] commit wait timed out
+[  281.073127] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  281.073156] exynos-drm exynos-drm: [drm] *ERROR* [PLANE:35:plane-0] commit wait timed out
+[  281.084388] panel-samsung-s6e3aa2 14800000.dsi.0: Skipping unprepare of already unprepared panel
+[  358.827943] exynos-dsi 14800000.dsi: PLL failed to stabilize
+[  358.827971] exynos-dsi 14800000.dsi: failed to configure DSI PLL
+[  359.013133] exynos-dsi 14800000.dsi: xfer timed out: 39 03 00 00 f0 5a 5a
+[  359.013207] panel-samsung-s6e3aa2 14800000.dsi.0: sending dcs data f0 5a 5a failed: -110
+[  360.017375] ------------[ cut here ]------------
+[  360.017406] [CRTC:41:crtc-0] vblank wait timed out
+[  360.017639] WARNING: drivers/gpu/drm/drm_atomic_helper.c:1928 at drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c, CPU#3: phoc/2507
+[  360.018215] pc : drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c
+[  360.018253] lr : drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c
+[  360.018838] Call trace:
+[  360.018855]  drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c (P)
+[  360.018899]  drm_atomic_helper_commit_tail_rpm+0xd8/0x14c
+[  360.018939]  commit_tail+0xa8/0x168
+[  360.018976]  drm_atomic_helper_commit+0x244/0x25c
+[  360.019014]  drm_atomic_commit+0xac/0xd8
+[  360.019049]  drm_mode_atomic_ioctl+0x568/0xba4
+[  360.019084]  drm_ioctl_kernel+0xc4/0x10c
+[  360.019131]  drm_ioctl+0x268/0x3d0
+[  360.019174]  __arm64_sys_ioctl+0x88/0xd0
+[  360.019209]  invoke_syscall+0x44/0xe8
+[  360.019246]  el0_svc_common+0x8c/0xd4
+[  360.019282]  do_el0_svc+0x1c/0x28
+[  360.019316]  el0_svc+0x3c/0x94
+[  360.019357]  el0t_64_sync_handler+0x68/0xdc
+[  360.019398]  el0t_64_sync+0x198/0x19c
+[  360.019434] ---[ end trace 0000000000000000 ]---
+[  370.196008] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  370.196078] exynos-drm exynos-drm: [drm] *ERROR* [CRTC:41:crtc-0] commit wait timed out
+[  380.438504] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  380.438572] exynos-drm exynos-drm: [drm] *ERROR* [CONNECTOR:43:DSI-1] commit wait timed out
+[  390.680626] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  390.680696] exynos-drm exynos-drm: [drm] *ERROR* [PLANE:35:plane-0] commit wait timed out
+[  390.691976] panel-samsung-s6e3aa2 14800000.dsi.0: Skipping unprepare of already unprepared panel
+[  423.419223] exynos-dsi 14800000.dsi: PLL failed to stabilize
+[  423.419251] exynos-dsi 14800000.dsi: failed to configure DSI PLL
+[  423.606622] exynos-dsi 14800000.dsi: xfer timed out: 39 03 00 00 f0 5a 5a
+[  423.606688] panel-samsung-s6e3aa2 14800000.dsi.0: sending dcs data f0 5a 5a failed: -110
+[  424.638774] ------------[ cut here ]------------
+[  424.638808] [CRTC:41:crtc-0] vblank wait timed out
+[  424.639077] WARNING: drivers/gpu/drm/drm_atomic_helper.c:1928 at drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c, CPU#7: phoc/2507
+[  424.639654] pc : drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c
+[  424.639691] lr : drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c
+[  424.640281] Call trace:
+[  424.640297]  drm_atomic_helper_wait_for_vblanks+0x1e8/0x22c (P)
+[  424.640341]  drm_atomic_helper_commit_tail_rpm+0xd8/0x14c
+[  424.640381]  commit_tail+0xa8/0x168
+[  424.640419]  drm_atomic_helper_commit+0x244/0x25c
+[  424.640457]  drm_atomic_commit+0xac/0xd8
+[  424.640492]  drm_mode_atomic_ioctl+0x568/0xba4
+[  424.640528]  drm_ioctl_kernel+0xc4/0x10c
+[  424.640574]  drm_ioctl+0x268/0x3d0
+[  424.640617]  __arm64_sys_ioctl+0x88/0xd0
+[  424.640652]  invoke_syscall+0x44/0xe8
+[  424.640689]  el0_svc_common+0x8c/0xd4
+[  424.640725]  do_el0_svc+0x1c/0x28
+[  424.640760]  el0_svc+0x3c/0x94
+[  424.640801]  el0t_64_sync_handler+0x68/0xdc
+[  424.640841]  el0t_64_sync+0x198/0x19c
+[  424.640878] ---[ end trace 0000000000000000 ]---
+[  465.444677] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  465.444747] exynos-drm exynos-drm: [drm] *ERROR* [CRTC:41:crtc-0] commit wait timed out
+[  475.686103] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  475.686172] exynos-drm exynos-drm: [drm] *ERROR* [CONNECTOR:43:DSI-1] commit wait timed out
+[  485.927132] exynos-drm exynos-drm: [drm] *ERROR* flip_done timed out
+[  485.927202] exynos-drm exynos-drm: [drm] *ERROR* [PLANE:35:plane-0] commit wait timed out
+[  485.938492] panel-samsung-s6e3aa2 14800000.dsi.0: Skipping unprepare of already unprepared panel

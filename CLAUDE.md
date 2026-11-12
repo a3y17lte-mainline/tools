@@ -57,6 +57,10 @@ Not done, roughly in planned order:
   fastboot (the user considers the boot loop finished).
 - postmarketOS (device package in testing, Phosh) is installed and in daily use on the phone
   (2026-11-11); see the GPU and postmarketOS section. Phase 2 closed 2026-11-09.
+- Phase 3 progress (2026-11-12): ADC + battery-thermal zone, MUIC BC1.2 (extcon-s2m v9 carried +
+  S2MU004 variant), charger currents per type + JEITA are done and tested (notes: charging.md
+  "Status"). Next: OTG boost regulator, then the TCPM driver. Plan: ~/.claude/plans/
+  plan-how-to-implement-cosmic-badger.md. Driver tests run on Alpine (install + reboot), not pmOS.
 - Then Phase 3, after the panel: the TCPM USB-C/PD driver at i2c0 0x3c (host/OTG, role switching) and
   S2MU004 "proper charging" (MUIC charger detection, higher input current: a charger write, needs the
   user's approval). Researched 2026-11-12: work/notes/usb-c.md (tcpc_dev driver like fusb302, no

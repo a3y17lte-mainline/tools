@@ -124,7 +124,7 @@ per block): gradient 938 ALU ops in 474 ALU bundles, floor 372 (-21 %, unreachab
 
 | Piece | Where | Installed on the phone |
 |---|---|---|
-| Kernel GPU DVFS (S: clk, T: OPP/cooling/supply) | `src/linux` a3y17lte `4f2936bf77f6`..`e04846a59a11` (pushed; old tip tagged `a3y17lte-pre-gpu-rework`) | `linux-samsung-a3y17lte-7.4_p20261111003613-r1` (same tree as the old tip 77382b95b917), `DEVFREQ_THERMAL=y`; previous boot files in `/home/user/boot-backup-20261111/` |
+| Kernel GPU DVFS (S: clk, T: OPP/cooling/supply) | `src/linux` a3y17lte `15bd435cebaa`..`edef9dd36714` (pushed; before the 2026-11-12 reorder `4f2936bf77f6`..`e04846a59a11`, tag `a3y17lte-pre-dsim-reorder`) | `linux-samsung-a3y17lte-7.4_p20261111003613-r1` (same tree as the old tip 77382b95b917), `DEVFREQ_THERMAL=y`; previous boot files in `/home/user/boot-backup-20261111/` |
 | Mesa Midgard series + renderonly leak fix | branch `a3-26.2.6` in `work/ref/mesa-26.2.6-series` (worktree of `work/ref/mesa-26.2.6`), 6 commits | pmaports `temp/mesa` 999926.2.6-r1 (still the old patch files incl. test knobs; same code) |
 | GTK adaptive gradient supersampling | `work/ref/gtk-4.24.1` commit a8decab, `gtk-linear-gradient-adaptive-supersampling.patch` | pmaports `temp/gtk4.0` 99994.24.1-r0 |
 | Gradient quirk removed | pmaports `device-samsung-a3y17lte` r2 | yes |
@@ -144,7 +144,7 @@ Tracker: groups S, T (kernel), U, V (Mesa), W (GTK) in the upstream tracker.
 
 ## Per-chip GPU voltages (2026-11-12: implemented, tested, installed in pmOS kernel r3)
 
-Kernel 2d9f141fea13, 6a7bb574ac9c, 7604138f4c47 (tracker group X). RAM test: ASV group 7, table 5;
+Kernel 4195aef43c59, abda411c1106, 2ce321ca6342 (tracker group X). RAM test: ASV group 7, table 5;
 GPU 1001 MHz at 900 mV (was 1006.25), 343 MHz asks 600 mV and BUCK2 stays at the 750 mV floor;
 glmark2 `--off-screen --swap-mode immediate` 224, no faults. (With the phone locked, glmark2 needs
 `--swap-mode immediate`: phoc sends no frame callbacks and the default mode scores 0.)

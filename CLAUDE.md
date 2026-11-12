@@ -48,7 +48,8 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
 Not done, roughly in planned order:
 - Display re-enable bug FIXED (2026-11-12, user-confirmed): "exynos-dsi: PLL failed to stabilize" on
   unblank came from samsung-dsim polling the PLL stable bit 3000 times without delay while the 7870
-  lock timer is ~3 ms. Kernel 02911a285c6d + 1f0792e4d555 (tracker group P). Groups P/Q/R unblocked.
+  lock timer is ~3 ms. Kernel 5a3ae34253d6 (Fixes: 7ef93667ab19) + 685b08411ddc, first in tracker group P
+  (branch reordered 2026-11-12, old tip tagged a3y17lte-pre-dsim-reorder). Groups P/Q/R unblocked.
   Blank/unblank from ssh: busctl --user set-property org.gnome.Mutter.DisplayConfig
   /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i 3 (0 = on), with
   DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus.

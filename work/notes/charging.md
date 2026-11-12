@@ -25,6 +25,13 @@ input/charge current, float voltage and OTG mode. Asking a PD source for 9 V is 
 but it puts 9 V on the charger input: the first 9 V test needs the user's approval too. The MUIC
 switch/BC1.2 registers are in the same I2C device: treat them the same way.
 
+## Status (2026-11-12)
+Done and tested on the phone (kernel a3y17lte 44fb004b470c): ADC + battery thermistor
+(battery-thermal zone, table in mV), MUIC BC1.2 types (extcon-s2m v9 + S2MU004 variant), charger
+currents per type + JEITA. Not tested yet: SDP and DCP ports (only a CDP PC port so far), real
+plug/unplug cycles. Left: simple-battery node (needs `monitored-battery` in the s2mu005-pmic
+binding), OTG regulator (section 4), then usb-c.md. See s2mu004-regs.md "Survey 2".
+
 ## 1. Register layout: S2MU004 vs S2MU005 MUIC
 
 The MUIC bit definitions are identical to the S2MU005's (mainline s2mu005.h). Only the addresses

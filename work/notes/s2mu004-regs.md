@@ -53,3 +53,27 @@ s2m-charger S2MU004 variant clears the watchdog (CTRL14 bit0) every 30 s: chargi
 80 s (+335 mA at 157 s uptime, health Good). Unplug/replug test via /root/battlog.txt (20 s samples):
 cable out -> charger online=0 Discharging, FG ~-150 mA (Wi-Fi idle), 4.31 V -> 4.05 V over 5.5 min,
 capacity 90 -> 89 %; cable back in -> online=1 Charging ~+350 mA immediately, no WD restart needed.
+
+## Survey 2 (2026-11-12, Alpine, kernel with ADC only, PC cable, before the MUIC driver)
+i2c bus numbers: Alpine i2c-1 = 13830000 (FG 0x3b, PD 0x3c), i2c-2 = 13870000 (0x3d); pmOS the same.
+Logger: tools/probes/s2mu004-survey.sh (log copy in out/survey/).
+- PD 0x3c: 01=01 (LPM off, unlike survey 1's 0x03), 18=e3 (DRP, Rp 180 uA), 1f=34 (SET_RP 2057 mV),
+  27=10, b3=d4 (CC1 4, CC2 2: the connected CC reads 2; the cable was flipped vs survey 1's e2),
+  b4=26 (attached as sink). So the bootloader state of the PD chip varies between boots.
+- PD IRQ gpa0-5 (gpa0 DAT 0x139f0044 = 0xcd, bit 5 = 0): LOW at idle with no driver = events pending
+  and not cleared -> the line is level-low; use IRQ_TYPE_LEVEL_LOW + IRQF_ONESHOT in the tcpc driver.
+- MUIC with the ID (RID) ADC on (0xcc = 0x1d): ADC 0x61 = 0x00, DEV1 = 0x80 (OTG) on a PC cable.
+  The ID pin is not connected on the Type-C port, so DEV1 says OTG for everything. With the RID ADC
+  off (0xcc bit1, our extcon driver) ADC reads 0x1f and a BCD rescan gives DEV1 = 0x20 = CDP:
+  the VMware host port is a charging downstream port.
+- Charger: CTRL2 = 0x3a (1500 mA input), CTRL9 = 0x46 (1775 mA) this time, vs 500/450 mA in
+  survey 1: the bootloader picks different limits per boot.
+- MUIC CTRL1 0xc7 = 0x13 (bit0 set) while the VBUS IRQs arrive: on the S2MU004 bit0 does not gate
+  the MUIC interrupts. No write needed.
+
+## MUIC + charger drivers (2026-11-12, user-approved writes)
+- extcon-s2m S2MU004: RID ADC off at probe, BCD rescan once when VBUS has no type, result re-read
+  after 1.5 s. The attach/detach IRQs for the probe-time rescan arrive ~12 s late (or not at all on
+  some boots; the PMIC parent IRQ fired with no child handled): cause not found, the re-read covers it.
+- s2m-charger S2MU004: input/charge current per BC1.2 type (CDP 1500/1500 verified), JEITA from the
+  battery-thermal zone (emul_temp 42/51/44/30 C verified: 825 mA, buck "Not charging", 825, 1500).

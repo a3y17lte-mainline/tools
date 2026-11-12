@@ -54,6 +54,24 @@ COD3026X + S1402X audio chain, so all audio work except board DT applies to it t
 
 Both areas can run in parallel after step 2 (different files, different subsystems).
 
+## Phase 3: USB-C/PD and proper charging (research 2026-11-12)
+
+Notes: `usb-c.md` (PD chip at i2c0 0x3c, TCPM low-level driver) and `charging.md` (MUIC
+BC1.2 + D+/D- switch, charger currents, temperature limits, OTG boost, AFC). All A3-specific in
+the sense that the S2MU004 is on the A3 only among upstream 7870 boards (J5 2017 has an S2MU005
+without a separate PD chip), but the MUIC work is a variant of the S2MU005 extcon driver on the
+list (extcon-s2m v9).
+
+Dependencies:
+- The ADC (step 2a above) comes first: battery temperature limits need the thermistor on ch1.
+- The OTG boost regulator in s2m-charger comes before the tcpc driver (`vbus-supply`).
+- The MUIC variant (BC1.2 types) comes before per-cable input currents.
+- Every charger/MUIC/AFC write needs the user's approval.
+
+Suggested order: ADC -> MUIC variant (read-only types) -> s2m-charger currents + JEITA + OTG
+regulator -> tcpc driver (sink first, then DRP/host) -> drop the forced peripheral role -> AFC
+(optional).
+
 ## Bugs found in mainline along the way (each a small upstream patch)
 
 - `drivers/clk/samsung/clk-exynos7870.c`: CMU_DISPAUD `fout_dispaud_aud_pll` is registered as

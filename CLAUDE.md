@@ -62,7 +62,9 @@ Not done, roughly in planned order:
   (2026-11-11); see the GPU and postmarketOS section. Phase 2 closed 2026-11-09.
 - Then Phase 3, after the panel: the TCPM USB-C/PD driver at i2c0 0x3c (host/OTG, role switching) and
   S2MU004 "proper charging" (MUIC charger detection, higher input current: a charger write, needs the
-  user's approval).
+  user's approval). Researched 2026-11-12: work/notes/usb-c.md (tcpc_dev driver like fusb302, no
+  VCONN, PD only 5 V, PD IRQ gpa0-5) and work/notes/charging.md (MUIC = S2MU005 extcon with other
+  addresses, stock current/temperature tables, OTG boost, AFC).
 - Suspend: needs the PMU sleep sequences from the vendor kernel.
 - SPI port config + STM32 sensor hub → IIO (large).
 - PDMA, ADC (battery thermistor), PWM.

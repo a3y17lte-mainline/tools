@@ -142,7 +142,14 @@ client and compare the `Total ... objects` line of `bufinfo` before and after.
 
 Tracker: groups S, T (kernel), U, V (Mesa), W (GTK) in the upstream tracker.
 
-## Design: per-chip GPU voltages (2026-11-12, not implemented; needs the user's go-ahead + RAM test)
+## Per-chip GPU voltages (2026-11-12: implemented, RAM-tested, not installed)
+
+Kernel 2d9f141fea13, 6a7bb574ac9c, 7604138f4c47 (tracker group X). RAM test: ASV group 7, table 5;
+GPU 1001 MHz at 900 mV (was 1006.25), 343 MHz asks 600 mV and BUCK2 stays at the 750 mV floor;
+glmark2 `--off-screen --swap-mode immediate` 224, no faults. (With the phone locked, glmark2 needs
+`--swap-mode immediate`: phoc sends no frame callbacks and the default mode scores 0.)
+
+### Design
 
 Data (ECT dump, `tools/ect-parse out/ect-a3y17lte.bin g3d`): ASV dvfs_g3d has 7 table
 versions x 10 levels (1300..343 MHz; 1146 MHz and up disabled) x 16 groups, the same

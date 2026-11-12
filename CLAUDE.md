@@ -46,16 +46,12 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
   patched Mesa + GTK on the installed postmarketOS (Phosh). See the GPU section.
 
 Not done, roughly in planned order:
-- DISPLAY RE-ENABLE FIX, awaiting confirmation (2026-11-12): intermittent "exynos-dsi: PLL failed
-  to stabilize" on unblank after long idle (log work/notes/dsi-pll-unblank-dmesg-20261111.txt).
-  Cause: samsung-dsim polled the PLL stable bit 3000 times without delay, while the 7870 lock timer
-  is 80000 OSC cycles (~3 ms); the boot enable is unaffected (bootloader left the PLL locked).
-  Fixed in kernel 02911a285c6d (poll by time, 20 ms) + 1f0792e4d555 (init returns the error),
-  installed on pmOS as linux-samsung-a3y17lte 7.4_p20261112184959-r2. Not reproducible on demand
-  (fails after long idle): the user watches daily use. Groups P/Q/R stay held until confirmed;
-  the two DSIM commits belong in P. Blank/unblank by hand: busctl --user set-property
-  org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig
-  PowerSaveMode i 3 (0 = on), with DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus.
+- Display re-enable bug FIXED (2026-11-12, user-confirmed): "exynos-dsi: PLL failed to stabilize" on
+  unblank came from samsung-dsim polling the PLL stable bit 3000 times without delay while the 7870
+  lock timer is ~3 ms. Kernel 02911a285c6d + 1f0792e4d555 (tracker group P). Groups P/Q/R unblocked.
+  Blank/unblank from ssh: busctl --user set-property org.gnome.Mutter.DisplayConfig
+  /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig PowerSaveMode i 3 (0 = on), with
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus.
 - U-Boot paths not tested yet: the Volume Down menu, "Boot Previous Kernel" and the fallback to
   fastboot (the user considers the boot loop finished).
 - postmarketOS (device package in testing, Phosh) is installed and in daily use on the phone
@@ -159,8 +155,7 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - Brightness: /sys/class/backlight/14800000.dsi.0 (0-255, non-linear like Samsung's UI scale). Gamma for
   74 steps is computed from the panel's MTP at first prepare; per level a step + AOR + ELVSS is sent.
 - Panel safety: only volatile registers are written. Never send OTP/MTP program commands.
-- Re-enable bug "PLL failed to stabilize" (2026-11-11): fix installed 2026-11-12, awaiting
-  confirmation; see "Not done".
+- Re-enable bug "PLL failed to stabilize": fixed 2026-11-12 (DSIM PLL lock poll), see "Not done".
 - A "white" screen at AOR 0 is the panel's stale frame memory, NOT our data. To test whether pixels
   arrive, fill the framebuffer black/with a pattern and see whether the screen changes.
 - Useful state: DCS 0x0A (0x9C ok), 0x0D bit 3 (all pixels off), 0x0E (0x80 TE on, bit 0 DSI error),

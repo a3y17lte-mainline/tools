@@ -14,9 +14,9 @@
 #                               (e.g. mesa, gtk4.0: our temp/ forks are never rebuilt otherwise)
 #
 # Nothing is rebuilt needlessly: the kernel only when the APKBUILD's _commit has no package
-# built yet (out/pmos-linux-src/.built), the device package only when its pkgver/pkgrel is
-# new, and dependencies are never pulled into a build (-i), so a bumped Mesa/GTK fork waits
-# until it is named. --force-kernel rebuilds the kernel anyway.
+# built yet (out/pmos-linux-src/.built), the device package only when its pkgver/pkgrel has
+# no .apk yet, and dependencies are never pulled into a build (--no-depends), so a bumped
+# Mesa/GTK fork waits until it is named. --force-kernel rebuilds the kernel anyway.
 #
 # Kernel package notes (both bit us when building by hand, 2026-11-11):
 # - Never call `pmbootstrap build --src=src/linux` or an export that still has the kernel's
@@ -76,9 +76,17 @@ if [ -n "$BUILD" ]; then
 	else
 		echo "build-pmos: kernel $commit already built ($built), skipping"
 	fi
-	# No --force: pmbootstrap skips it when this pkgver/pkgrel is already built.
-	pmbootstrap build -i device-samsung-a3y17lte
-	for p in "${EXTRA[@]}"; do pmbootstrap build -i "$p"; done
+	# pmbootstrap rebuilds every outdated runtime dependency (e.g. a bumped Mesa fork) when
+	# asked for a package, even one that is already built (-i does not stop that). So only
+	# call it when this device pkgver/pkgrel has no package yet, and then with --no-depends.
+	D=$ROOT/src/pmaports/device/testing/device-samsung-a3y17lte/APKBUILD
+	dver=$(sed -n 's/^pkgver=//p' "$D")-r$(sed -n 's/^pkgrel=//p' "$D")
+	if [ -e "$PKGS/device-samsung-a3y17lte-$dver.apk" ]; then
+		echo "build-pmos: device-samsung-a3y17lte-$dver already built, skipping"
+	else
+		pmbootstrap build --no-depends device-samsung-a3y17lte
+	fi
+	for p in "${EXTRA[@]}"; do pmbootstrap build --no-depends "$p"; done
 fi
 if [ -n "$PACKAGES_ONLY" ]; then
 	ls -t ~/.local/var/pmbootstrap/packages/edge/aarch64/ | grep -E '^(linux|device)-samsung-a3y17lte-' | head -2

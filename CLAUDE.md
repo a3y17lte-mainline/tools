@@ -347,8 +347,9 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
   `user` @10.78.70.1, key ~/.ssh/a3y17lte_ed25519, known_hosts_a3pmos). Root: `sudo -S` with
   `out/pmos-password` on stdin (the user is fine with that).
 - Build pmOS kernel/device packages ONLY with `tools/build-pmos --packages [mesa gtk4.0 ...]` (full
-  images: no argument). It skips a kernel commit that is already built and never rebuilds
-  dependencies; Mesa/GTK forks build only when named (a Mesa build takes very long). Its header lists the traps: `--src` drops kernel/time/timeconst.bc via .gitignore,
+  images: no argument). It skips a kernel commit that is already built and a device pkgrel that
+  has an .apk, and never rebuilds dependencies (--no-depends); Mesa/GTK forks build only when
+  named (~11 min for Mesa). Kernel and forks compile through ccache (20G, pmbootstrap config). Its header lists the traps: `--src` drops kernel/time/timeconst.bc via .gitignore,
   dated pkgver, GCC `CC` leaking into resolve_btfids (the APKBUILD unsets CC). Install on the phone:
   copy the .apk over ssh, `sudo apk add --allow-untrusted ./x.apk` (kernel install rewrites /boot via
   boot-deploy). The pmaports kernel APKBUILD `_commit` must be a commit pushed to the gh fork.

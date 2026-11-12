@@ -142,14 +142,53 @@ client and compare the `Total ... objects` line of `bufinfo` before and after.
 
 Tracker: groups S, T (kernel), U, V (Mesa), W (GTK) in the upstream tracker.
 
+## Design: per-chip GPU voltages (2026-11-12, not implemented; needs the user's go-ahead + RAM test)
+
+Data (ECT dump, `tools/ect-parse out/ect-a3y17lte.bin g3d`): ASV dvfs_g3d has 7 table
+versions x 10 levels (1300..343 MHz; 1146 MHz and up disabled) x 16 groups, the same
+6.25 mV/600 mV encoding as the CPU tables. GEN SSA_G3D: split at level 7 (levels 0..6 =
+1300..676 MHz take SSA10, the rest SSA11), SSA0 floor 575 mV + 25 mV steps, offsets
+0/12.5/25/50 mV: the same rules as the CPU, only the split differs (CPU: 6). Fuse word 1
+bits 15:0 = G3D group/mod-group/SSA10/SSA11/SSA0 in the CPU layout. This unit at table 5:
+1001 MHz 900 mV if group 7 (DT worst case 1006.25 mV).
+
+1. BUCK2 floor: BUCK2 also feeds MIF/INT/DISP/CAM, which have no consumer in mainline,
+   and the bootloader leaves it at 750 mV. Put `regulator-min-microvolt = <750000>` on BUCK2
+   in the board DTS (a board constraint: J5/A3 share the PMIC wiring, so exynos7870-j5lte
+   too if its DTS describes BUCK2 the same way). The regulator core then clamps every GPU
+   request to >= 750 mV, so ASV values below that (most of the 343..545 MHz rows) are
+   harmless. Keep each OPP's DT maximum (1006.25 mV) when lowering, as for the CPUs, so the
+   requested range always contains 750 mV.
+2. ASV for a device whose OPP table appears only when panfrost probes: exynos-asv (chipid,
+   early) cannot touch the GPU table at its own probe. Options:
+   a. Create the table first from the ASV side (dev_pm_opp_of_add_table on the GPU device;
+      panfrost's later add_table just takes a reference). Rejected as fragile: panfrost
+      configures the table (supported_hw, regulators) expecting to do it before the OPPs
+      are parsed, and ASV would need the GPU device long before panfrost binds.
+   b. (chosen) Bus notifier: exynos-asv registers a platform bus notifier and, on
+      BUS_NOTIFY_BOUND_DRIVER for the device of the `gpu` node (found from the chipid
+      node, e.g. a `samsung,asv-gpu` phandle or by the SoC compatible of the GPU node),
+      calls dev_pm_opp_adjust_voltage() per level; also handles a GPU that was bound
+      before the notifier was registered. The adjust sends OPP_EVENT_ADJUST_VOLTAGE; the
+      new voltage applies at the next devfreq transition (until then the GPU runs at the
+      DT worst case, which is safe). Unbind needs nothing (the table goes away with it).
+   Generalise exynos7870_asv_init_subsys() to take the frequency list, the level count and
+   the SSA split, add a third subsys for G3D (exynos_asv.subsys[] has 2 entries today).
+3. Test (RAM only, fastboot boot of build-pmos-ram-kernel): dmesg "GPU: ASV group N",
+   debugfs opp/.../11400000.gpu/*/supply-0/u_volt_target, regulator_summary for BUCK2
+   (never below 750 mV), glmark2 + the GTK gradient at 1001 MHz pinned, then a long run.
+
 ## Open
 
-- Mesa series: rebase on main (`work/ref/mesa-main`, cloned 2026-11-11) for MRs, re-run
-  shader-db per commit (T720/T820/T830/T860) and check the numbers in the commit messages
-  (taken from earlier runs). Send U (renderonly) first. Point pmaports `temp/mesa` at the
-  clean series (format-patch of `a3-26.2.6`) and bump pkgrel. The phone stays on stable
-  releases (26.2.x, GTK 4.24.x); main is only for sending.
-- GTK patch: rebase on GTK main for the MR; radial/conic gradients not covered.
+- Mesa series (2026-11-12): shader-db re-run per commit on T720/T820/T830/T860, three messages
+  corrected (branch `a3-26.2.6` rewritten). Rebased on main in `work/ref/mesa-main`: branches
+  `renderonly-gem-close` (Cc: mesa-stable; send first) and `midgard-t830`, both apply cleanly,
+  not built on main. pmaports `temp/mesa` 999926.2.6-r2 uses the format-patch output (no test
+  knobs) but is NOT built/installed yet (phone still has r1, same code): build with
+  `tools/build-pmos --packages mesa`, then check bufinfo before/after a client run.
+  The phone stays on stable releases (26.2.x, GTK 4.24.x); main is only for sending.
+- GTK patch: rebased on GTK main (`work/ref/gtk-main`, branch `gpu-gradient-adaptive-ss`,
+  applies unchanged: the shader file is identical on main); radial/conic not covered.
 - Per-chip GPU voltages (this unit needs 900 mV at 1001 MHz, the DT worst case is
   1006.25 mV): extend exynos-asv to G3D (fuse word 1 bits 15:0, same layout as the CPU;
   SSA_G3D split at vendor level 7 = 676 MHz and above use SSA10). Needs (a) the 750 mV

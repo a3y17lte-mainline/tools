@@ -46,15 +46,16 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
   patched Mesa + GTK on the installed postmarketOS (Phosh). See the GPU section.
 
 Not done, roughly in planned order:
-- FIX FIRST (blocks upstreaming the panel driver, tracker Q parked; P/R too): display re-enable
-  fails intermittently on pmOS (2026-11-11, 3 times in ~4 min; f0 5a 5a is the first command of
-  the panel power-on sequence, so these are unblanks, presumably screen-on in Phosh):
-  "exynos-dsi: PLL failed to stabilize" -> "failed to configure DSI PLL" -> DCS f0 5a 5a xfer
-  timeout (-110) -> vblank wait / flip_done timeouts in phoc's atomic commits, then "Skipping
-  unprepare of already unprepared panel". Log: work/notes/dsi-pll-unblank-dmesg-20261111.txt.
-  Suspects: DSIM PLL lock/stable timer or PHY reference clock/power on re-enable (first enable at
-  boot works), samsung-dsim PLL timeout handling on 7870, our command-mode DSIM/DECON changes.
-  Do not send groups P, Q, R before this is understood and fixed.
+- DISPLAY RE-ENABLE FIX, awaiting confirmation (2026-11-12): intermittent "exynos-dsi: PLL failed
+  to stabilize" on unblank after long idle (log work/notes/dsi-pll-unblank-dmesg-20261111.txt).
+  Cause: samsung-dsim polled the PLL stable bit 3000 times without delay, while the 7870 lock timer
+  is 80000 OSC cycles (~3 ms); the boot enable is unaffected (bootloader left the PLL locked).
+  Fixed in kernel 02911a285c6d (poll by time, 20 ms) + 1f0792e4d555 (init returns the error),
+  installed on pmOS as linux-samsung-a3y17lte 7.4_p20261112184959-r2. Not reproducible on demand
+  (fails after long idle): the user watches daily use. Groups P/Q/R stay held until confirmed;
+  the two DSIM commits belong in P. Blank/unblank by hand: busctl --user set-property
+  org.gnome.Mutter.DisplayConfig /org/gnome/Mutter/DisplayConfig org.gnome.Mutter.DisplayConfig
+  PowerSaveMode i 3 (0 = on), with DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus.
 - U-Boot paths not tested yet: the Volume Down menu, "Boot Previous Kernel" and the fallback to
   fastboot (the user considers the boot loop finished).
 - postmarketOS (device package in testing, Phosh) is installed and in daily use on the phone
@@ -151,8 +152,8 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - Brightness: /sys/class/backlight/14800000.dsi.0 (0-255, non-linear like Samsung's UI scale). Gamma for
   74 steps is computed from the panel's MTP at first prepare; per level a step + AOR + ELVSS is sent.
 - Panel safety: only volatile registers are written. Never send OTP/MTP program commands.
-- OPEN BUG (2026-11-11): re-enabling the display after blank sometimes fails with "PLL failed to
-  stabilize" in exynos-dsi; see "Not done" (FIX FIRST) and work/notes/dsi-pll-unblank-dmesg-20261111.txt.
+- Re-enable bug "PLL failed to stabilize" (2026-11-11): fix installed 2026-11-12, awaiting
+  confirmation; see "Not done".
 - A "white" screen at AOR 0 is the panel's stale frame memory, NOT our data. To test whether pixels
   arrive, fill the framebuffer black/with a pattern and see whether the screen changes.
 - Useful state: DCS 0x0A (0x9C ok), 0x0D bit 3 (all pixels off), 0x0E (0x80 TE on, bit 0 DSI error),
@@ -339,8 +340,9 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
 - The phone runs postmarketOS (Phosh) from eMMC. ssh: `work/notes/gpu-gsk-spill/pm 'cmd'` (user
   `user` @10.78.70.1, key ~/.ssh/a3y17lte_ed25519, known_hosts_a3pmos). Root: `sudo -S` with
   `out/pmos-password` on stdin (the user is fine with that).
-- Build pmOS kernel/device packages ONLY with `tools/build-pmos --packages` (full images: no
-  argument). Its header lists the traps: `--src` drops kernel/time/timeconst.bc via .gitignore,
+- Build pmOS kernel/device packages ONLY with `tools/build-pmos --packages [mesa gtk4.0 ...]` (full
+  images: no argument). It skips a kernel commit that is already built and never rebuilds
+  dependencies; Mesa/GTK forks build only when named (a Mesa build takes very long). Its header lists the traps: `--src` drops kernel/time/timeconst.bc via .gitignore,
   dated pkgver, GCC `CC` leaking into resolve_btfids (the APKBUILD unsets CC). Install on the phone:
   copy the .apk over ssh, `sudo apk add --allow-untrusted ./x.apk` (kernel install rewrites /boot via
   boot-deploy). The pmaports kernel APKBUILD `_commit` must be a commit pushed to the gh fork.

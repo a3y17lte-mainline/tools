@@ -25,12 +25,14 @@ input/charge current, float voltage and OTG mode. Asking a PD source for 9 V is 
 but it puts 9 V on the charger input: the first 9 V test needs the user's approval too. The MUIC
 switch/BC1.2 registers are in the same I2C device: treat them the same way.
 
-## Status (2026-11-12)
-Done and tested on the phone (kernel a3y17lte 44fb004b470c): ADC + battery thermistor
-(battery-thermal zone, table in mV), MUIC BC1.2 types (extcon-s2m v9 + S2MU004 variant), charger
-currents per type + JEITA. Not tested yet: SDP and DCP ports (only a CDP PC port so far), real
-plug/unplug cycles. Left: simple-battery node (needs `monitored-battery` in the s2mu005-pmic
-binding), OTG regulator (section 4), then usb-c.md. See s2mu004-regs.md "Survey 2".
+## Status (2026-11-12, kernel a3y17lte aa2d2824373b)
+Done and tested on the phone: ADC + battery thermistor (IIO channel, table in mV), MUIC BC1.2
+types (extcon-s2m v9 + S2MU004 variant: RID ADC off, MUIC IRQ unmask, no rescan), charger
+currents per type + JEITA (reads the thermistor via `io-channels`/"batt-temp" on pmic@3d),
+simple-battery node, OTG boost regulator (`usb-otg-vbus-regulator`, boost verified by STATUS2).
+All DT-linked (muic child node, io-channels, monitored-battery). Not tested: DCP (no dumb
+charger), JEITA via the IIO path (emul_temp only fakes the zone; logic tested before the switch),
+OTG load (hub LED not confirmed). Next: usb-c.md (TCPM driver). See s2mu004-regs.md.
 
 ## 1. Register layout: S2MU004 vs S2MU005 MUIC
 

@@ -77,3 +77,18 @@ Logger: tools/probes/s2mu004-survey.sh (log copy in out/survey/).
   some boots; the PMIC parent IRQ fired with no child handled): cause not found, the re-read covers it.
 - s2m-charger S2MU004: input/charge current per BC1.2 type (CDP 1500/1500 verified), JEITA from the
   battery-thermal zone (emul_temp 42/51/44/30 C verified: 825 mA, buck "Not charging", 825, 1500).
+
+## Cable session + OTG (2026-11-12 evening; logs in out/survey/)
+- MUIC CTRL1 bit0 = interrupt mask (vendor clears it at the end of probe, like S2MU005). With it
+  set, MUIC attach/detach only got noticed when another S2MU004 source fired the parent IRQ: the
+  "late or lost" attach IRQs. Cleared by our driver now: unplug/replug reported within 1 s.
+- BCD_RESCAN (0x6a bit0) is NOT trustworthy: after turning the RID ADC off it reported the PC port
+  as CDP (DEV1 0x20), a fresh plug-in reports the same port as SDP (0x04). Dropped: a cable present
+  at probe stays "Unknown" (500/500 mA) until replugged.
+- OTG boost (CTRL0 mode 6) on for 30 s with the hub: STATUS2[7:5] = 4 while boosting (0 otherwise),
+  PD chip saw the hub (b4 = 0x6b, source attached, b3 = d1). Battery current only ~20 mA higher than
+  idle; hub LED not confirmed yet. Off -> CTRL0 0x83 cleanly.
+- PD charger and laptop without a tcpc driver: VBUS comes and goes (the PD chip keeps DRP-toggling,
+  b4 0x26 <-> 0x41/0x00), MUIC gets no BC1.2 type. Needs the TCPM driver (usb-c.md).
+- PLUG_MON2 values seen: 0x26 attached as sink (PC, PD charger, laptop), 0x6b attached as source
+  (hub), 0x41 / 0x00 toggling/unattached. PLUG_MON1: d4/c9/cc/e4/d1 across states.

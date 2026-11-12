@@ -6,7 +6,7 @@ fuel gauge and the charger watchdog (both working, see CLAUDE.md "Battery / char
 - input and charge current per cable;
 - battery temperature limits;
 - the OTG boost (VBUS out, needed by usb-c.md);
-- Samsung AFC 9 V (optional).
+- fast charging: **9 V over USB PD instead of Samsung AFC** (decision 2026-11-12, section 5).
 
 Sources:
 - vendor `drivers/battery_v2/s2mu004_charger.c` + `include/charger/s2mu004_charger.h`,
@@ -21,7 +21,8 @@ Sources:
   our tree; the extcon driver (`drivers/extcon/extcon-s2m.c`) was not merged as of v9.
 
 **Every write to the charger block needs the user's approval** (CLAUDE.md safety rule). That covers
-input/charge current, float voltage, OTG mode and AFC (which raises VBUS to 9 V). The MUIC
+input/charge current, float voltage and OTG mode. Asking a PD source for 9 V is not a chip write,
+but it puts 9 V on the charger input: the first 9 V test needs the user's approval too. The MUIC
 switch/BC1.2 registers are in the same I2C device: treat them the same way.
 
 ## 1. Register layout: S2MU004 vs S2MU005 MUIC
@@ -120,7 +121,7 @@ power_supply_type enum, include/linux/power_supply.h):
 | USB DCP (dumb wall charger) | 900 mA | 1200 mA | MUIC DEV1 DCP |
 | MAINS / UNKNOWN / UARTOFF | 1500 mA | 1775 mA | |
 | Type-C Rp 1.5 A / 3.0 A, PD 5 V ("PDIC") | min(Rp/PD current, 1500 mA) | 1500 mA region | tcpm psy CURRENT_MAX |
-| AFC 9 V (HV_MAINS) | 1650 mA | 3000 mA (clamped by `max_charging_current` 2100 mA and step charging) | AFC (section 5) |
+| 9 V (stock: AFC "HV_MAINS"; ours: PD 9 V fixed PDO) | 1650 mA | 3000 mA in the table, clamped by `max_charging_current` 2100 mA | tcpm psy (section 5) |
 | OTG (phone is source) | 450 mA | - | |
 
 - Float voltage `battery,chg_float_voltage` = 4350 mV (bootloader value already).
@@ -202,23 +203,38 @@ Open: mA per OCP code and mV per VF_VBYP code (no table in the vendor header). R
 in section 6; the S2MU005 datasheet-derived values in mainline (OCP 1.5 A, OTG 5.1 V) suggest the
 same encodings, but don't assume.
 
-## 5. Samsung AFC (9 V over D+/D-), optional, later
+## 5. Fast charging: 9 V over PD, no AFC (decision 2026-11-12)
 
-Protocol engine in the MUIC block, registers 0x48-0x5f (s2mu004-private.h), IRQs AFC_INT 0x04
-(already in our irq.h: VBADC, VDNMON, DNRES, MPNACK, MRXTRF, MRXPERR, MRXRDY):
-- AFC_STATUS 0x48: [3:0] VBUS ADC, b4 VDNMON, b5 DNRES, b6 MPNACK.
-- AFC_CTRL1 0x49 (HVCONTROL1): b0 DPDNVDEN, [2:1] DN voltage, [4:3] DP voltage, b5 VBUS ADC en,
-  b6 CTRLIDMON, b7 AFC enable.
-- AFC_CTRL2 0x4a (HVCONTROL2): b1 DP 0.6 V en, b2 DN res en, b3 MPING, b4 MTX en, b7 RST DM 100UI.
-- TX_BYTE1 0x4b: [7:4] voltage (0 = 5 V ... 4 = 9 V ... 7 = 12 V), [3:0] current code;
-  RX_BYTE1-16 0x4c-0x5b.
-- Prepare (s2mu004-muic-afc.c:1339): after DCP detection, 200 ms, CTRL1 = 0xa0, TX_BYTE1 = 0x46
-  (9 V, 1.65 A), CTRL1 = 0xa1, CTRL2 = 0x06 (DP 0.6 V + DN res), then ping (MPING) and wait for
-  the charger's reply; on success VBUS rises to 9 V and the charger input limit becomes 1650 mA.
-- QC 2.0 fallback: CTRL1 = 0xbd (D+ 0.6 V / D- 3.3 V) selects 9 V on QC chargers, 0xa1 back to 5 V.
-Mainline has no AFC framework. If wanted: an optional part of the extcon/MUIC driver exposing a
-"fast charge" knob, or a power_supply property; out of scope until basic charging is done. Raising
-VBUS to 9 V is a charger-side change: needs the user's explicit approval and a thermal story.
+**AFC and QC 2.0 are dropped.** Their operating point moves to USB PD.
+
+- **Stock AFC operating point:** 9 V at 1650 mA input. `s2mu004_muic_prepare_afc_charger`
+  (s2mu004-muic-afc.c:1339) sends TX_BYTE1 = 0x46 (9 V, 1.65 A). The stock input limit for the
+  9 V cable type is 1650 mA. Charge current is 3000 mA in the table, clamped by
+  `max_charging_current` = 2100 mA. That is about 15 W in.
+- **Stock PD was capped at 5 V by software only.** `make_pd_list` (sec_battery.c:7548) skips
+  every PDO above `battery,max_input_voltage` = 5000 mV. It also limits PDO power to
+  `base_charge_power` = 7500 mW and current to `max_input_current` = 1500 mA.
+- **The charger hardware is the same for both paths.** AFC and PD both just put 9 V on CHGIN.
+  The only 9 V-specific charger code (`s2mu004_analog_ivr_switch`, :119) returns early on chip
+  revision >= 3, and this unit is revision 3 (REV_ID 0x38).
+  So a PD 9 V contract is electrically the same as the stock AFC 9 V state the phone shipped with.
+- **What we do:**
+  - Sink PDOs 5 V and 9 V, at most 1650 mA (usb-c.md section 1). 1.67 A at 9 V is the standard
+    15 W PD level, so any 15 W-or-better PD charger offers it.
+  - The charger driver takes the input limit from the tcpm psy CURRENT_MAX: 1650 mA at 9 V,
+    up to 1500 mA at 5 V.
+  - Charge current up to 2100 mA when the input allows it, else 1500 mA.
+- **Thermal story, required before enabling 9 V by default:**
+  - JEITA stop/resume (section 3) works the same at 9 V.
+  - Stock also cut the 9 V input to 700 mA under heavy load (`siop_hv_input_limit_current`
+    0x2bc) and charged at 825 mA above 41 °C ("swelling"). Implement at least the 41 °C reduced
+    current before 9 V goes in by default.
+  - Until then, keep 9 V out of the default `sink-pdos`: a DT change, or a lower
+    `op-sink-microwatt`.
+- **Cost:** Samsung AFC-only (non-PD) chargers stay at 5 V and are charged as DCP (900 mA). That
+  is accepted.
+- **MUIC side:** do not touch the AFC registers 0x48-0x5f. Leave the AFC IRQs (already in our
+  irq.h) masked.
 
 ## 6. Read-only checks (when the phone is free)
 
@@ -226,11 +242,10 @@ With the drivers bound reads need `i2cget -f`; on pmOS `sudo`. i2c-1 = 13870000 
 check bus numbers via /sys/bus/i2c/devices/*/name first. Do NOT read clear-on-read registers:
 0x00, 0x01 (charger INT), 0x04 (AFC INT), 0x06, 0x07 (MUIC INT); the regmap-irq driver owns them.
 
-Read in states (a) no cable, (b) PC USB, (c) dumb wall charger, (d) Samsung AFC charger if the
-user has one (it stays at 5 V without the AFC handshake), (e) OTG adapter:
+Read in states (a) no cable, (b) PC USB, (c) dumb wall charger, (d) a USB-C PD charger if the
+user has one (it stays at 5 V until a PD contract), (e) OTG adapter:
 - MUIC: 0x08 0x09 (masks), 0x61-0x6a, 0xc7-0xcd, 0xd4 0xd5;
 - charger: 0x10-0x24 (CTRL0-20; CTRL4 0x14 and CTRL7 0x17 for the OTG encodings), 0x0a-0x0f;
-- AFC: 0x48-0x4b (status/ctrl only);
 - `cat /sys/class/power_supply/*/uevent`.
 Expected: DEV1 = 0x04 (SDP) on the PC, 0x40 (DCP) on a wall charger, SW_CTRL 0xca = 0x24
 (D-/D+ = USB) or auto. If DEV1 stays 0 on the charger, BC1.2 did not run (no rescan) and the
@@ -244,4 +259,5 @@ MUIC driver must trigger it.
 3. s2m-charger: USB_TYPE + input-current setting per type (user approval for the writes), then
    JEITA stop/resume in the watchdog work, then the OTG regulator.
 4. tcpc driver (usb-c.md), then input current from the tcpm psy.
-5. AFC only if the user wants faster charging, with explicit approval.
+5. 9 V PD sink PDO, after the reduced-current thermal band, with the user's approval for the
+   first 9 V contract. No AFC.

@@ -64,7 +64,8 @@ Not done, roughly in planned order:
   S2MU004 "proper charging" (MUIC charger detection, higher input current: a charger write, needs the
   user's approval). Researched 2026-11-12: work/notes/usb-c.md (tcpc_dev driver like fusb302, no
   VCONN, PD only 5 V, PD IRQ gpa0-5) and work/notes/charging.md (MUIC = S2MU005 extcon with other
-  addresses, stock current/temperature tables, OTG boost, AFC).
+  addresses, stock current/temperature tables, OTG boost). AFC is dropped: its 9 V / 1.65 A comes from a PD
+  9 V sink PDO instead (stock capped PD at 5 V in software only).
 - Suspend: needs the PMU sleep sequences from the vendor kernel.
 - SPI port config + STM32 sensor hub → IIO (large).
 - PDMA, ADC (battery thermistor), PWM.

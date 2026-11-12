@@ -57,7 +57,7 @@ Both areas can run in parallel after step 2 (different files, different subsyste
 ## Phase 3: USB-C/PD and proper charging (research 2026-11-12)
 
 Notes: `usb-c.md` (PD chip at i2c0 0x3c, TCPM low-level driver) and `charging.md` (MUIC
-BC1.2 + D+/D- switch, charger currents, temperature limits, OTG boost, AFC). All A3-specific in
+BC1.2 + D+/D- switch, charger currents, temperature limits, OTG boost, 9 V over PD instead of Samsung AFC). All A3-specific in
 the sense that the S2MU004 is on the A3 only among upstream 7870 boards (J5 2017 has an S2MU005
 without a separate PD chip), but the MUIC work is a variant of the S2MU005 extcon driver on the
 list (extcon-s2m v9).
@@ -66,11 +66,11 @@ Dependencies:
 - The ADC (step 2a above) comes first: battery temperature limits need the thermistor on ch1.
 - The OTG boost regulator in s2m-charger comes before the tcpc driver (`vbus-supply`).
 - The MUIC variant (BC1.2 types) comes before per-cable input currents.
-- Every charger/MUIC/AFC write needs the user's approval.
+- Every charger/MUIC write needs the user's approval, and so does the first 9 V PD contract.
 
 Suggested order: ADC -> MUIC variant (read-only types) -> s2m-charger currents + JEITA + OTG
-regulator -> tcpc driver (sink first, then DRP/host) -> drop the forced peripheral role -> AFC
-(optional).
+regulator -> tcpc driver (sink first, then DRP/host) -> drop the forced peripheral role -> 9 V PD
+sink PDO after the thermal limits (AFC is dropped).
 
 ## Bugs found in mainline along the way (each a small upstream patch)
 

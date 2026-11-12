@@ -23,11 +23,15 @@ cables, dual_role_usb) is NOT to be ported. Mainline TCPM does the policy; we on
   = 5000 mV, `max_input_current` = 1500 mA):
   - Source: one fixed PDO 5 V 500 mA, DRP + DR swap + USB comm capable.
   - Sink: fixed 5 V (op 500 mA) plus a variable 5 V..`sink_cap_max_volt`; the battery driver then
-    capped the request to 5 V. So on the A3, **PD only ever negotiated 5 V**. Fast charging is
-    Samsung AFC over D+/D- (charging.md), not PD.
-  - Mainline DT: `sink-pdos = <PDO_FIXED(5000, 1500, PDO_FIXED_DUAL_ROLE | PDO_FIXED_DATA_SWAP |
-    PDO_FIXED_USB_COMM)>`, `source-pdos = <PDO_FIXED(5000, 500, ...)>`, `op-sink-microwatt =
-    <2500000>`. Raise the sink current only after charger tests (input limit is a charger write).
+    capped the request to 5 V (a software cap only, charging.md section 5). Stock fast charging
+    was Samsung AFC 9 V / 1.65 A over D+/D-.
+  - **Ours: AFC is dropped; the same 9 V / 1.65 A comes from PD** (decision 2026-11-12).
+    - Step 1 (bring-up): `sink-pdos = <PDO_FIXED(5000, 1500, PDO_FIXED_DUAL_ROLE |
+      PDO_FIXED_DATA_SWAP | PDO_FIXED_USB_COMM)>`, `op-sink-microwatt = <2500000>`.
+    - Step 2, after the thermal limits in charging.md section 5: add
+      `PDO_FIXED(9000, 1650, 0)` and set `op-sink-microwatt = <15000000>`. With the 9 V PDO
+      listed, TCPM requests 9 V from any source that offers it.
+    - Source: `source-pdos = <PDO_FIXED(5000, 500, ...)>` (OTG).
 
 ## 2. Wiring (stock DT)
 
@@ -178,6 +182,7 @@ SET_RP = 42 (1628 mV).
 			power-role = "dual";
 			try-power-role = "sink";
 			vbus-supply = <&otg_vbus>;   /* from s2m-charger */
+			/* step 2 adds PDO_FIXED(9000, 1650, 0), see section 1 */
 			sink-pdos = <PDO_FIXED(5000, 1500, PDO_FIXED_DUAL_ROLE |
 					       PDO_FIXED_DATA_SWAP | PDO_FIXED_USB_COMM)>;
 			source-pdos = <PDO_FIXED(5000, 500, PDO_FIXED_DUAL_ROLE |
@@ -249,3 +254,4 @@ nothing, because the chip is in DFP/Rp0 LPM, which is why vendor needs the MUIC 
 3. tcpc driver `drivers/usb/typec/tcpm/s2mu004-tcpc.c` (name TBD, e.g. `tcpci`-less like fusb302),
    bring-up as sink only first (try-power-role sink, source-pdos absent), then DRP + OTG.
 4. Drop `role-switch-default-mode = "peripheral"` once host/device switching works.
+5. 9 V sink PDO (replaces Samsung AFC), after the thermal work in charging.md section 5.

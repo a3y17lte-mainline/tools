@@ -67,6 +67,9 @@ Not done, roughly in planned order:
 - SPI port config + STM32 sensor hub → IIO (large).
 - PDMA, ADC (battery thermistor), PWM.
 - Audio COD3026X (shared with every 7870 phone).
+  Sensor hub, audio and their shared prerequisites (SPI4, ADC, AUD_PLL fix, ADMA, resets) are
+  researched (2026-11-12): start with work/notes/next-areas.md, then sensorhub.md and audio.md.
+  The hub's SPI port is mainline SPI4 (CMU/pinctrl naming), not the vendor alias "spi2".
 - GPU follow-ups: per-chip GPU voltages (exynos-asv G3D), sending the Mesa/GTK patches (see GPU section).
 - Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.
 - Upstreaming: wave 1 is ready to prepare once the user wants to send.

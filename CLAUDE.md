@@ -73,7 +73,8 @@ Not done, roughly in planned order:
   Sensor hub, audio and their shared prerequisites (SPI4, ADC, AUD_PLL fix, ADMA, resets) are
   researched (2026-11-12): start with work/notes/next-areas.md, then sensorhub.md and audio.md.
   The hub's SPI port is mainline SPI4 (CMU/pinctrl naming), not the vendor alias "spi2".
-- GPU follow-ups: per-chip GPU voltages (exynos-asv G3D), sending the Mesa/GTK patches (see GPU section).
+- GPU follow-ups: sending the Mesa/GTK patches (see GPU section); build + shader-db the Mesa
+  branches on main before the MR. Per-chip GPU voltages done and installed 2026-11-12 (group X).
 - Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.
 - Upstreaming: wave 1 is ready to prepare once the user wants to send.
 

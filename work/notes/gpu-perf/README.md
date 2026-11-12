@@ -142,7 +142,7 @@ client and compare the `Total ... objects` line of `bufinfo` before and after.
 
 Tracker: groups S, T (kernel), U, V (Mesa), W (GTK) in the upstream tracker.
 
-## Per-chip GPU voltages (2026-11-12: implemented, RAM-tested, not installed)
+## Per-chip GPU voltages (2026-11-12: implemented, tested, installed in pmOS kernel r3)
 
 Kernel 2d9f141fea13, 6a7bb574ac9c, 7604138f4c47 (tracker group X). RAM test: ASV group 7, table 5;
 GPU 1001 MHz at 900 mV (was 1006.25), 343 MHz asks 600 mV and BUCK2 stays at the 750 mV floor;
@@ -191,8 +191,7 @@ bits 15:0 = G3D group/mod-group/SSA10/SSA11/SSA0 in the CPU layout. This unit at
   corrected (branch `a3-26.2.6` rewritten). Rebased on main in `work/ref/mesa-main`: branches
   `renderonly-gem-close` (Cc: mesa-stable; send first) and `midgard-t830`, both apply cleanly,
   not built on main. pmaports `temp/mesa` 999926.2.6-r2 uses the format-patch output (no test
-  knobs) but is NOT built/installed yet (phone still has r1, same code): build with
-  `tools/build-pmos --packages mesa`, then check bufinfo before/after a client run.
+  knobs); installed on the phone 2026-11-12, bufinfo unchanged after a client run.
   The phone stays on stable releases (26.2.x, GTK 4.24.x); main is only for sending.
 - GTK patch: rebased on GTK main (`work/ref/gtk-main`, branch `gpu-gradient-adaptive-ss`,
   applies unchanged: the shader file is identical on main); radial/conic not covered.

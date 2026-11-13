@@ -69,11 +69,25 @@ Charging/Good throughout, "watchdog suspended charging" never logged.
   charger status/health and battery current per cycle to /root/s2idle-charge.log.
 - Reset reason: `/usr/local/bin/peek 0x10480404` (PMU RST_STAT): 0x20000000 after `reboot`,
   0x00800000 (bit 23) after a watchdog reset. peek is not on the ssh PATH.
-- Wake IRQs: 54 = gpa0-2 = S2MPU05 (RTC alarm), 78 = gpio-keys KEY_POWER. `SSP_Int` has wake
-  enabled from probe. Watchdog state: WTCON/WTDAT/WTCNT = 0x10170000/04/08.
+- Wake IRQs: 54 = gpa0-2 = S2MPU05 (RTC alarm, also the charger watchdog alarm), 68 = gpa2-7 =
+  S2MU004 (cable plug), 78 = gpio-keys KEY_POWER, 86 = `SSP_Int` (wake enabled from probe). Watchdog state: WTCON/WTDAT/WTCNT = 0x10170000/04/08.
+
+## Wake sources and resume checks (2026-11-14)
+
+- USB/charger plug: the S2MU004 PMIC (pmic@3d, IRQ gpa2-7 = 68) is a wakeup source
+  (`wakeup-source` in DT; the i2c core arms the IRQ). Plug-in during s2idle woke the phone at once
+  (wake IRQ 68), and charging restarted. Without it, a charger plugged in during suspend charged
+  for only 80 s (charger watchdog, alarm not armed).
+- The charger "done" source toggles every ~7 s while a full battery sits on a weak port. The
+  charger driver masks it across system sleep, so it can't wake the phone: on the PC port at 100%,
+  3/3 s2idle cycles slept until the 30 s charger alarm (IRQ 54).
+- Sensor hub: with accel + mag buffers and prox events on, s2idle slept the full 20 s (RTC wake).
+  `SSP_Int` doesn't wake the phone: the hub stops streaming after AP_STATUS_SUSPEND. Data resumed
+  at the same ~5.5 Hz right after wake (tools/probes/ssp-s2idle.sh; the plug test is tools/probes/plug-wake.sh).
+- After resume: touch keys work (IRQ 84), BT works (hci0 powered, scan finds devices), Wi-Fi
+  reconnects. Not checked: display unblank under Phosh (pmOS).
 
 ## Open
 
-- Wakeup sources other than RTC and power: sensor hub (`SSP_Int` is wake-enabled: check it does
-  not wake the phone constantly once sensors are enabled), USB plug, home key.
-- Check after resume: sensor hub data, touch keys, display unblank under Phosh, BT.
+- Phosh unblank after s2idle (pmOS only).
+- Power: s2idle and cluster idle battery current, not measured yet (needs the cable out).

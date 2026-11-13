@@ -2,11 +2,14 @@
  * ssp-probe: talk to the Galaxy A3 2017 sensor hub (STM32F410, Samsung "SSP" firmware) from
  * userspace through spidev + the GPIO character device, using READ commands only:
  *   WHOAMI (0x0f, 1 byte, expect 0x55), FIRMWARE_REV (0xf0, u32), SENSOR_SCANNING (0xf4, u64).
- * Nothing on the hub changes state. MCU reset and BOOT0 are never requested (requesting them,
- * even as inputs, would change their direction): read their levels with ssp-pins.sh instead.
+ * Nothing on the hub changes state. Without -r, MCU reset and BOOT0 are never requested
+ * (requesting them, even as inputs, would change their direction): read their levels with
+ * ssp-pins.sh instead.
  *
- * Usage: ssp-probe [-n] [-d /dev/spidevX.Y] [-s HZ] [-m MODE] [whoami|rev|scan|all]
+ * Usage: ssp-probe [-n] [-r] [-d /dev/spidevX.Y] [-s HZ] [-m MODE] [whoami|rev|scan|all]
  *   -n  dry run: print the bytes that would be sent, touch no device.
+ *   -r  release the MCU from reset first: BOOT0 (gpd4-3) := 0, nRST (gpd2-3) := 1, wait 500 ms,
+ *       as the vendor kernel does at boot (S-Boot leaves nRST low). The lines stay that way.
  * Lines (by gpiochip label): AP_INT gpd4-2 (output, idle high), MCU_INT2 gpd3-7 (input),
  * MCU_INT1 gpa0-7 (input, low = hub has a message).
  *
@@ -85,6 +88,8 @@ struct line { const char *bank; u32 off; int out; int fd; const char *name; };
 static struct line ap_int = { "gpd4", 2, 1, -1, "AP_INT" };
 static struct line mcu_int2 = { "gpd3", 7, 0, -1, "MCU_INT2" };
 static struct line mcu_int1 = { "gpa0", 7, 0, -1, "MCU_INT1" };
+static struct line boot0 = { "gpd4", 3, 1, -1, "BOOT0" };	/* requested low */
+static struct line nrst = { "gpd2", 3, 1, -1, "nRST" };	/* requested high */
 
 static int chip_by_label(const char *label)
 {
@@ -125,7 +130,7 @@ static int line_request(struct line *l)
 		req.config.flags = GPIO_V2_LINE_FLAG_OUTPUT;
 		req.config.num_attrs = 1;
 		req.config.attrs[0].attr.id = GPIO_V2_LINE_ATTR_ID_OUTPUT_VALUES;
-		req.config.attrs[0].attr.values = 1;	/* idle high */
+		req.config.attrs[0].attr.values = l == &boot0 ? 0 : 1;	/* BOOT0 low, others high */
 		req.config.attrs[0].mask = 1;
 	} else {
 		req.config.flags = GPIO_V2_LINE_FLAG_INPUT;
@@ -270,16 +275,18 @@ static const char *const types[64] = {
 static int run(int argc, char **argv)
 {
 	const char *dev = "/dev/spidev4.0", *what = "all";
+	int release = 0;
 	u8 b[8];
 
 	for (int i = 1; i < argc; i++) {
 		if (streq(argv[i], "-n")) dry = 1;
+		else if (streq(argv[i], "-r")) release = 1;
 		else if (streq(argv[i], "-d") && i + 1 < argc) dev = argv[++i];
 		else if (streq(argv[i], "-s") && i + 1 < argc) speed = num(argv[++i]);
 		else if (streq(argv[i], "-m") && i + 1 < argc) mode = num(argv[++i]) & 3;
 		else if (streq(argv[i], "whoami") || streq(argv[i], "rev") || streq(argv[i], "scan") ||
 			 streq(argv[i], "all")) what = argv[i];
-		else { out("usage: ssp-probe [-n] [-d DEV] [-s HZ] [-m MODE] [whoami|rev|scan|all]\n"); return 2; }
+		else { out("usage: ssp-probe [-n] [-r] [-d DEV] [-s HZ] [-m MODE] [whoami|rev|scan|all]\n"); return 2; }
 	}
 
 	if (!dry) {
@@ -294,6 +301,14 @@ static int run(int argc, char **argv)
 	}
 	if (line_request(&mcu_int1) || line_request(&mcu_int2) || line_request(&ap_int))
 		return 1;
+	if (release) {
+		/* BOOT0 first: the MCU samples it when it leaves reset */
+		out("releasing the MCU from reset (BOOT0 low, nRST high), waiting 500 ms\n");
+		if (line_request(&boot0) || line_request(&nrst))
+			return 1;
+		if (!dry)
+			sleep_us(500000);
+	}
 
 	out("spi mode "); dec(mode); out(", "); dec(speed); out(" Hz; MCU_INT1 ");
 	dec(line_get(&mcu_int1)); out(", MCU_INT2 "); dec(line_get(&mcu_int2)); out("\n");

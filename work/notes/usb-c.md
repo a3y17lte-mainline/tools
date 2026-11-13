@@ -255,3 +255,39 @@ nothing, because the chip is in DFP/Rp0 LPM, which is why vendor needs the MUIC 
    bring-up as sink only first (try-power-role sink, source-pdos absent), then DRP + OTG.
 4. Drop `role-switch-default-mode = "peripheral"` once host/device switching works.
 5. 9 V sink PDO (replaces Samsung AFC), after the thermal work in charging.md section 5.
+
+## 9. Driver results (2026-11-12, kernel 42a9a06b24b3, Alpine; logs in out/survey/)
+
+Driver: drivers/usb/typec/tcpm/s2mu004-tcpc.c (tracker group AA). Built in; the charger waits for its
+TCPM power supply (`power-supplies = <&usbpd>` on pmic@3d), the driver takes `otg_vbus` lazily.
+fw_devlink reports and resolves the two DT cycles at boot. Logger: tools/probes/pd-log.sh.
+
+Tested (all DRP, try-power-role sink):
+- PC over a Xiaomi USB-A to C cable: sink/device, USB networking unaffected. The cable has a
+  non-compliant 10 k pull-up, so Rp reads 3.0 A; we trust Rp (user decision), the charger takes 1.5 A.
+- PD charger (5/9/12/15/20 V, PPS): 9 V / 1.65 A contract in ~50 ms, charger 1650 mA in /
+  2100 mA charge. Battery was at 100 %, so the 9 V charge current itself is not measured yet.
+- ASUS laptop over C-to-C: PD source 5 V / 3 A, we request 1.5 A; Discover Identity both ways.
+- SanDisk Type-C pendrive: source/host, OTG boost on, enumerated as usb-storage (sda).
+
+Answers to the unknowns in section 6:
+1. PLUG_MON1 code 2 = CC voltage between SET_RD and SET_RP (window), 4 = outside, 1 = Ra (as
+   source; the pendrive and the e-marker side of C-to-C cables read 1). Rp level: with SET_RD
+   214 mV, connected CC inside the window at SET_RP 685 mV -> default, at 1328 mV -> 1.5 A, else 3.0 A.
+   The vendor's rp_check misreads default Rp.
+2. Each received message raises its STATUS0-3 type bit, then STATUS4 MSG_PASS alone; messages the
+   chip does not classify raise only MSG_PASS. RX = MSG_PASS only (type bits masked). Our TX
+   completes with MSG_SENT + GOODCRC (MSG_ERROR without a partner), never MSG_PASS.
+3. TX MessageID from 0xF8 always matched TCPM's.
+4. Not measured; TCPM's handling is fine with MSG_ERROR as failure.
+5. PD rev 3.0 works (charger, laptop).
+
+Pitfalls found:
+- BMC must stay off (0x28 = CC manual, no CC) until set_pd_rx(on): the chip GoodCRCs Source_Caps
+  in hardware while TCPM still debounces CC, and the source hard-resets 30 ms later.
+- As a sink, select the BMC CC from the hardware attach, not TCPM's polarity: a hard reset during
+  SNK_ATTACH_WAIT skips set_polarity.
+- Changing PLUG_CTRL_PORT mode while attached raises no new PLUG_IRQ: start_toggling re-reads MON2.
+- The charger does not report its own boost as VBUS: set_vbus calls tcpm_vbus_change().
+- CC12_DET fires on every DRP toggle (~25/s unplugged): unmasked only while PD RX is on.
+- The TCPM debugfs log empties when read: copy it to a file once.

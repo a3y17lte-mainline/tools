@@ -58,16 +58,13 @@ Not done, roughly in planned order:
 - postmarketOS (device package in testing, Phosh) is installed and in daily use on the phone
   (2026-11-11); see the GPU and postmarketOS section. Phase 2 closed 2026-11-09.
 - Phase 3 progress (2026-11-12): ADC + battery thermistor, MUIC BC1.2 (extcon-s2m v9 carried +
-  S2MU004 variant), charger currents per type + JEITA, OTG boost regulator: done, DT-linked,
-  tested (notes: charging.md "Status", s2mu004-regs.md). Tracker groups Y, Z. Next: TCPM driver
-  (usb-c.md). Plan: ~/.claude/plans/plan-how-to-implement-cosmic-badger.md. Driver tests run on
-  Alpine (a3-install-kernel + reboot), not pmOS. On-phone loggers: tools/probes/.
-- Then Phase 3, after the panel: the TCPM USB-C/PD driver at i2c0 0x3c (host/OTG, role switching) and
-  S2MU004 "proper charging" (MUIC charger detection, higher input current: a charger write, needs the
-  user's approval). Researched 2026-11-12: work/notes/usb-c.md (tcpc_dev driver like fusb302, no
-  VCONN, PD only 5 V, PD IRQ gpa0-5) and work/notes/charging.md (MUIC = S2MU005 extcon with other
-  addresses, stock current/temperature tables, OTG boost). AFC is dropped: its 9 V / 1.65 A comes from a PD
-  9 V sink PDO instead (stock capped PD at 5 V in software only).
+  S2MU004 variant), charger currents per type + JEITA, OTG boost regulator, and the USB-C/PD TCPM
+  driver (s2mu004-tcpc, DRP: sink up to 9 V PD, host with OTG VBUS): done and tested (notes:
+  usb-c.md section 9, charging.md "Status", s2mu004-regs.md). Tracker groups Y, Z, AA. Open: a
+  9 V charge-current measurement on a drained battery. Driver tests run on Alpine (a3-install-kernel
+  + reboot), not pmOS. On-phone loggers: tools/probes/ (pd-log.sh for cable swaps).
+  AFC is dropped: its 9 V / 1.65 A operating point is a PD 9 V sink PDO (stock capped PD at 5 V in
+  software only). 9 V contract verified 2026-11-12 (charger 1650 mA in / 2100 mA charge).
 - Suspend: needs the PMU sleep sequences from the vendor kernel.
 - SPI port config + STM32 sensor hub → IIO (large).
 - PDMA, ADC (battery thermistor), PWM.
@@ -303,17 +300,16 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
   driver clears it every 30 s (CTRL14 bit0) and cycles buck->charge mode if it already expired.
   User-approved write (2026-11-08); other charger settings (input 500 mA, charge 450 mA, float 4.35 V)
   are left as the bootloader set them. Changing those needs the user's yes.
-- USB-C/PD controller: 0x3c on &i2c0, no driver (later phase). Raw register survey and test log:
-  work/notes/s2mu004-regs.md.
+- USB-C/PD controller: 0x3c on &i2c0, s2mu004-tcpc TCPM driver (usb-c.md section 9). Raw register
+  survey and test log: work/notes/s2mu004-regs.md.
 - Safety: no userspace I2C writes to these chips and no I2C bus scans (quick-write probing); the guard
   hook blocks the i2c-tools write/scan commands (even inside heredocs: edit docs with the editor).
   With the drivers bound, reads need `i2cget -f`.
 - Read status: `cat /sys/class/power_supply/*/uevent`. Measured: ~-150 mA idle on Wi-Fi, ~+350 mA
   charging from the VMware USB port; unplug/replug switches state by itself.
 - The phone's dropbear listens only on the USB address, so cable-out tests log to a file on the phone.
-- Left (2026-11-08): wall-charger speed (MUIC charger-type detection + higher input limit, needs the
-  user's yes) together with battery-temperature limits (thermistor on the SoC ADC); stock-style %
-  scaling (cosmetic); USB-C/PD at 0x3c (own phase). Camera flash is an RT8547, not on the S2MU004.
+- Done 2026-11-12: MUIC charger-type detection, currents per port type, JEITA limits from the
+  battery thermistor, OTG boost, USB-C/PD (up to 9 V). Left: stock-style % scaling (cosmetic). Camera flash is an RT8547, not on the S2MU004.
 
 ## CPU DVFS facts (for cpufreq work)
 

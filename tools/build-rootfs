@@ -79,7 +79,8 @@ EOF
 chmod 755 "$R/etc/local.d/touchkey-led.start"
 
 svc() { mkdir -p "$R/etc/runlevels/$1"; ln -sfn "/etc/init.d/$2" "$R/etc/runlevels/$1/$2"; }
-for s in devfs dmesg sysfs; do svc sysinit $s; done
+# mdev = hotplug, hwdrivers = coldplug: modules load by modalias (touch, GPU, sensor hub...).
+for s in devfs dmesg sysfs mdev hwdrivers; do svc sysinit $s; done
 for s in bootmisc hostname hwclock modules a3-addr sysctl syslog networking; do
 	[ -e "$R/etc/init.d/$s" ] && svc boot $s
 done

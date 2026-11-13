@@ -38,7 +38,7 @@ install -m644 "$FW/system/bdwlan30.bin" "$S/lib/firmware/ath10k/QCA9377/hw1.0/bo
 install -m644 "$FW/system/rampatch_tlv_tf_1.1.tlv" "$S/lib/firmware/qca/rampatch_00230302.bin"
 install -m644 "$FW/system/nvm_tlv_tf_1.1.bin" "$S/lib/firmware/qca/nvm_00230302.bin"
 
-# No udev/mdev hotplug in the rootfs: load the drivers from openrc's "modules" service.
+# Drivers load by modalias (mdev + hwdrivers in sysinit); /etc/modules stays as a fallback.
 printf '# QCA9377 Wi-Fi (SDIO) and Bluetooth (UART)\nath10k_sdio\nhci_uart\n' > "$S/etc/modules"
 
 # Made-up, locally administered addresses (the real ones are in Samsung EFS; we don't use them).
@@ -87,7 +87,7 @@ echo "staged $REL: $(find "$S/lib/modules" -name '*.ko*' | wc -l) modules, $(fin
 
 PHONE_REL=$(ssh -T a3 uname -r)
 [ "$PHONE_REL" = "$REL" ] || echo "note: phone runs $PHONE_REL, staged $REL (takes effect after booting the new kernel)"
-tar -C "$S" -cf - lib etc | ssh -T a3 "rm -rf /lib/modules/$REL && tar -xf - -C / && rc-update add modules boot >/dev/null && rc-update add a3-addr boot >/dev/null && for x in dbus bluetooth wpa_supplicant; do rc-update add \$x default >/dev/null; done; sync"
+tar -C "$S" -cf - lib etc | ssh -T a3 "rm -rf /lib/modules/$REL && tar -xf - -C / && rc-update add mdev sysinit >/dev/null && rc-update add hwdrivers sysinit >/dev/null && rc-update add modules boot >/dev/null && rc-update add a3-addr boot >/dev/null && for x in dbus bluetooth wpa_supplicant; do rc-update add \$x default >/dev/null; done; sync"
 echo "synced to the phone"
 
 if [ -n "$APK" ]; then

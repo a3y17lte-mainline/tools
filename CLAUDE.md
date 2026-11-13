@@ -64,8 +64,7 @@ Not done, roughly in planned order:
 - Phase 3 progress (2026-11-12): ADC + battery thermistor, MUIC BC1.2 (extcon-s2m v9 carried +
   S2MU004 variant), charger currents per type + JEITA, OTG boost regulator, and the USB-C/PD TCPM
   driver (s2mu004-tcpc, DRP: sink up to 9 V PD, host with OTG VBUS): done and tested (notes:
-  usb-c.md section 9, charging.md "Status", s2mu004-regs.md). Tracker groups Y, Z, AA. Open: a
-  9 V charge-current measurement on a drained battery. Driver tests run on Alpine (a3-install-kernel
+  usb-c.md section 9, charging.md "Status", s2mu004-regs.md). Tracker groups Y, Z, AA. Driver tests run on Alpine (a3-install-kernel
   + reboot), not pmOS. On-phone loggers: tools/probes/ (pd-log.sh for cable swaps).
   AFC is dropped: its 9 V / 1.65 A operating point is a PD 9 V sink PDO (stock capped PD at 5 V in
   software only). 9 V contract verified 2026-11-12 (charger 1650 mA in / 2100 mA charge).
@@ -280,7 +279,7 @@ Keep series small: one commit per logical change, follow-ups folded in.
   supply for it), WLAN_EN gpd3-6 (mmc-pwrseq-simple on mmc1), BT_EN gpd4-0, BT on serial1 (UART1) at 3 Mbaud,
   32 kHz sleep clock from the S2MPU05 described as a fixed clock. Host-wake pins unused (in-band SDIO IRQ).
 - Wi-Fi: ath10k_sdio, qca9377 hw1.1, SDIO high speed 50 MHz, firmware-sdio-5.bin (WLAN.TF.1.1.1-00061) +
-  the A3's bdwlan30.bin as board.bin. ~2.4 MiB/s download on 2.4 GHz ch1 at -35 dBm; 5 GHz scans but untested.
+  the A3's bdwlan30.bin as board.bin. ~2.4 MiB/s download on 2.4 GHz ch1 at -35 dBm; 5 GHz works (user-confirmed 2026-11-13).
 - BT: hci_qca reads controller version 0x00230302 (not 0x00440302); uses the stock rampatch_tlv_tf_1.1.tlv +
   nvm_tlv_tf_1.1.bin renamed to qca/rampatch_00230302.bin / nvm_00230302.bin (linux-firmware's 00230302 files
   are an older QCA6174 patch). "Frame reassembly failed (-84)" once at power-up is harmless.

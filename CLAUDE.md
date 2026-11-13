@@ -129,6 +129,11 @@ Keep series small: one commit per logical change, follow-ups folded in.
     2026-11-12, not a GitHub fork since pmaports lives on GitLab; the local clone is unshallowed)
   - u-boot: git@github.com:a3y17lte-mainline/u-boot.git (fork of u-boot/u-boot, branch a3y17lte on upstream main,
     rebased 2026-11-09 onto 934995f642 = v2027.01-rc1+; old tip tagged a3y17lte-pre-rebase-20261109)
+  - android-host-arm64: git@github.com:a3y17lte-mainline/android-host-arm64.git (public, branch main,
+    local clone src/android-host-arm64): native arm64-host LineageOS 24.0 builds (patches, setup.sh,
+    local manifest, docker/). Builds run on the user's DGX Spark in Docker under /opt/los, not here.
+    Plan doc: https://claude.ai/artifact/PM2LhJSdPyAwWK6ZT4KGiY. src/los-ref = partial LOS 24.0
+    checkouts for rebasing/checking the patches; out/go = Go 1.25.4 for Soong compile tests.
   A rebased series is a force push: use `git push --force-with-lease gh a3y17lte`.
   src/ trees are blob:none partial clones: only push to repos that already have the upstream
   history (the forks), never to an empty repo.

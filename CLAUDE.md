@@ -1,6 +1,6 @@
 # Exynos 7870 mainline bring-up: Galaxy A3 2017 (SM-A320F, a3y17lte)
 
-## Start here (fresh chat orientation, as of 2026-11-11)
+## Start here (fresh chat orientation, as of 2026-11-13)
 
 Goal: mainline Linux on the Galaxy A3 2017 (Exynos 7870), then Android 17 on that kernel, upstreaming
 everything along the way. The A3 is a J5 2017 (already upstream in 7.4-rc1) with four different parts:
@@ -14,17 +14,13 @@ Read these first:
    ref {object: project, id: 68e0bf34-4bb3-416e-8e67-c58359edbe23}, then read the tab's root node. The
    tab output is ~55 KB of XML and gets saved to a file: strip the tags with a short python script.
    Its "Phase" status lines lag behind this file; this file wins.
-3. Upstream tracker, an HTML artifact with a db: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r. It
-   holds 15 patch groups for the 35 local kernel commits (none sent yet). Read it with ArtifactData:
-   `list groups`, `list meta`.
-   - Wave 1: A board DTS, B watchdog, C IST3038H start command, D TMU, E MCT/early clocks, K S2MU004,
-     M A96T316 touch keys.
-   - Wave 2: F CPU clocks, G cpuidle PMU, H ASV.
-   - RFC: D′ thermal IRQ type, I cpufreq-dt boot OPP (ready; patch in out/upstream/).
-   - Wave 3: J DVFS DT (needs A, F, H), L board fuel gauge/charger (needs A, K),
-     N board hall + touch keys (needs A, M).
-   - `meta/prep` is the user's pre-send checklist: their own Signed-off-by, an AI tool-use note per cover
-     letter, b4/send-email, rebase, dt_binding_check.
+3. Upstream tracker, an HTML artifact with a db: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r.
+   33 groups (A..AF, Dp; U/V/W are Mesa/GTK) covering all 97 local kernel commits; none sent yet.
+   Waves: 1 = standalone, 2 = needs nothing unsent, 3 = board DT/drivers that depend on others, rfc.
+   Don't summarise the groups here (that copy went stale): export and print them instead,
+   `ArtifactData list groups out_dir=DIR`, then `tools/tracker-check DIR --show`.
+   `meta/prep` is the user's pre-send checklist: their own Signed-off-by, an AI tool-use note per cover
+   letter, b4/send-email, rebase, dt_binding_check.
 4. Rig spec, a Claude Docs doc: https://claude.ai/artifact/Waw3bXZYPkFAiDc1SKqyrS (id
    ef95df2e-cfef-43d9-b6df-90616edcc3d3). This is a PLAN ONLY: no rig hardware exists, the user has just
    the phone. Parts are superseded:
@@ -87,6 +83,13 @@ Working style (user preferences, also in memory): short single-step phone comman
 loops. Trust what the user reports seeing on the phone. For low-risk boot changes, build and flash BOOT
 directly instead of staged test ceremonies. The user puts the phone into download mode themselves.
 
+## Series and tracker hygiene (hard)
+
+After changing the kernel series, before pushing: `tools/series-lint` in src/linux must be clean, and
+`tools/tracker-check DIR` (DIR = an `ArtifactData list groups out_dir` export) must report 0 errors and 0
+to review. For a group it flags, rewrite notes/risk for the current state (never append), then `--mark`.
+Keep series small: one commit per logical change, follow-ups folded in.
+
 ## Phone safety rules (hard)
 
 - Write to the phone ONLY with `tools/a3-flash <PARTITION> <img>`. It allows BOOT and RECOVERY
@@ -148,10 +151,12 @@ directly instead of staged test ceremonies. The user puts the phone into downloa
   "Boot postmarketOS (CACHE)" menu entry, source u-boot a3y17lte 2c2bc7ddcb) and linux-a3y17lte-fastboot.img
 - `out/upstream/` patches prepared for sending (rfc-cpufreq-dt-boot-opp: the cpufreq-dt commit, sent apart
   from the 7870 series as an RFC)
-- Upstream tracker: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r (artifact db: `groups/<A..L,Dp>` with
-  commits, status, version, lore link, checks, notes; `log`; `meta/series`, `meta/prep`). Update it with
-  ArtifactData (read first, pin if_version) whenever patches are regrouped, sent or reviewed.
-- Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master = v7.4-rc2) (46 as of 2026-11-09; Wi-Fi/BT folded into the initial DTS)
+- Upstream tracker: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r (artifact db: `groups/<id>` with
+  commits, status, version, lore link, checks, notes, risk; `log`; `meta/series`, `meta/prep`). Update it
+  with ArtifactData (read first, pin if_version) whenever patches change, are regrouped, sent or reviewed,
+  following "Series and tracker hygiene" below.
+- Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master =
+  v7.4-rc2; 97 as of 2026-11-13)
 
 ## Display (command-mode panel, working 2026-11-09)
 

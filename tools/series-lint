@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""series-lint: check the local kernel series the way an upstream reviewer would.
+
+  series-lint [--range master..a3y17lte] [--quiet]
+
+Run it in src/linux (or pass -C DIR) after every rebase, fold or reword, and before reporting
+the series as clean. Exit status 1 if any ERROR. Checks, per commit:
+  ERROR  checkpatch errors/warnings (--no-signoff; the MAINTAINERS question for new files and the
+         host-side spdxcheck import error are ignored)
+  ERROR  author is not the user (carried patches listed in CARRIED are exempt)
+  ERROR  AI attribution, Co-Authored-By, Signed-off-by (the user adds their own), Change-Id
+  ERROR  fixup!/squash!/amend!/wip/tmp subjects (commit spam left behind)
+  ERROR  Fixes: tag malformed or not naming a mainline commit with that exact subject
+  ERROR  subject over 75 characters, empty body, body line over 75 characters (except tags/URLs)
+  WARN   subject prefix never used in mainline for these files (or their directory)
+  WARN   first word capitalisation differs from the mainline majority for these files
+  WARN   "this patch"/"this commit" wording; ragged wrapping inside a paragraph
+  WARN   small commit that only rewrites lines added earlier in this series: fold it (fixup)
+"""
+import collections
+import re
+import subprocess
+import sys
+
+USER = "Martin Štrobl <recordyletsplays@gmail.com>"
+# patches carried from others: author and their sign-offs are theirs
+CARRIED = {"extcon: add support for Samsung S2M series PMIC extcon devices"}
+# small follow-ups to earlier local commits that were reviewed and are separate changes on purpose
+REVIEWED_FOLLOWUPS = {
+    "arm64: dts: exynos7870: Add GPU cooling",                       # group T, not CPU cooling
+    "arm64: dts: exynos7870-a3y17lte: Keep BUCK2 at 750 mV or more",  # group X, own rationale
+}
+# checkpatch spelling false positives (names)
+KNOWN_WORDS = {"ABOV", "abov"}
+BAD_TAGS = re.compile(r"(?im)^(co-authored-by|signed-off-by|change-id|generated[- ]by|assisted-by):")
+BAD_AI = re.compile(r"(?i)claude|anthropic|chatgpt|copilot")
+SPAM_SUBJ = re.compile(r"(?i)^(fixup!|squash!|amend!|wip\b|tmp\b|temp\b)")
+
+
+def git(*a, ok_fail=False):
+    r = subprocess.run(["git", *a], capture_output=True, text=True)
+    if r.returncode and not ok_fail:
+        sys.exit(f"git {' '.join(a)}: {r.stderr.strip()}")
+    return r.stdout
+
+
+def prefix_of(subj):
+    """'iio: common: ssp_sensors: Add x' -> ('iio: common: ssp_sensors', 'Add')"""
+    m = re.match(r"^(.*?):\s+(?!.*:\s)(\S+)", subj)
+    if subj.startswith("Input: "):
+        m2 = re.match(r"^(Input: [^ ]+) - (\S+)", subj)
+        if m2:
+            return m2.group(1), m2.group(2)
+    if not m:
+        return "", subj.split()[0] if subj else ""
+    return m.group(1), m.group(2)
+
+
+def mainline_subjects(paths, n=60):
+    out = git("log", f"-{n}", "--no-merges", "--format=%s", "master", "--", *paths, ok_fail=True)
+    return [s for s in out.splitlines() if s]
+
+
+def main():
+    args = sys.argv[1:]
+    rng, quiet = "master..a3y17lte", False
+    while args:
+        a = args.pop(0)
+        if a == "--range":
+            rng = args.pop(0)
+        elif a == "--quiet":
+            quiet = True
+        elif a == "-C":
+            import os
+            os.chdir(args.pop(0))
+        else:
+            sys.exit(__doc__)
+    commits = git("rev-list", "--reverse", rng).split()
+    local = set(commits)
+    errors = warns = 0
+    for c in commits:
+        short = c[:12]
+        subj, author, body = git("log", "-1", "--format=%s%x00%an <%ae>%x00%b", c).split("\x00")
+        files = [f for f in git("show", "--format=", "--name-only", c).split() if f]
+        added = [l[2:] for l in git("show", "--format=", "--name-status", c).splitlines() if l.startswith("A\t")]
+        msgs = []
+
+        def err(m):
+            msgs.append(("ERROR", m))
+
+        def warn(m):
+            msgs.append(("WARN", m))
+
+        carried = subj in CARRIED
+        if author != USER and not carried:
+            err(f"author {author}")
+        if BAD_AI.search(body) or (BAD_TAGS.search(body) and not carried):
+            err("attribution/sign-off/AI line in the message")
+        if SPAM_SUBJ.match(subj):
+            err("fixup/wip subject: fold it")
+        if len(subj) > 75:
+            err(f"subject {len(subj)} chars")
+        if not body.strip():
+            err("empty body")
+        lines = body.splitlines()
+        for prev, nxt in zip(lines, lines[1:]):
+            plain = lambda l: l and not re.match(r"^(\s|- |\* |[A-Z][\w-]+: |https?://)", l)
+            if plain(prev) and plain(nxt) and not prev.endswith(":") and \
+                    len(prev) + 1 + len(nxt.split()[0]) <= 72 and len(prev) < 60:
+                warn(f"ragged wrap: '{prev[-30:]}' / '{nxt[:20]}'")
+        for line in lines:
+            if len(line) > 75 and not re.match(r"^(Fixes|Link|Closes|Reported-by|Cc):|https?://", line):
+                err(f"body line {len(line)} chars: {line[:40]}...")
+            if re.search(r"(?i)\bthis (patch|commit)\b", line):
+                warn("'this patch/commit' wording")
+        for m in re.finditer(r"(?m)^Fixes:\s*(.*)$", body):
+            fm = re.match(r'^([0-9a-f]{12,40}) \("(.*)"\)$', m.group(1))
+            if not fm:
+                err(f"malformed Fixes: {m.group(1)}")
+                continue
+            real = git("log", "-1", "--format=%s", fm.group(1), ok_fail=True).strip()
+            inmaster = subprocess.run(["git", "merge-base", "--is-ancestor", fm.group(1), "master"],
+                                      capture_output=True).returncode == 0
+            if real != fm.group(2) or not inmaster:
+                err(f"Fixes: {fm.group(1)} is not a mainline commit with that subject")
+        # checkpatch
+        patch = git("format-patch", "-1", "--stdout", c)
+        cp = subprocess.run(["scripts/checkpatch.pl", "-q", "--no-signoff", "-"], input=patch,
+                            capture_output=True, text=True).stdout
+        for blk in re.split(r"\n\n", cp):
+            head = blk.strip().splitlines()[0] if blk.strip() else ""
+            if not re.match(r"^(ERROR|WARNING|CHECK):", head):
+                continue
+            if "MAINTAINERS need updating" in head or "spdxcheck" in blk:
+                continue
+            sp = re.search(r"'(\S+)' may be misspelled", head)
+            if sp and sp.group(1) in KNOWN_WORDS:
+                continue
+            (err if head.startswith(("ERROR", "WARNING")) else warn)(f"checkpatch: {head}")
+        # prefix / capitalisation against mainline history
+        if not carried:
+            pre, word = prefix_of(subj)
+            src = [f for f in files if f.rsplit("/", 1)[-1] not in ("MAINTAINERS", "Kconfig", "Makefile")]
+            hist = mainline_subjects(src or files)
+            dirs = sorted({f.rsplit("/", 1)[0] for f in (src or files)})
+            hist_all = hist + mainline_subjects(dirs)
+            hp = collections.Counter(prefix_of(s)[0] for s in hist_all)
+            stems = {f.rsplit("/", 1)[-1].rsplit(".", 1)[0] for f in files}
+            board_ok = pre.startswith("arm64: dts: ") and pre.rsplit(": ", 1)[-1] in stems
+            if hist_all and not board_ok and pre not in hp and \
+                    not any(pre.startswith(p + ":") or p.startswith(pre + ":") for p in hp):
+                warn(f"prefix '{pre}' not seen in mainline for these files (common: "
+                     f"{', '.join(p for p, _ in hp.most_common(3))})")
+            # capitalisation: judge only by mainline commits with the same prefix
+            same = mainline_subjects(dirs, 300)
+            caps = [prefix_of(s)[1][:1].isupper() for s in same
+                    if prefix_of(s)[0] == pre and prefix_of(s)[1][:1].isalpha()]
+            if len(caps) >= 5 and word[:1].isalpha():
+                ratio = sum(caps) / len(caps)
+                major = ratio >= 0.5
+                # only a clear convention (>= 70 % one way) counts
+                if word[:1].isupper() != major and max(ratio, 1 - ratio) >= 0.7:
+                    warn(f"'{word}': mainline mostly {'capitalises' if major else 'uses lowercase'} "
+                         f"here ({sum(caps)}/{len(caps)} capitalised)")
+        # follow-up to an earlier local commit = fixup candidate
+        stat = git("show", "--format=", "--numstat", c).split()
+        nlines = sum(int(x) for x in stat[0::3] + stat[1::3] if x.isdigit())
+        if nlines <= 12 and not added:
+            origins = set()
+            for f in files:
+                for hunk in re.finditer(r"(?m)^@@ -(\d+)(?:,(\d+))? ", git("show", "--format=", "-U0", c, "--", f)):
+                    start, cnt = int(hunk.group(1)), int(hunk.group(2) or 1)
+                    if cnt == 0:
+                        continue
+                    bl = git("blame", "-l", "-s", f"-L{start},{start + cnt - 1}", f"{c}^", "--", f, ok_fail=True)
+                    origins |= {l.split()[0].lstrip("^") for l in bl.splitlines() if l}
+            if origins and origins <= local and subj not in REVIEWED_FOLLOWUPS:
+                warn("small change to lines added earlier in this series: fold it into "
+                     + ", ".join(git("log", "-1", "--format=%h", o).strip() for o in sorted(origins)))
+        errors += sum(1 for k, _ in msgs if k == "ERROR")
+        warns += sum(1 for k, _ in msgs if k == "WARN")
+        if msgs or not quiet:
+            print(f"{short} {subj}")
+            for k, m in msgs:
+                print(f"    {k}: {m}")
+    print(f"\n{len(commits)} commits: {errors} errors, {warns} warnings")
+    sys.exit(1 if errors else 0)
+
+
+main()

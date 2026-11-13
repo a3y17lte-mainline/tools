@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""tracker-check: keep the upstream tracker (artifact db) true to the kernel branch.
+
+The tracker lives in an artifact database that only the ArtifactData tool can read, so work on an
+export: ArtifactData list collection=groups out_dir=DIR (files land in DIR/groups/*.json).
+
+  tracker-check DIR                 check structure, then list groups that need a review
+  tracker-check DIR --show G [G..]  print groups in full (title, commits, notes, risk, deps)
+  tracker-check DIR --mark G [G..]  record G as reviewed: ONLY after reading its --show output
+                                    and rewriting every stale field (in the tracker, re-exported)
+
+Checks (exit 1 on any ERROR):
+  ERROR  a kernel commit (master..a3y17lte) in no group or in several groups
+  ERROR  a group commit whose sha is not on the branch, or whose subject/stat differs
+  ERROR  depends naming a group that does not exist
+  REVIEW the code of a group changed since its text was last marked reviewed (git patch-id, so a
+         plain rebase does not count): notes/risk/title must be re-read and rewritten
+  REVIEW the text changed since it was last marked (someone edited it: read it once)
+  REVIEW never reviewed
+In review output, phrases that often go stale are marked >>like this<<.
+
+Reviewed state: tools/tracker-reviewed.json (committed with the tools).
+Rule: when a group's commits change, rewrite its notes and risk from scratch for the current
+state; never append a "later:" paragraph to old text.
+"""
+import glob
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+
+ROOT = os.path.expanduser("~/Projects/exynos7870")
+LINUX = os.path.join(ROOT, "src/linux")
+STATE = os.path.join(ROOT, "tools/tracker-reviewed.json")
+RANGE = "master..a3y17lte"
+NON_KERNEL_WAVES = {"mesa", "gtk"}
+STALE = re.compile(r"(?i)\bnot (fully |yet )?(verified|tested|done|implemented)\b|\bunverified\b|"
+                   r"\brecheck\b|\bre-check\b|\bTODO\b|\bFIXME\b|\byet\b|\blater:|\bto add\b|"
+                   r"\bfor now\b|\btemporar|\bWIP\b|\bguess\b|\buntested\b|\bmissing\b|\bopen:")
+
+
+def git(*a):
+    return subprocess.run(["git", "-C", LINUX, *a], capture_output=True, text=True, check=True).stdout
+
+
+def stat_of(c):
+    s = git("show", "--shortstat", "--format=", c)
+    f = re.search(r"(\d+) files? changed", s)
+    i = re.search(r"(\d+) insertions?", s)
+    d = re.search(r"(\d+) deletions?", s)
+    return f"{f.group(1) if f else 0}f" + (f" +{i.group(1)}" if i else "") + (f" -{d.group(1)}" if d else "")
+
+
+def patch_id(c):
+    out = subprocess.run(f"git -C {LINUX} show {c} | git patch-id --stable", shell=True,
+                         capture_output=True, text=True).stdout.split()
+    return out[0] if out else ""
+
+
+def text_hash(g):
+    return hashlib.sha256(json.dumps([g.get("title"), g.get("notes"), g.get("risk"),
+                                      g.get("depends")], ensure_ascii=False).encode()).hexdigest()[:16]
+
+
+def mark_stale(t):
+    return STALE.sub(lambda m: f">>{m.group(0)}<<", t or "")
+
+
+def show(gid, g, kernel):
+    print(f"===== {gid}: {g.get('title')}")
+    print(f"  wave {g.get('wave')}  status {g.get('status')}  depends {g.get('depends')}  "
+          f"tree {g.get('tree')}")
+    for c in g.get("commits", []):
+        mark = "" if c["sha"] in kernel or g.get("wave") in NON_KERNEL_WAVES else "  <-- not on branch"
+        print(f"    {c['sha']} {c.get('stat', ''):12} {c['subject']}{mark}")
+    print(f"  NOTES: {mark_stale(g.get('notes'))}")
+    print(f"  RISK:  {mark_stale(g.get('risk'))}")
+    print(f"  checks: {g.get('checks')}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit(__doc__)
+    d = sys.argv[1]
+    mode = sys.argv[2] if len(sys.argv) > 2 else None
+    names = sys.argv[3:]
+    G = {os.path.basename(f)[:-5]: json.load(open(f)) for f in glob.glob(os.path.join(d, "groups", "*.json"))}
+    if not G:
+        sys.exit(f"no groups in {d}/groups: export with ArtifactData list out_dir={d}")
+    commits = git("log", "--format=%h|%s", "--abbrev=12", RANGE).splitlines()
+    kernel = {h: s for h, s in (l.split("|", 1) for l in commits)}
+    state = json.load(open(STATE)) if os.path.exists(STATE) else {}
+
+    if mode == "--show":
+        for n in names or sorted(G):
+            show(n, G[n], kernel)
+        return
+    errors = 0
+
+    def err(m):
+        nonlocal errors
+        errors += 1
+        print(f"ERROR: {m}")
+
+    owner = {}
+    for gid, g in G.items():
+        for dep in g.get("depends") or []:
+            if dep not in G:
+                err(f"{gid}: depends on unknown group {dep}")
+        for c in g.get("commits", []):
+            h = c["sha"]
+            if h not in kernel:
+                if g.get("wave") not in NON_KERNEL_WAVES:
+                    err(f"{gid}: {h} '{c['subject']}' is not on {RANGE}")
+                continue
+            owner.setdefault(h, []).append(gid)
+            if not c["subject"].startswith(kernel[h]):
+                err(f"{gid}: {h} subject '{c['subject']}' != '{kernel[h]}'")
+            st = stat_of(h)
+            if c.get("stat") != st:
+                err(f"{gid}: {h} stat '{c.get('stat')}' != '{st}'")
+    for h, s in kernel.items():
+        if len(owner.get(h, [])) != 1:
+            err(f"{h} '{s}' is in groups {owner.get(h, [])}")
+
+    cur = {}
+    for gid, g in G.items():
+        pids = [patch_id(c["sha"]) if c["sha"] in kernel else c["subject"] + c.get("stat", "")
+                for c in g.get("commits", [])]
+        cur[gid] = {"code": hashlib.sha256("".join(pids).encode()).hexdigest()[:16], "text": text_hash(g)}
+
+    if mode == "--mark":
+        for n in names:
+            state[n] = cur[n]
+        json.dump(dict(sorted(state.items())), open(STATE, "w"), indent=1)
+        print(f"marked reviewed: {' '.join(names)}")
+        return
+
+    review = []
+    for gid in sorted(G):
+        s = state.get(gid)
+        if not s:
+            review.append((gid, "never reviewed"))
+        elif s["code"] != cur[gid]["code"]:
+            review.append((gid, "CODE CHANGED since the text was reviewed: rewrite notes/risk"))
+        elif s["text"] != cur[gid]["text"]:
+            review.append((gid, "text changed since review: read it"))
+    for gid, why in review:
+        print(f"REVIEW {gid}: {why}")
+    print(f"\n{len(G)} groups, {len(kernel)} kernel commits: {errors} errors, {len(review)} to review"
+          + (f"  -> tracker-check {d} --show {' '.join(g for g, _ in review)}" if review else ""))
+    sys.exit(1 if errors or review else 0)
+
+
+main()

@@ -3,7 +3,8 @@
 Researched 2026-11-12 from the vendor driver (`src/vendor-kernel/drivers/sensorhub/stm32/`,
 config `CONFIG_SENSORS_SSP_STM32` + `_2017A3`), the stock DT, the stock sensors HAL
 (`/system/lib/hw/sensors.universal7870.so` from `work/system/SYSTEM.img`), the hub firmware blob and
-mainline `drivers/iio/common/ssp_sensors/`. Nothing was run on the phone.
+mainline `drivers/iio/common/ssp_sensors/`. Implemented and tested on the phone 2026-11-13: section 7
+is the current state; sections 1-3 and 6 are the reference, 4-5 record how it was planned.
 
 ## 1. Hardware
 
@@ -162,14 +163,14 @@ Payload sizes and meaning (`ssp_sensorlist.h`, `struct sensor_value`, HAL `senso
 | Type | Bytes | Layout | Unit (from the HAL resolution) |
 |---|---|---|---|
 | 1 accel | 6 | 3 x s16 | 1/4096 g per LSB (HAL res 0.0023942 m/s^2 = 9.80665/4096; range +-8 g) |
-| 4 gyro | 6 | 3 x s16 | HAL res 0.000610865 rad/s = 0.035 dps/LSB (+-1000 dps); the vendor `gyro_dps` default says 2000 dps: verify at rest/with a known rotation |
-| 2 mag | 7 | 3 x s16 + u8 accuracy | calibrated by the MCU; HAL res 0.06 uT/LSB (AK09916 raw is 0.15 uT/LSB: verify against Earth field ~50 uT) |
+| 4 gyro | 6 | 3 x s16 | HAL res 0.000610865 rad/s = 0.035 dps/LSB (+-1000 dps); the vendor `gyro_dps` default says 2000 dps (see section 7) |
+| 2 mag | 7 | 3 x s16 + u8 accuracy | calibrated by the MCU; 0.06 uT/LSB (stock HAL factor, section 7) |
 | 14 mag uncal | 12 | 3 x s16 uncal + 3 x s16 offset | same unit |
 | 16 gyro uncal | 12 | 3 x s16 + 3 x s16 bias | same as gyro |
-| 6 pressure | 6 | s32 pressure + s16 temperature | LPS25H: pressure probably in 1/4096 hPa (LPS25H native) or Pa*100; HAL res 1 hPa says nothing. Verify: ~1013 hPa at sea level, ~-0.12 hPa/m. Temperature likely 1/100 C |
+| 6 pressure | 6 | s32 pressure + s16 temperature | LPS25H native units: 1/4096 hPa; temperature (raw + 20400) / 480 C (section 7) |
 | 5 light | 18 | u32 lux, s32 cct, u16 r, g, b, c(w), u8 atime, u8 again (&3) | lux already computed on the MCU with the coefficients |
 | 34 light CCT | 18 | same | |
-| 8 prox | 2 | u8 near(1)/far(0)?, u8 raw | HAL maxRange 8, i.e. 0 = near, 8 = far after HAL mapping: verify the polarity of byte 0 by covering the sensor |
+| 8 prox | 2 | u8 near (1) / far (0), u8 raw | polarity verified by covering the sensor (section 7) |
 | 29 prox raw | 1 | u8 | factory |
 | 11/15/20 rotation vectors | 17 | 4 x s32 quaternion + u8 accuracy | |
 | 17, 18, 22, 25 | 1 | u8 event | |
@@ -199,7 +200,7 @@ at first contact and log it; that is the ground truth for this FW.
   no flashing code at all (`"Firmware version not supported"`): that check has to become
   "warn and continue" for the A3 variant.
 
-## 4. Mainline: extend `ssp_sensors` or write a new driver?
+## 4. Mainline: extend `ssp_sensors` or write a new driver? (planning, 2026-11-12; done as described)
 
 Recommendation: **extend `drivers/iio/common/ssp_sensors/`** with a per-firmware "protocol
 variant" chosen by compatible, because Jonathan Cameron (IIO maintainer) will ask why a second
@@ -242,7 +243,7 @@ directory sharing the transport file. Decide after an RFC.
 Effort: transport and init are small (the protocol is simple); most work is the four new IIO
 drivers and the units.
 
-## 5. Bring-up plan (low risk first)
+## 5. Bring-up plan (planning, 2026-11-12; all steps done, results in section 7)
 
 0. Read-only phone checks (no driver, `peek` only; both pin controllers are in use already, so
    clocked). Bank layout: +0 CON (4 bits/pin: 0 input, 1 output, 2+ function, 0xf EINT),
@@ -285,7 +286,7 @@ instead), `gpio_to_irq` + legacy GPIO numbers.
 
 ## 7. Implementation status (2026-11-13: working, all six sensors, prox events)
 
-Kernel (src/linux a3y17lte, 22 commits after "Add the USB-C port controller", squashed 2026-11-13;
+Kernel (src/linux a3y17lte, 11 commits after "Add the USB-C port controller", squashed 2026-11-13;
 pre-squash tip tagged a3y17lte-pre-ssp-squash):
 - pinctrl: wakeup EINT digital filter on (Fixes:). THE transport bug: without it, glitches on
   MCU_INT1 (gpa0-7) start transfers the hub never set up; it then clocks out dummy bytes
@@ -308,7 +309,7 @@ sysinit for modalias autoload (build-rootfs and a3-sync-modules set them since 2
 Units as implemented (sysfs value x scale; verified against reality where noted):
 - accel 1/4096 g. Verified: flat on its back z = +4030, on its face -4150, so 1 g = 4090 LSB
   (0.15 %) with a -60 LSB (15 mg) z bias; upright portrait y = +4022 (Android/IIO axes).
-- gyro 35 mdps/LSB.
+- gyro 35 mdps/LSB: the stock HAL factor (+-1000 dps); not checked against a known rotation.
 - mag 0.0006 G = 0.06 uT/LSB: the stock HAL multiplies AKM values by exactly 0.06 (0.1 for ST and
   Yamaha; MagneticSensor ctor in sensors.universal7870.so). The hub calibrates the field ITSELF
   (hard iron) once it sees motion: uncalibrated |m| was a steady 86 uT; after ~15 s of figure-8,

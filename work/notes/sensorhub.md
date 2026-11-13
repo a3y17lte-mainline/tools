@@ -283,22 +283,51 @@ fake timestamp channel per sensor, debug timers that reset the MCU, the big-data
 factory selftests, `CONFIG_SENSORS_SSP_*` per-chip Kconfig symbols (detect from the scan bitmap
 instead), `gpio_to_irq` + legacy GPIO numbers.
 
-## 7. Implementation status (2026-11-13)
+## 7. Implementation status (2026-11-13: working, all six sensors)
 
-Kernel (src/linux a3y17lte, local): SPI binding + s3c64xx 7870 port config + dtsi SPI4; ssp fixes
-(`__packed`, re-enable after reset); ssp core variant (wire types, 8-byte scan, batched frames with
-per-sensor timestamps, A3 init: formation, mag matrix, light coefficients, boot0, reset + 500 ms
-boot at probe); binding; accel/gyro scale; board DTS. Config: SPI_S3C64XX=y, SPIDEV/SSP =m.
+Kernel (src/linux a3y17lte, 22 commits after "Add the USB-C port controller", squashed 2026-11-13;
+pre-squash tip tagged a3y17lte-pre-ssp-squash):
+- pinctrl: wakeup EINT digital filter on (Fixes:). THE transport bug: without it, glitches on
+  MCU_INT1 (gpa0-7) start transfers the hub never set up; it then clocks out dummy bytes
+  (headers `02 02 02 02`, "unknown frame type 0x02") and stalls ~10 s, 3-4 times per 90 s.
+  The vendor kernel enables the filter. Registers 0x139f0800+ = 0xc0c0c0c0 when on.
+- spi: binding + s3c64xx 7870 port config; dtsi SPI4 with the mux on OSC (26 MHz -> ext 8.67 MHz
+  -> SCK 4.33 MHz). From the 799.5 MHz bus PLL the divider bottoms out at 6.25 MHz SCK.
+- ssp mainline fixes (separate, Fixes:-style): `__packed`, restore only enabled sensors after a
+  hub reset, unregister consumers on removal (use-after-free on rmmod while samples arrive),
+  SPI ID table, platform ID tables for accel/gyro (they never autoloaded), no CHANGE_DELAY to
+  stopped sensors.
+- ssp A3 variant: timestamp in the core, hub-info firmware differences, binding, A3 support
+  (batched frames, init sequence, BOOT0 low, reset + 500 ms at probe), accel/gyro scale, raw
+  reads + read_raw/write_raw helpers, the other sensors (sample sizes, prox thresholds).
+- New IIO drivers: ssp_magn_sensor, ssp_pressure_sensor, ssp_light_sensor, ssp_prox_sensor.
+- Board DTS: hub node (reset described ACTIVE_HIGH, see section 4 point 4).
+Config: SPI_S3C64XX=y, IIO_SSP_SENSORHUB/COMMONS=m, SPIDEV=m. Alpine needs mdev + hwdrivers in
+sysinit for modalias autoload (build-rootfs and a3-sync-modules set them since 2026-11-13).
+
+Units as implemented (sysfs value x scale; verified against reality where noted):
+- accel 1/4096 g (z ~4018 flat), gyro 35 mdps/LSB.
+- mag scale 0.0006 G = 0.06 uT/LSB (HAL). Rotation test: horizontal circle radius 386 LSB,
+  i.e. 0.050-0.053 uT/LSB against the local ~20 uT horizontal field; accuracy byte stayed 0
+  (hub never calibrated in the test). Recheck once calibration converges.
+- pressure 1/4096 hPa (raw 4031891 = 984 hPa); temperature (raw + 20400) / 480 C (LPS25H).
+- light: lux and CCT processed on the hub; RGBC raw. Prox: raw count (cover/uncover seen).
+
+Tests: 90 s all-sensor capture without gaps or hub errors on the final series; module reload
+clean (no Oops); everything autoloads at boot on Alpine (#93, 2026-11-13).
+
 Tools: tools/probes/ssp-probe (spidev, read commands only; -r releases nRST), ssp-pins.sh.
-Host test of the batched parser (10 hand-built frames incl. truncated/unknown records): pass.
+SPI4 registers as bus 0 (no alias): device spi0.0.
 
-First contact (spidev + ssp-probe, sensorhub module blacklisted in /etc/modprobe.d):
-- SPI4 registers as bus 0 (no alias): device spi0.0, /dev/spidev0.0.
-- Pins after boot: every hub pin at its reset state (input), except SPI pins once the controller
-  probes. nRST reads high on our kernel (an earlier read on the previous boot showed 0: treat the
-  reset state as unknown, the driver pulses reset at probe anyway). BOOT0 reads 0 (pull-down).
-- Mode 1, 4.8 MHz works. The first WHOAMI timed out at the MCU_INT2 handshake; the hub then sent
-  an unsolicited HUB2AP frame `07` (RESET record) and the retry returned 0x55.
+Open: iio-sensor-proxy/Phosh rotation check (mount matrix = identity assumed); prox near/far
+as an IIO event; suspend (SUSPEND/RESUME commands, wake IRQ); virtual sensors (step counter,
+sig motion); calibration (calibbias). Firmware stays 16112800 (never flashed).
+
+First contact details (spidev, before the driver):
+- Pins after boot at reset state (input) except SPI once the controller probes. nRST read high on
+  one boot, 0 on another: the driver pulses reset at probe anyway. BOOT0 reads 0 (pull-down).
+- Mode 1 at 4.8 MHz works. The first WHOAMI timed out at the MCU_INT2 handshake; the hub then
+  sent an unsolicited `07` (RESET) frame and the retry returned 0x55.
 - FIRMWARE_REV = 16112800 (older than the vendor blob's 18011800; not flashed, accepted).
 - SENSOR_SCANNING = 0x00000000f24f4176: 1 accel, 2 mag, 4 gyro, 5 light, 6 pressure, 8 prox,
   14 mag uncal, 16 gyro uncal, 17 sig motion, 18 step det, 19 step counter, 22 tilt, 25 pickup,

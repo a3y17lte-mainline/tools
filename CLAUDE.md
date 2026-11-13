@@ -42,6 +42,13 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
   256 calibrated brightness levels, blank/unblank. See the Display section.
 - Power: S2MU004 fuel gauge + charger (watchdog kick), thermal, cpufreq 343–1586 MHz with per-chip
   ASV voltages, and cpuidle (core power-down; cluster power-down not done).
+- Sensors (2026-11-13): STM32 sensor hub on SPI4 (mainline ssp_sensors + A3 variant): accel, gyro,
+  mag, pressure, light, prox as IIO devices. The pinctrl EINT filter fix was the key. See
+  work/notes/sensorhub.md section 7.
+- Module policy (2026-11-13): built in = boot, rescue (USB/display/serial/pstore), safety (watchdog,
+  thermal, cpufreq, charger/fuel gauge/MUIC/TCPC/ADC), power key; modules = firmware loaders
+  (Wi-Fi/BT), optional peripherals (touch, touch keys, haptic, Panfrost, sensor hub), spidev.
+  I2C_CHARDEV stays built in. Alpine autoloads by modalias (mdev + hwdrivers in sysinit).
 - GPU (2026-11-11): Panfrost on Mali-T830 with DVFS 343–1001 MHz (worst-case voltages, GPU cooling),
   patched Mesa + GTK on the installed postmarketOS (Phosh). See the GPU section.
 
@@ -66,12 +73,10 @@ Not done, roughly in planned order:
   AFC is dropped: its 9 V / 1.65 A operating point is a PD 9 V sink PDO (stock capped PD at 5 V in
   software only). 9 V contract verified 2026-11-12 (charger 1650 mA in / 2100 mA charge).
 - Suspend: needs the PMU sleep sequences from the vendor kernel.
-- SPI port config + STM32 sensor hub → IIO (large).
-- PDMA, ADC (battery thermistor), PWM.
-- Audio COD3026X (shared with every 7870 phone).
-  Sensor hub, audio and their shared prerequisites (SPI4, ADC, AUD_PLL fix, ADMA, resets) are
-  researched (2026-11-12): start with work/notes/next-areas.md, then sensorhub.md and audio.md.
-  The hub's SPI port is mainline SPI4 (CMU/pinctrl naming), not the vendor alias "spi2".
+- Sensor hub follow-ups: Phosh rotation check, prox near/far event, suspend (sensorhub.md 7).
+- PDMA, PWM.
+- Audio COD3026X (shared with every 7870 phone). Prerequisites (AUD_PLL fix, ADMA, resets) are
+  researched (2026-11-12): start with work/notes/next-areas.md, then audio.md.
 - GPU follow-ups: sending the Mesa/GTK patches (see GPU section); build + shader-db the Mesa
   branches on main before the MR. Per-chip GPU voltages done and installed 2026-11-12 (group X).
 - Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.

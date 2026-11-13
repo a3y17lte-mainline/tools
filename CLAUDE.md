@@ -73,8 +73,9 @@ Not done, roughly in planned order:
   software only). 9 V contract verified 2026-11-12 (charger 1650 mA in / 2100 mA charge).
 - Suspend: s2idle works (2026-11-13; RTC/power key wake, Wi-Fi loaded). Fixed: imagis suspend
   NULL deref (group AI), and the CPUCL0 watchdog losing its state in cluster 0's power domain
-  (CPU0 kept out of power-down during s2idle, group G). Deep sleep needs the vendor PMU sleep
-  sequences. Details, tools and traps: work/notes/suspend.md.
+  (CPU0 kept out of power-down during s2idle, group G). Charging continues across suspend (the
+  charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
+  Deep sleep needs the vendor PMU sleep sequences. Details, tools and traps: work/notes/suspend.md.
 - PDMA, PWM.
 - Audio COD3026X (shared with every 7870 phone). Prerequisites (AUD_PLL fix, ADMA, resets) are
   researched (2026-11-12): start with work/notes/next-areas.md, then audio.md.

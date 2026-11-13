@@ -30,6 +30,17 @@ not started.
      offline, CPU0 runs resume, so the domain is up when the watchdog is restored).
    - Not proven / dropped: stopping the per-CPU MCT "oneshot wakeup" timers in tick_suspend_local().
 
+## Charging across suspend
+
+The S2MU004 charger watchdog (80 s, left on by the bootloader) is cleared every 30 s. While a
+charger is attached, a boottime wakeup alarm drives that (alarmtimer programs the RTC on suspend)
+and a wakeup source holds the system until the clearing work has run, as the stock sec_battery does
+(polling_time 30 s while charging). On battery it is a plain delayed work: no wakeups. The work
+runs on the freezable workqueue, so it never touches I2C before resume. Folded into "power: supply:
+s2m-charger: Add S2MU004 support" (group K). Verified 2026-11-13 with tools/probes/s2idle-charge.sh:
+4 s2idle cycles in a row on a charger, each woken by the alarm after ~30 s (wake IRQ 54), status
+Charging/Good throughout, "watchdog suspended charging" never logged.
+
 ## Tools
 
 - Config (tools/mkconfig-a3y17lte): PM_DEBUG + PM_ADVANCED_DEBUG (pm_test, pm_print_times,
@@ -41,6 +52,8 @@ not started.
   writes /root/s2idle-LEVEL.log. After a reset: /sys/fs/pstore/console-ramoops-0 (16 KiB; the
   verbose per-device log fills it with the resume alone, `quiet` keeps entry + wake) and
   pmsg-ramoops-0 (`probe`: watchdog registers every 0.2 s after resume).
+- tools/probes/s2idle-charge.sh [CYCLES]: back-to-back s2idle cycles on a charger, logs wake IRQ,
+  charger status/health and battery current per cycle to /root/s2idle-charge.log.
 - Reset reason: `/usr/local/bin/peek 0x10480404` (PMU RST_STAT): 0x20000000 after `reboot`,
   0x00800000 (bit 23) after a watchdog reset. peek is not on the ssh PATH.
 - Wake IRQs: 54 = gpa0-2 = S2MPU05 (RTC alarm), 78 = gpio-keys KEY_POWER. `SSP_Int` has wake
@@ -51,6 +64,3 @@ not started.
 - Wakeup sources other than RTC and power: sensor hub (`SSP_Int` is wake-enabled: check it does
   not wake the phone constantly once sensors are enabled), USB plug, home key.
 - Check after resume: sensor hub data, touch keys, display unblank under Phosh, BT.
-- Long sleeps while charging: the S2MU004 charger watchdog (80 s) is kicked by a frozen work item;
-  charging stops during sleep and the driver recovers it on resume. Changing that is a charger
-  setting (needs the user's yes).

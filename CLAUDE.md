@@ -71,9 +71,10 @@ Not done, roughly in planned order:
   + reboot), not pmOS. On-phone loggers: tools/probes/ (pd-log.sh for cable swaps).
   AFC is dropped: its 9 V / 1.65 A operating point is a PD 9 V sink PDO (stock capped PD at 5 V in
   software only). 9 V contract verified 2026-11-12 (charger 1650 mA in / 2100 mA charge).
-- Suspend: s2idle mostly works (2026-11-13): imagis suspend NULL deref fixed; open: ath10k_sdio
-  resume hangs, and with core power-down ~1 in 4 resumes stops silently and the watchdog resets.
-  Deep sleep needs the vendor PMU sleep sequences. State and tools: work/notes/suspend.md.
+- Suspend: s2idle works (2026-11-13; RTC/power key wake, Wi-Fi loaded). Fixed: imagis suspend
+  NULL deref (group AI), and the CPUCL0 watchdog losing its state in cluster 0's power domain
+  (CPU0 kept out of power-down during s2idle, group G). Deep sleep needs the vendor PMU sleep
+  sequences. Details, tools and traps: work/notes/suspend.md.
 - PDMA, PWM.
 - Audio COD3026X (shared with every 7870 phone). Prerequisites (AUD_PLL fix, ADMA, resets) are
   researched (2026-11-12): start with work/notes/next-areas.md, then audio.md.
@@ -164,7 +165,7 @@ Keep series small: one commit per logical change, follow-ups folded in.
   with ArtifactData (read first, pin if_version) whenever patches change, are regrouped, sent or reviewed,
   following "Series and tracker hygiene" below.
 - Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master =
-  v7.4-rc2; 97 as of 2026-11-13)
+  v7.4-rc2; 91 as of 2026-11-13)
 
 ## Display (command-mode panel, working 2026-11-09)
 
@@ -254,6 +255,10 @@ Keep series small: one commit per logical change, follow-ups folded in.
   or panic resets the phone in ~13 s (U-Boot then autoboots eMMC). `reboot -f` works via its restart
   handler (~4 s). After `reboot`, wait for the USB link to drop before waiting for it to come back:
   the old system answers pings for a few seconds while shutting down.
+  It lives in cluster 0's non-CPU power domain: if all four cluster-0 cores stay powered down for
+  long, it comes back with reset values (on, ~1 s) and resets the board. Reset reason: peek PMU
+  RST_STAT 0x10480404 (bit 23 = watchdog, bit 29 = SWRESET). Don't set the vendor L2 option
+  STANDBYWFIL2 alone: it makes cluster 0 go down at runtime.
 - Thermal: one TMU sensor at 0x10130000 (zone soc-thermal, passive 76 C, critical 110 C). TRIMINFO
   25 C trim on this unit is 319 (9-bit), so mainline's Exynos7 efuse range would read ~274 C.
   Both CPU clusters are its cooling devices. Test trips with .../thermal_zone0/emul_temp.

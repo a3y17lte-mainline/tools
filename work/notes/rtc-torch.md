@@ -30,6 +30,10 @@
 - Test: `/sys/class/leds/white:flash/brightness` 0..5; strobe with flash_brightness (uA),
   flash_timeout (us), flash_strobe.
 
-## Status
+## Status (verified on Alpine 2026-11-13)
 
-Built, not run on the phone at the time of writing.
+- RTC: rtc0 registers at boot and sets the system clock (the RTC already held correct UTC time);
+  the alarm IRQ fires (`echo +5 > /sys/class/rtc/rtc0/wakealarm` -> rtc-alarm0 count +1).
+  Time across a full power-off: not checked.
+- Torch: leds_rt8547 autoloads, `white:flash` appears; torch steps 1-5 and a 1 A / 512 ms strobe
+  light the LED (user-confirmed); the strobe ends by itself (flash_strobe reads 0 afterwards).

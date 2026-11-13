@@ -46,6 +46,9 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
   thermal, cpufreq, charger/fuel gauge/MUIC/TCPC/ADC), power key; modules = firmware loaders
   (Wi-Fi/BT), optional peripherals (touch, touch keys, haptic, Panfrost, sensor hub), spidev.
   I2C_CHARDEV stays built in. Alpine autoloads by modalias (mdev + hwdrivers in sysinit).
+- RTC + torch (2026-11-13): S2MPU05 RTC via mainline rtc-s5m (config only; hctosys + alarm IRQ),
+  RT8547 flash LED (our leds-rt8547 + ExpressWire multi-bit write) as `white:flash`: torch 1-5
+  (25-125 mA) and strobe. Tracker groups AG/AH. See work/notes/rtc-torch.md.
 - GPU (2026-11-11): Panfrost on Mali-T830 with DVFS 343–1001 MHz (worst-case voltages, GPU cooling),
   patched Mesa + GTK on the installed postmarketOS (Phosh). See the GPU section.
 

@@ -37,7 +37,8 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
 - Display (2026-11-09): Exynos DRM (DECON command mode + DSIM) + our S6E3AA2 panel driver, fbcon,
   256 calibrated brightness levels, blank/unblank. See the Display section.
 - Power: S2MU004 fuel gauge + charger (watchdog kick), thermal, cpufreq 343–1586 MHz with per-chip
-  ASV voltages, and cpuidle (core power-down; cluster power-down not done).
+  ASV voltages, and cpuidle: core power-down, plus cluster 1 power-down (2026-11-13). The firmware
+  takes a cluster request only from the last CPU, so exynos-pmu coordinates it: work/notes/cpuidle.md.
 - Sensors (2026-11-13): STM32 sensor hub on SPI4 (mainline ssp_sensors + A3 variant): accel, gyro,
   mag, pressure, light, prox (+ near/far events) as IIO devices. The pinctrl EINT filter fix was
   the key. The hub calibrates the magnetometer itself after some motion (lost on MCU reset).
@@ -166,7 +167,7 @@ Keep series small: one commit per logical change, follow-ups folded in.
   with ArtifactData (read first, pin if_version) whenever patches change, are regrouped, sent or reviewed,
   following "Series and tracker hygiene" below.
 - Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master =
-  v7.4-rc2; 91 as of 2026-11-13)
+  v7.4-rc2; 94 as of 2026-11-13)
 
 ## Display (command-mode panel, working 2026-11-09)
 

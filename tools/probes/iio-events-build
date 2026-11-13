@@ -1,0 +1,9 @@
+#!/bin/bash
+# Build iio-events: freestanding static aarch64, against the arm64 uapi headers of our kernel tree
+# (make -C src/linux O=out/linux ARCH=arm64 LLVM=1 headers). Usage on the phone: see the header of iio-events.c.
+# Push like peek (see tools/peek/build).
+set -e; cd "$(dirname "$0")"
+INC=../../out/linux/usr/include
+[ -f $INC/linux/iio/events.h ] || { echo "run: make -C src/linux O=\$PWD/out/linux ARCH=arm64 LLVM=1 headers" >&2; exit 1; }
+clang --target=aarch64-linux-gnu -ffreestanding -fno-stack-protector -nostdlib -nostdinc -isystem $INC \
+	-static -O2 -fuse-ld=lld -Wall -Wextra -Wno-unused-parameter -o iio-events iio-events.c

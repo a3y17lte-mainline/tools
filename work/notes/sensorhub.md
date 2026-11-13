@@ -283,7 +283,7 @@ fake timestamp channel per sensor, debug timers that reset the MCU, the big-data
 factory selftests, `CONFIG_SENSORS_SSP_*` per-chip Kconfig symbols (detect from the scan bitmap
 instead), `gpio_to_irq` + legacy GPIO numbers.
 
-## 7. Implementation status (2026-11-13: working, all six sensors)
+## 7. Implementation status (2026-11-13: working, all six sensors, prox events)
 
 Kernel (src/linux a3y17lte, 22 commits after "Add the USB-C port controller", squashed 2026-11-13;
 pre-squash tip tagged a3y17lte-pre-ssp-squash):
@@ -306,12 +306,23 @@ Config: SPI_S3C64XX=y, IIO_SSP_SENSORHUB/COMMONS=m, SPIDEV=m. Alpine needs mdev 
 sysinit for modalias autoload (build-rootfs and a3-sync-modules set them since 2026-11-13).
 
 Units as implemented (sysfs value x scale; verified against reality where noted):
-- accel 1/4096 g (z ~4018 flat), gyro 35 mdps/LSB.
-- mag scale 0.0006 G = 0.06 uT/LSB (HAL). Rotation test: horizontal circle radius 386 LSB,
-  i.e. 0.050-0.053 uT/LSB against the local ~20 uT horizontal field; accuracy byte stayed 0
-  (hub never calibrated in the test). Recheck once calibration converges.
+- accel 1/4096 g. Verified: flat on its back z = +4030, on its face -4150, so 1 g = 4090 LSB
+  (0.15 %) with a -60 LSB (15 mg) z bias; upright portrait y = +4022 (Android/IIO axes).
+- gyro 35 mdps/LSB.
+- mag 0.0006 G = 0.06 uT/LSB: the stock HAL multiplies AKM values by exactly 0.06 (0.1 for ST and
+  Yamaha; MagneticSensor ctor in sensors.universal7870.so). The hub calibrates the field ITSELF
+  (hard iron) once it sees motion: uncalibrated |m| was a steady 86 uT; after ~15 s of figure-8,
+  40-58 uT in every orientation (local field ~49 uT), z flips cleanly face up/down. The
+  calibration lives in MCU RAM and is lost at every MCU reset (every probe): stock is the same
+  (no stored mag calibration anywhere; the AKM path has no load command, 0xf5 HWOFFSET is Yamaha).
 - pressure 1/4096 hPa (raw 4031891 = 984 hPa); temperature (raw + 20400) / 480 C (LPS25H).
-- light: lux and CCT processed on the hub; RGBC raw. Prox: raw count (cover/uncover seen).
+- light: lux and CCT processed on the hub; RGBC raw.
+- prox: raw count (uncovered 3-7, covered 90-255); in_proximity_nearlevel = DT high threshold
+  (55); events: rising = near, falling = far, from the hub's own decision byte (1 = near), values
+  read-only (55/40). Enabling events keeps the sensor on (spd->keep_on; raw reads then use the
+  last sample). Tested: events alternate exactly with cover/uncover.
+- Timestamps: light and prox are on-change (the hub sends time delta 0 for them): stamped with
+  arrival time, like the vendor (REPORT_MODE_ON_CHANGE). Continuous sensors accumulate deltas.
 
 Tests: 90 s all-sensor capture without gaps or hub errors on the final series; module reload
 clean (no Oops); everything autoloads at boot on Alpine (#93, 2026-11-13).
@@ -319,9 +330,15 @@ clean (no Oops); everything autoloads at boot on Alpine (#93, 2026-11-13).
 Tools: tools/probes/ssp-probe (spidev, read commands only; -r releases nRST), ssp-pins.sh.
 SPI4 registers as bus 0 (no alias): device spi0.0.
 
-Open: iio-sensor-proxy/Phosh rotation check (mount matrix = identity assumed); prox near/far
-as an IIO event; suspend (SUSPEND/RESUME commands, wake IRQ); virtual sensors (step counter,
-sig motion); calibration (calibbias). Firmware stays 16112800 (never flashed).
+Suspend: mainline's ssp_suspend/resume (0xd4/0xd3) are in place but untested: s2idle itself hangs
+on this board (2026-11-13, kernel #95: log ends at "printk: Suspending console(s)", power key did
+not wake it, forced reset). Next try: `echo N > /sys/module/printk/parameters/console_suspend`,
+`echo 1 > /sys/power/pm_print_times`, acpid stopped (the power key runs poweroff), and expect
+another forced reset. Power and home keys are wakeup sources since then.
+
+Open: suspend (above); virtual sensors (step counter, sig motion); accel/gyro calibbias (stock keeps
+factory values in /efs: not used). Firmware stays 16112800 (never flashed). Phosh not needed.
+Tools: tools/probes/iio-events (event reader), ssp-cap.sh (60 s capture).
 
 First contact details (spidev, before the driver):
 - Pins after boot at reset state (input) except SPI once the controller probes. nRST read high on

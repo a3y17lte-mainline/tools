@@ -29,6 +29,18 @@ not started.
      in the transition). Only for PM_SUSPEND_TO_IDLE: deep sleep is not affected (secondaries
      offline, CPU0 runs resume, so the domain is up when the watchdog is restored).
    - Not proven / dropped: stopping the per-CPU MCT "oneshot wakeup" timers in tick_suspend_local().
+   - Side effect (found 2026-11-13): with CPU0's power-down states disabled, s2idle is never
+     "proper". cpuidle_enter_s2idle() only considers states >= 1 that have ->enter_s2idle, so CPU0
+     gets index 0. It then falls back to tick_nohz_idle_stop_tick() + WFI with its hrtimers live,
+     and never calls tick_freeze(). Timekeeping is never suspended (no "Timekeeping suspended for"
+     on resume, even with pm_debug_messages; dmesg time runs on), and CPU0 keeps taking timer
+     interrupts all through s2idle. The other CPUs do freeze their ticks.
+   - Visible symptom: with the debug config's buddy hard-lockup detector, CPU0's watchdog hrtimer
+     sees CPU1's hrtimer count stand still and logs "watchdog: CPU0: Watchdog detected hard LOCKUP
+     on cpu 1" ~10-16 s into every s2idle longer than that (3/3 runs; CPU1's NMI backtrace sits in
+     cpuidle_enter_s2idle). False positive: not related to cluster 1 power-down
+     (cpuidle.md). A fix belongs in group G: CPU0 needs a way to stay up without losing tick
+     freezing, or the cluster 0 domain must be kept on another way.
 
 ## Charging across suspend
 

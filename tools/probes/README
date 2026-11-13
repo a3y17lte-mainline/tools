@@ -8,6 +8,13 @@ Bare-metal S-Boot payload probes for the Galaxy A3 2017 (no UART needed).
                  the vendor SMC, prints them, then refuses to load. Build with the kernel's Kbuild
                  (make ARCH=arm64 -C <kernel out dir> M=$PWD/asv-fuse) and insmod on the phone.
                  Superseded in practice by exynos7870-asv, which logs the group at boot.
+  ssp-probe.c    userspace sensor hub probe (phone, Linux): WHOAMI, FIRMWARE_REV and
+                 SENSOR_SCANNING over spidev + GPIO chardev, read commands only; never touches the
+                 MCU reset or BOOT0 lines. Build with ./ssp-probe-build (needs the kernel uapi
+                 headers: make ... headers), dry run on the host: qemu-aarch64-static ./ssp-probe -n.
+                 On the phone: bind spidev to spi4.0 (driver_override) with the sensorhub module
+                 not loaded, then ./ssp-probe. See work/notes/sensorhub.md section 7.
+  ssp-pins.sh    read-only state of the sensor hub pins (function, level, pull) via peek.
 
 Build (from this directory):
   aarch64-linux-gnu-gcc -nostdlib -nostartfiles -Wl,-Ttext=0 -Wl,--build-id=none -o rebootdl.elf rebootdl.S

@@ -20,3 +20,4 @@
 *.symvers
 /tools/peek/peek
 /tools/peek/dump
+/tools/probes/ssp-probe

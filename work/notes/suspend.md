@@ -86,8 +86,3 @@ Charging/Good throughout, "watchdog suspended charging" never logged.
   at the same ~5.5 Hz right after wake (tools/probes/ssp-s2idle.sh; the plug test is tools/probes/plug-wake.sh).
 - After resume: touch keys work (IRQ 84), BT works (hci0 powered, scan finds devices), Wi-Fi
   reconnects. Not checked: display unblank under Phosh (pmOS).
-
-## Open
-
-- Phosh unblank after s2idle (pmOS only).
-- Power: s2idle and cluster idle battery current, not measured yet (needs the cable out).

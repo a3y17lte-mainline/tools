@@ -1,8 +1,7 @@
 # CPU idle: cluster power-down (CPD)
 
 Status 2026-11-13: working on cluster 1 (sections 5-6). Tracker group: cpuidle-psci RFC + exynos-pmu + DT.
-Plan: cluster 1 only, as the vendor does. Cluster 0 holds the CPUCL0 watchdog (suspend.md
-item 2), and the vendor never powers it down ("no benefit in boot cluster").
+Plan: cluster 1 only, as the vendor does. The vendor never powers cluster 0 down ("no benefit in boot cluster").
 
 ## 1. Registers (PMU 0x10480000)
 

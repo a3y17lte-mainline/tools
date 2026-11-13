@@ -72,9 +72,11 @@ Not done, roughly in planned order:
   + reboot), not pmOS. On-phone loggers: tools/probes/ (pd-log.sh for cable swaps).
   AFC is dropped: its 9 V / 1.65 A operating point is a PD 9 V sink PDO (stock capped PD at 5 V in
   software only). 9 V contract verified 2026-11-12 (charger 1650 mA in / 2100 mA charge).
-- Suspend: s2idle works (2026-11-13; RTC/power key wake, Wi-Fi loaded). Fixed: imagis suspend
-  NULL deref (group AI), and the CPUCL0 watchdog losing its state in cluster 0's power domain
-  (CPU0 kept out of power-down during s2idle, group G). Charging continues across suspend (the
+- Suspend: s2idle works (2026-11-14; RTC/power key wake, Wi-Fi loaded). Fixed: imagis suspend
+  NULL deref (group AI), and the CPUCL0 watchdog resuming from its reset values (s3c2410_wdt
+  resume order vs the PMU automatic disable, fixed 2026-11-14; the old CPU0 hold is gone, so
+  every tick freezes now). Tracker changes are pending in the local out/tracker/ledger.md
+  (the tracker db can't be reached from Claude Code). Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
   Deep sleep needs the vendor PMU sleep sequences. Details, tools and traps: work/notes/suspend.md.
 - PDMA, PWM.
@@ -257,8 +259,8 @@ Keep series small: one commit per logical change, follow-ups folded in.
   or panic resets the phone in ~13 s (U-Boot then autoboots eMMC). `reboot -f` works via its restart
   handler (~4 s). After `reboot`, wait for the USB link to drop before waiting for it to come back:
   the old system answers pings for a few seconds while shutting down.
-  It lives in cluster 0's non-CPU power domain: if all four cluster-0 cores stay powered down for
-  long, it comes back with reset values (on, ~1 s) and resets the board. Reset reason: peek PMU
+  While PMU AUTOMATIC_DISABLE_WDT (0x10480408) bit 23 is set it is held at its reset values (on,
+  ~1 s): its resume must clear that bit before restoring (our s3c2410_wdt fix). Reset reason: peek PMU
   RST_STAT 0x10480404 (bit 23 = watchdog, bit 29 = SWRESET). Don't set the vendor L2 option
   STANDBYWFIL2 alone: it makes cluster 0 go down at runtime.
 - Thermal: one TMU sensor at 0x10130000 (zone soc-thermal, passive 76 C, critical 110 C). TRIMINFO

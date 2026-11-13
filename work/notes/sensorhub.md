@@ -331,11 +331,8 @@ clean (no Oops); everything autoloads at boot on Alpine (#93, 2026-11-13).
 Tools: tools/probes/ssp-probe (spidev, read commands only; -r releases nRST), ssp-pins.sh.
 SPI4 registers as bus 0 (no alias): device spi0.0.
 
-Suspend: mainline's ssp_suspend/resume (0xd4/0xd3) are in place but untested: s2idle itself hangs
-on this board (2026-11-13, kernel #95: log ends at "printk: Suspending console(s)", power key did
-not wake it, forced reset). Next try: `echo N > /sys/module/printk/parameters/console_suspend`,
-`echo 1 > /sys/power/pm_print_times`, acpid stopped (the power key runs poweroff), and expect
-another forced reset. Power and home keys are wakeup sources since then.
+Suspend: ssp_suspend/resume (0xd4/0xd3) run without errors in s2idle (2026-11-13); whether
+sensors report correctly after resume is not checked yet. s2idle state: work/notes/suspend.md.
 
 Open: suspend (above); virtual sensors (step counter, sig motion); accel/gyro calibbias (stock keeps
 factory values in /efs: not used). Firmware stays 16112800 (never flashed). Phosh not needed.

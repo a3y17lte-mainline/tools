@@ -71,8 +71,9 @@ Not done, roughly in planned order:
   + reboot), not pmOS. On-phone loggers: tools/probes/ (pd-log.sh for cable swaps).
   AFC is dropped: its 9 V / 1.65 A operating point is a PD 9 V sink PDO (stock capped PD at 5 V in
   software only). 9 V contract verified 2026-11-12 (charger 1650 mA in / 2100 mA charge).
-- Suspend: needs the PMU sleep sequences from the vendor kernel. Even s2idle hangs (2026-11-13,
-  log ends at "Suspending console(s)"; debug steps in sensorhub.md section 7).
+- Suspend: s2idle mostly works (2026-11-13): imagis suspend NULL deref fixed; open: ath10k_sdio
+  resume hangs, and with core power-down ~1 in 4 resumes stops silently and the watchdog resets.
+  Deep sleep needs the vendor PMU sleep sequences. State and tools: work/notes/suspend.md.
 - PDMA, PWM.
 - Audio COD3026X (shared with every 7870 phone). Prerequisites (AUD_PLL fix, ADMA, resets) are
   researched (2026-11-12): start with work/notes/next-areas.md, then audio.md.

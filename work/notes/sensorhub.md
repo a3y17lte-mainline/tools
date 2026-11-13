@@ -282,3 +282,25 @@ the sysfs `enable` bitmask ABI and `sensors_event_class` devices, the misc devic
 fake timestamp channel per sensor, debug timers that reset the MCU, the big-data dump tasks, the
 factory selftests, `CONFIG_SENSORS_SSP_*` per-chip Kconfig symbols (detect from the scan bitmap
 instead), `gpio_to_irq` + legacy GPIO numbers.
+
+## 7. Implementation status (2026-11-13)
+
+Kernel (src/linux a3y17lte, local): SPI binding + s3c64xx 7870 port config + dtsi SPI4; ssp fixes
+(`__packed`, re-enable after reset); ssp core variant (wire types, 8-byte scan, batched frames with
+per-sensor timestamps, A3 init: formation, mag matrix, light coefficients, boot0, reset + 500 ms
+boot at probe); binding; accel/gyro scale; board DTS. Config: SPI_S3C64XX=y, SPIDEV/SSP =m.
+Tools: tools/probes/ssp-probe (spidev, read commands only; -r releases nRST), ssp-pins.sh.
+Host test of the batched parser (10 hand-built frames incl. truncated/unknown records): pass.
+
+First contact (spidev + ssp-probe, sensorhub module blacklisted in /etc/modprobe.d):
+- SPI4 registers as bus 0 (no alias): device spi0.0, /dev/spidev0.0.
+- Pins after boot: every hub pin at its reset state (input), except SPI pins once the controller
+  probes. nRST reads high on our kernel (an earlier read on the previous boot showed 0: treat the
+  reset state as unknown, the driver pulses reset at probe anyway). BOOT0 reads 0 (pull-down).
+- Mode 1, 4.8 MHz works. The first WHOAMI timed out at the MCU_INT2 handshake; the hub then sent
+  an unsolicited HUB2AP frame `07` (RESET record) and the retry returned 0x55.
+- FIRMWARE_REV = 16112800 (older than the vendor blob's 18011800; not flashed, accepted).
+- SENSOR_SCANNING = 0x00000000f24f4176: 1 accel, 2 mag, 4 gyro, 5 light, 6 pressure, 8 prox,
+  14 mag uncal, 16 gyro uncal, 17 sig motion, 18 step det, 19 step counter, 22 tilt, 25 pickup,
+  28 accel int, 29 prox raw, 30 geomag power, 31 interrupt gyro. No rotation vectors (11/15/20)
+  in this firmware.

@@ -1,8 +1,24 @@
 # Bus DVFS: MIF (DRAM controller), INT, DISP (research 2026-11-14)
 
-Status: Stage 0 (research, read-only survey) done. No driver code yet.
-Plan: Stage 1 INT + DISP (exynos-bus, passive from cpufreq, BUCK2 voting) -> Stage 2 MIF
-(exynos7870-dmc devfreq driver) -> Stage 3 drop the 750 mV BUCK2 floor.
+Status (2026-11-14): Stage 0 (research) and Stage 1 (INT + DISP) done and tested on Alpine; Stage 2
+(MIF) next. Kernel groups BE (OPP core), BF (exynos-bus without PPMU), BG (ASV + DTS).
+Plan: Stage 2 MIF (exynos7870-dmc devfreq, passive from cpufreq via MINLOCK) -> Stage 3 drop the
+750 mV BUCK2 floor once MIF votes.
+
+## 0. Stage 1 result (INT/DISP)
+
+- Design change from the plan, on evidence: stock runs INT and DISP at their MINIMUM (134 MHz) all
+  the time (stock DT freq_info min 134; DECON BTS requests only MIF; audio asks no INT; no USB INT
+  lock in the stock DT). So the buses are exynos-bus devices with the powersave governor (lowest
+  OPP, raised only by QoS: sysfs min_freq / future interconnect), not passive from cpufreq.
+- bus-int = CLKCMU_FSYS_BUS 199.875/159.9/133.25 MHz (INT 334/200/134 voltages); MFC/MSCL pinned to
+  133.25 MHz with assigned-clock-rates (no driver). bus-disp = CLKCMU_DISPAUD_BUS 199.875/133.25.
+  Real rates: BUS_PLL 1599 MHz (/2 = 799.5), MEDIA_PLL 1332.5 (/2 = 666.25).
+- ASV on this unit: INT 600/612.5/662.5 mV, DISP 637.5/656.25 mV (debugfs opp/platform-bus-*).
+- OPP core fix: dev_pm_opp_adjust_voltage() now applies the voltage of the active OPP, otherwise a
+  powersave bus keeps the DT worst case (781/800 mV) for good.
+- Measured: eMMC direct read 21.7 MB/s at FSYS 133 MHz vs 21.9 at 200 (not the limit). Display
+  healthy (DSIM INTSRC 0x01080000). BUCK2 still at the 750 mV floor (MIF has no vote yet).
 
 Sources: vendor `drivers/soc/samsung/pwrcal/S5E7870/{S5E7870-dfs.c,S5E7870-drampara.c,S5E7870-asv.c}`,
 `drivers/devfreq/exynos/exynos7870_bus_{mif,int,disp}.c`, stock DT `devfreq_*@170000x0`, the ECT

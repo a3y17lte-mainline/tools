@@ -96,6 +96,10 @@ Not done, roughly in planned order:
   Screen after wake user-confirmed. Open: other wake sources,
   S2MPU05 sleep modes (needs the user's yes), drain. Start with work/notes/deep-sleep.md: status
   header, section 9 (root causes and takeaways), sections 7, 8, 10 for details.
+- Bus DVFS (2026-11-14): INT + DISP buses done (exynos-bus, powersave governor like stock: lowest
+  level unless QoS; per-chip ASV voltages; groups BE/BF/BG). Next: MIF (DRAM controller) devfreq
+  driver, then drop the 750 mV BUCK2 floor. Start with work/notes/mif-dvfs.md (DREX timings are
+  identical at every MIF level; the switch clock is MEDIA_PLL).
 - PDMA, PWM.
 - Audio: nothing open. 192 kHz is deliberately not implemented. BT audio needs no audio-driver work
   (A2DP over HCI); the hardware SCO PCM path (QCA9377 -> mixer BT port) only matters for calls:

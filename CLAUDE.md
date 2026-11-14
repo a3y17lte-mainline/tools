@@ -79,7 +79,12 @@ Not done, roughly in planned order:
   2026-11-14); sensor hub, touch keys and BT verified after resume. Tracker changes are pending in the local out/tracker/ledger.md
   (the tracker db can't be reached from Claude Code). Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
-  Deep sleep needs the vendor PMU sleep sequences. Details, tools and traps: work/notes/suspend.md.
+  Details, tools and traps: work/notes/suspend.md.
+- Deep sleep (`mem`, 2026-11-14): entry, RTC wake and display resume work on a debug build; the
+  fixes are committed locally (not pushed). Any DISPAUD power loss needs the content firewall SMC
+  (exynos7_drm_decon) and the DSIM HS clock request after the panel reset. Open: the user's visual
+  confirmation, a run without debug code, wake sources, touch key read errors at resume, PMIC
+  sleep modes, drain. Start with work/notes/deep-sleep.md (status header, sections 7 and 8).
 - PDMA, PWM.
 - Audio COD3026X (shared with every 7870 phone). Prerequisites (AUD_PLL fix, ADMA, resets) are
   researched (2026-11-12): start with work/notes/next-areas.md, then audio.md.

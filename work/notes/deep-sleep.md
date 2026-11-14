@@ -6,15 +6,18 @@ defects that any DISPAUD power loss exposes (section 8): the display content fir
 set up again through the EL3 firmware, and the DSIM has to start the HS clock only after the
 panel reset. Verified by registers on the phone (60 Hz frame counter, sysmmu idle, DSIM INTSRC
 0x01080000, TE present), with the display blanked and with it on + fbcon bound (no panic), with
-and without the debug DISPAUD power cycle. Open: the user's visual confirmation, reducing the
-DSIM change to the minimal set and cleaning the debug code out, tm2-touchkey reads (-6) twice
-during resume, wake sources, sleep modes of the S2MPU05 rails, drain numbers.
-Kernel commits (a3y17lte, not pushed): f56de1bae4a3 pinctrl pad retention, c8426396033e A3
-power-down pin states (verified: CON_PDN/PUD_PDN = stock), 53f0f832d75a PMU system sleep + fixup
-c68dd03b80bc (CPU0 local PWR_CFG kept on in sleep, as the vendor), 1e2e1051e92b clk: PHY user
-muxes to OSC for suspend, 7b2d45d8a4ae clk: CMU_MIF top clock enables on for suspend (verified
-run 124), 0c1e0e72b5eb imagis power cycle at probe, 16dabf2568fe DSIM M_PLL_CTRL1. The fixup and
-1e2e1051e92b's FSYS/ISP parts are not verified individually. With the suspend ops in place
+and without the debug DISPAUD power cycle. Fixes committed (c65bbc2e01aa DECON firewall,
+ce50f7a5b474 DSIM start order), the debug code is out of the tree (out/deep-sleep-pmu-debug-
+current.patch has the PMU part: abort switch, DISPAUD cycle, watchdog). Open: the user's visual
+confirmation, a run of the series without any debug code, the M_PLL_CTRL1 test,
+tm2-touchkey reads (-6) twice during resume, wake sources, sleep modes of the S2MPU05 rails, drain numbers.
+Kernel commits (a3y17lte, not pushed; old tip tagged a3y17lte-pre-sleep-fold): f56de1bae4a3
+pinctrl pad retention, c8426396033e A3 power-down pin states (verified: CON_PDN/PUD_PDN = stock),
+7c685396ceec PMU system sleep (CPU0 local PWR_CFG kept on in sleep, as the vendor, folded in),
+645e9b43822e clk: PHY user muxes to OSC for suspend, 4a07eb6a58b7 clk: CMU_MIF top clock enables
+on for suspend (verified run 124), 6b0e9efe6340 imagis power cycle at probe, da7b67cd113b DSIM
+M_PLL_CTRL1, c65bbc2e01aa, ce50f7a5b474. The CPU0 part and the FSYS/ISP mux parts are not
+verified individually. With the suspend ops in place
 `mem_sleep` defaults to `deep`.
 
 Deep sleep is a PMU-sequenced system power-down. The kernel programs the PMU (per-block SYS_PWR
@@ -260,18 +263,31 @@ Boot and runtime blank/unblank only work because the state S-Boot set up is stil
   - without SWRST: same. With the lanes enabled before the esc/byte clocks (vendor order): no
     contention flag, with or without SWRST. The HS request then takes the clock lane to
     HS-ready (0x40f) at once, also in the vendor order: that is normal.
-- Kernel tests, first enable after a verified power cycle:
-  - PHYCTRL + PHY timing before the PLL enable (#143): no change.
-  - lanes before the esc/byte clocks (#144): contention flag gone, still no TE.
+- Kernel tests, first enable after a verified power cycle (tools/probes/ds-reduce.sh; #146/#147/
+  #151 had a switch per sub-change, out/dsim-switch-build-151.patch):
+  - PHYCTRL + PHY timing before the PLL enable (#143): no change. Not needed.
+  - lanes before the esc/byte clocks (#144): contention flag gone, still no TE. Not needed for
+    the display (PASS with the flag set); left out of the series.
   - panel commands in LP mode (#144, dbg_lpm): still no TE, so not the HS data path.
-  - plus the HS clock request (and standby) only at the first transfer, after the panel has
-    been powered and reset with the lanes in stop state (#145): **works**.
-- So mainline requests the HS clock before the panel is out of reset; from a reset DSIM the
-  clock lane then really is in HS when the panel starts, and the panel never syncs (no TE). The
-  vendor kernel and S-Boot: PLL, lanes, wait for stop state, esc/byte clocks, CONFIG, panel
-  reset, then HS request + standby.
-- Not known yet: which of the #145 changes are needed beyond the late HS request (lanes before
-  clocks, DSIM init before the panel power, timings at init, clearing a stale HS request).
+  - HS clock request at the first transfer instead of in the clock setup: **needed**.
+  - command mode timings (porches, TE timers) at the end of the DSIM init instead of at the
+    output enable: **needed**; standby (SFR_CTRL bit 4) at the first transfer instead of at the
+    output enable: **needed**. Standby without the timings gives ABNORMAL_CMD_ST (INTSRC
+    0x01400000), the timings without standby the plain failure.
+  - trace prints on or off, a 1 ms hold before the HS request: no influence (not a timing race).
+- What it comes down to: upstream runs samsung_dsim_init() in atomic_pre_enable on the 7870
+  (samsung_dsim_hw_is_exynos() only covers 3250..5433), that is before the panel is powered. With
+  the HS request in the clock setup the clock lane is in HS before the panel reset, and from a
+  reset DSIM the panel then never syncs. A first clean version that did everything at the end of
+  the init (still before the panel reset) failed for the same reason. Vendor kernel and S-Boot:
+  PLL, lanes, stop state, esc/byte clocks, CONFIG and timings, panel reset, then HS request +
+  standby, then the panel commands.
+- Fix (ce50f7a5b474, 7870 command mode only): no HS request in the clock setup, timings at the
+  end of the init, HS request + standby at the first transfer (or at the output enable if the
+  sink sent nothing). Verified on #152: boot, first enable after a power cycle (2x), runtime
+  blank/unblank, real deep sleep with the display on and fbcon bound.
+- Open: whether M_PLL_CTRL1 (da7b67cd113b) is needed at all: test build #153 (pll_ctrl1 = 0)
+  is installed, result pending.
 - Earlier "not sufficient" verdicts (deferred HS request, PHY before PLL, ...) were judged on a
   display that the firewall kept dark anyway and with the other defect still in: void.
 

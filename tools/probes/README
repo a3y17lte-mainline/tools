@@ -17,6 +17,10 @@ Bare-metal S-Boot payload probes for the Galaxy A3 2017 (no UART needed).
                  (phyon swrst pll phy fifo cfg lanes clk hs ... off), printing LINK/DPHY status,
                  INTSRC, CLKCTRL and CONFIG after each. Found the lane/clock order defect
                  (deep-sleep.md section 8.2). Only meaningful right after a DISPAUD power cycle.
+  ds-reduce.sh   phone, Linux, debug kernel (exynos_pmu dbg_abort): power cycles DISPAUD without a
+                 system sleep, enables the display and prints PASS/FAIL from the registers (frame
+                 counter, TE pin, DSIM INTSRC). Reports INVALID when the power cycle did not
+                 happen. Arguments only matter on the switch builds (deep-sleep.md section 8.2).
   ssp-probe.c    userspace sensor hub probe (phone, Linux): WHOAMI, FIRMWARE_REV and
                  SENSOR_SCANNING over spidev + GPIO chardev, read commands only; never touches the
                  MCU reset or BOOT0 lines. Build with ./ssp-probe-build (needs the kernel uapi

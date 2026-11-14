@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""backport-kernel: regenerate the Android kernel branch from the mainline series.
+
+    backport-kernel start [--base REF]   rebuild branch lineage-24.0 from scratch
+    backport-kernel continue             after resolving a conflict (cherry-pick or am)
+    backport-kernel status
+
+Source of truth stays the mainline series (src/linux, master..a3y17lte). The Android
+branch is generated, never edited by hand:
+
+  1. base: ACK android17-6.18 (default origin/android17-6.18, or --base)
+  2. upstream prerequisites from tools/android/kernel-prereqs.txt, cherry-picked -x in
+     upstream order from the `torvalds` remote, subject prefix "UPSTREAM: " (or
+     "BACKPORT: " when a conflict was resolved)
+  3. the series, `git format-patch master..a3y17lte` in src/linux, applied with `git am -3`
+  4. Android-only patches, tools/android/kernel-patches/*.patch (subjects "ANDROID: ...")
+
+Conflict resolutions are recorded by git rerere in tools/android/rr-cache (symlinked as
+.git/rr-cache), so a later regeneration replays them. src/linux is only read.
+"""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path.home() / "Projects/exynos7870"
+KDIR = ROOT / "src/android/kernel/samsung/exynos7870"
+MAINLINE = ROOT / "src/linux"
+PREREQS = ROOT / "tools/android/kernel-prereqs.txt"
+ANDROID_PATCHES = ROOT / "tools/android/kernel-patches"
+RR_CACHE = ROOT / "tools/android/rr-cache"
+BRANCH = "lineage-24.0"
+DEFAULT_BASE = "origin/android17-6.18"
+STATE = KDIR / ".git/a3-backport.json"
+SERIES_DIR = KDIR / ".git/a3-series"
+
+
+def git(*args, cwd=KDIR, check=True, capture=True):
+    r = subprocess.run(["git", *args], cwd=cwd, text=True,
+                       stdout=subprocess.PIPE if capture else None)
+    if check and r.returncode:
+        sys.exit(f"git {' '.join(args)} failed ({r.returncode})")
+    return r.stdout.strip() if capture else r.returncode
+
+
+def setup():
+    git("config", "rerere.enabled", "true")
+    git("config", "rerere.autoupdate", "true")
+    RR_CACHE.mkdir(parents=True, exist_ok=True)
+    link = KDIR / ".git/rr-cache"
+    if link.is_dir() and not link.is_symlink():
+        for f in link.iterdir():
+            os.rename(f, RR_CACHE / f.name)
+        link.rmdir()
+    if not link.is_symlink():
+        link.symlink_to(RR_CACHE)
+
+
+def prereq_steps():
+    want = []
+    for line in PREREQS.read_text().splitlines():
+        line = line.split("#", 1)[0].split()
+        if line:
+            want.append(git("rev-parse", "--verify", line[0] + "^{commit}"))
+    # upstream topological order
+    order = git("rev-list", "--reverse", "--topo-order", "v6.18..torvalds/master").split()
+    pos = {c: i for i, c in enumerate(order)}
+    missing = [c for c in want if c not in pos]
+    if missing:
+        sys.exit(f"not in v6.18..torvalds/master: {missing}")
+    return [["pick", c] for c in sorted(want, key=pos.get)]
+
+
+def series_steps():
+    head = git("rev-parse", "a3y17lte", cwd=MAINLINE)
+    base = git("rev-parse", "master", cwd=MAINLINE)
+    for f in SERIES_DIR.glob("*.patch") if SERIES_DIR.exists() else []:
+        f.unlink()
+    SERIES_DIR.mkdir(parents=True, exist_ok=True)
+    git("format-patch", "-q", "--no-signature", "--zero-commit", "-o", str(SERIES_DIR),
+        f"{base}..{head}", cwd=MAINLINE)
+    steps = [["am", str(p)] for p in sorted(SERIES_DIR.glob("*.patch"))]
+    steps += [["am", str(p)] for p in sorted(ANDROID_PATCHES.glob("*.patch"))]
+    return head, steps
+
+
+def save(st):
+    STATE.write_text(json.dumps(st, indent=1))
+
+
+def prefix_last(prefix):
+    msg = git("log", "-1", "--format=%B")
+    for p in ("UPSTREAM: ", "BACKPORT: "):
+        if msg.startswith(p):
+            msg = msg[len(p):]
+    git("commit", "--amend", "-q", "--no-verify", "-m", prefix + msg)
+
+
+def run(st):
+    while st["next"] < len(st["steps"]):
+        kind, arg = st["steps"][st["next"]]
+        if kind == "pick":
+            rc = git("cherry-pick", "-x", "--allow-empty", arg, check=False, capture=False)
+            if rc:
+                if not git("diff", "--name-only", "--diff-filter=U"):
+                    # rerere resolved everything
+                    git("-c", "core.editor=true", "cherry-pick", "--continue")
+                    prefix_last("BACKPORT: ")
+                else:
+                    st["conflict"] = True
+                    save(st)
+                    sys.exit(f"conflict picking {arg}: resolve, `git add`, then "
+                             "backport-kernel continue")
+            else:
+                prefix_last("UPSTREAM: ")
+        else:
+            rc = git("am", "-3", "--keep-cr", arg, check=False, capture=False)
+            if rc:
+                if not git("diff", "--name-only", "--diff-filter=U") and \
+                        (KDIR / ".git/rebase-apply").exists() and \
+                        git("diff", "--cached", "--quiet", check=False, capture=False):
+                    git("am", "--continue")
+                else:
+                    save(st)
+                    sys.exit(f"conflict applying {Path(arg).name}: resolve, `git add`, "
+                             "then backport-kernel continue")
+        st["next"] += 1
+        st.pop("conflict", None)
+        save(st)
+    print(f"done: {BRANCH} = {git('rev-parse', '--short', 'HEAD')}, "
+          f"series {st['series'][:12]}, {len(st['steps'])} steps")
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+    if cmd == "start":
+        base = DEFAULT_BASE
+        if "--base" in sys.argv:
+            base = sys.argv[sys.argv.index("--base") + 1]
+        if git("status", "--porcelain", "--untracked-files=no"):
+            sys.exit("kernel tree has uncommitted changes")
+        setup()
+        git("checkout", "-q", "-B", BRANCH, base)
+        series, steps = series_steps()
+        st = {"base": git("rev-parse", base), "series": series,
+              "steps": prereq_steps() + steps, "next": 0}
+        save(st)
+        run(st)
+    elif cmd == "continue":
+        st = json.loads(STATE.read_text())
+        kind, arg = st["steps"][st["next"]]
+        if kind == "pick":
+            git("-c", "core.editor=true", "cherry-pick", "--continue")
+            prefix_last("BACKPORT: ")
+        else:
+            git("am", "--continue")
+        st["next"] += 1
+        st.pop("conflict", None)
+        save(st)
+        run(st)
+    elif cmd == "status":
+        st = json.loads(STATE.read_text())
+        print(f"base {st['base'][:12]}  series {st['series'][:12]}  "
+              f"step {st['next']}/{len(st['steps'])}")
+        if st["next"] < len(st["steps"]):
+            print("next:", *st["steps"][st["next"]])
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

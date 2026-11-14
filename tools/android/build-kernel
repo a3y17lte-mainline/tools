@@ -1,0 +1,52 @@
+#!/bin/bash
+# build-kernel: build kernel_samsung_exynos7870 (android17-6.18 + the a3y17lte series) and
+# install Image, dt.img and modules into the device tree's prebuilt/ for the LineageOS build.
+#
+#   build-kernel [--no-install]
+#
+# Separate from the mainline build on purpose: own tree, own out dir (out/android/kernel) and
+# own ccache dir, so it never touches src/linux, out/linux or work/config-a3y17lte.
+# The Image header is patched to the layout S-Boot is known to boot (text_offset 0x80000,
+# flags 0, as tools/build-uboot does), and dt.img is a DTBH table from dtbTool-exynos (needs
+# the model_info-* properties of the ANDROID: DT commit).
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+SRC=$ROOT/src/android/kernel/samsung/exynos7870
+O=$ROOT/out/android/kernel
+DEV=$ROOT/src/android/device/samsung/a3y17lte/prebuilt
+LOG=$ROOT/out/android/kernel-build.log
+INSTALL=1
+[[ "${1:-}" == --no-install ]] && INSTALL=0
+
+export CCACHE_DIR=$ROOT/out/android/ccache
+mkdir -p "$O" "$CCACHE_DIR"
+MAKE=(nice make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1 CC="ccache clang" -j"$(nproc)")
+
+"${MAKE[@]}" a3y17lte_defconfig > "$LOG" 2>&1
+"${MAKE[@]}" Image dtbs modules >> "$LOG" 2>&1 || { tail -20 "$LOG"; exit 1; }
+
+IMG=$O/arch/arm64/boot/Image
+DTB=$O/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dtb
+size=$(stat -c %s "$IMG")
+echo "Image: $size bytes"
+# BOOT is 32 MiB for Image + ramdisk + dt.img, and S-Boot cannot decompress.
+(( size <= 24 * 1024 * 1024 )) || { echo "Image over 24 MiB: move drivers to modules" >&2; exit 1; }
+
+(( INSTALL )) || exit 0
+rm -rf "$DEV.new"; mkdir -p "$DEV.new/modules"
+python3 -I - "$IMG" "$DEV.new/Image" <<'EOF'
+import struct, sys
+d = bytearray(open(sys.argv[1], "rb").read())
+assert d[0x38:0x3c] == b"ARMd", "no arm64 Image header"
+struct.pack_into("<Q", d, 0x08, 0x80000)   # text_offset
+struct.pack_into("<Q", d, 0x18, 0)         # flags
+open(sys.argv[2], "wb").write(d)
+EOF
+dtbTool-exynos -o "$DEV.new/dt.img" "$DTB" >/dev/null
+
+# Modules: flat, stripped; modules.load keeps the kernel's build order.
+"${MAKE[@]}" INSTALL_MOD_PATH="$O/staging" INSTALL_MOD_STRIP=1 modules_install >> "$LOG" 2>&1
+find "$O/staging/lib/modules" -name '*.ko' -exec cp -t "$DEV.new/modules" {} +
+sed 's#.*/##' "$O/modules.order" | sed 's/\.o$/.ko/' > "$DEV.new/modules/modules.load"
+rm -rf "$O/staging" "$DEV"; mv "$DEV.new" "$DEV"
+echo "installed: $DEV ($(ls "$DEV/modules" | grep -c '\.ko$') modules, kernel $(git -C "$SRC" describe --always))"

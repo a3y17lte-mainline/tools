@@ -1,0 +1,26 @@
+# Upstream commits (torvalds, v6.18..v7.4-rc2) that the a3y17lte series needs on android17-6.18.
+# backport-kernel cherry-picks them in upstream topological order (the order here does not matter)
+# with an "UPSTREAM: " subject prefix ("BACKPORT: " when a conflict had to be resolved).
+# One sha per line; the rest of the line is a comment.
+
+# Exynos7870 DTS/bindings (DSI node + its syscon/PMU bindings, I2C cells, J5 2017 for context)
+81280d39a2f9  dt-bindings: exynos-pmu: allow mipi-phy subnode for Exynos7870 PMU
+3abd9b087a4c  dt-bindings: exynos-sysreg: add exynos7870 sysregs
+fe02894a1930  arm64: dts: exynos7870: add DSI support
+41dadc6f7815  arm64: dts: exynos7870: Move I2C address/size-cells to DTSI
+135b55014109  dt-bindings: arm: samsung: Galaxy J5 (2017)
+a3a20c5f4e10  arm64: dts: exynos: Galaxy J5 (2017)
+
+# S2MU005 PMIC stack (mfd base for the S2MU004 work)
+d74b4fcc8093  dt-bindings: power: supply: S2MU005 fuel gauge
+aa2132799817  power: supply: S2MU005 fuel gauge driver
+2cd517ed4eaf  dt-bindings: mfd: S2MU005 PMIC
+e491ebea157f  mfd: sec: Add support for S2MU005 PMIC
+9e667b8ebd5d  mfd: sec: Set DMA coherent mask
+cf5d7a55d3b6  dt-bindings: extcon: S2M series PMIC extcon
+7e541f6dbd05  power: supply: S2M series PMIC charger
+38c8b37600b6  power: supply: s2mu005-battery: return errors from dev_err_probe()
+
+# Fixes the series relies on
+5a759b120e31  phy: exynos5-usbdrd: fix USB 2.0 HS PHY tuning values for Exynos7870
+f4b830a53719  leds: expresswire: Fix chip state breakage

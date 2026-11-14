@@ -28,7 +28,8 @@ Verified 2026-11-14 on Alpine:
 Phone state from S-Boot (section 10 reads): every DISPAUD audio gate is on, 0x148f1000 = 0, and
 PMU 0x80 = 0. The MI2S divider is 1 (98.3 MHz), the MIXER divider is 2, and both MUXes select AUD_PLL.
 Next: the S1402X mixer driver (section 7). It must pulse its reset like the I2S does. Then the
-COD3026X codec.
+COD3026X codec. **Section 12 corrects sections 1, 8, 9 and 11**: the A3 loudspeaker is a TFA9896
+amp on i2c3, not the codec, and the card needs audio-graph-card2.
 
 ## 1. The chain
 
@@ -41,7 +42,7 @@ COD3026X codec.
                                    | mixer is master towards the codec: 64 fs, 24-bit, MCKO = codec MCLK
                                    v
                        COD3026X codec (I2C hsi2c0 @0x04, IRQ gpa0-4)
-                         outputs: SPK (mono class-D, the A3 loudspeaker), EP (earpiece), HP (stereo, class-G)
+                         outputs: SPK (mono class-D, NOT connected on the A3: see 12), EP (earpiece), HP (stereo, class-G)
                          inputs:  MIC1 (main), MIC2 (2nd/top), MIC3 (headset mic), LINEIN (unused)
                          jack + buttons measured through the SoC ADC (ch2 ear, ch4 ground)
 ```
@@ -310,3 +311,42 @@ First look at `/sys/kernel/debug/clk/clk_summary` and only `peek` blocks whose g
 4. Card in DT (simple/graph) + UCM in pmaports. Speaker playback is the first milestone, then
    EP/HP, mics, jack + buttons, BT SCO through the mixer's BT port, then 192 kHz.
 Tracker: new groups for each of 1's patches, the mixer, the codec, and the A3 sound DT.
+
+## 12. COD3026X work: findings and corrections (2026-11-14)
+
+Plan: ~/.claude/plans/currently-an-agent-is-joyful-liskov.md (mixer -> TFA9896 amp -> codec -> card).
+
+### The loudspeaker is an NXP TFA9896, not the codec
+- Stock `/etc/mixer_paths.xml`: "In this model, directly connect AP to external DAC & AMP for speaker
+  path, not use codec DAC & AMP"; every `SPK SPK On` line is commented out.
+- The HAL (`/lib/hw/audio.primary.universal7870.so`) drives the amp from userspace through
+  `libtfa98xx.so` on `/dev/i2c-20`. `/vendor/etc/Tfa9896.cnt` (container "PM3_01"): TFA9896 N1B, mono,
+  I2C 0x34, AUDFS 48 kHz, NBCK 2 (64 fs). No DT child (userspace driver).
+- Bus: stock i2c@13860000, pins gpc9-0/1 (`spk-amp-i2c`) = mainline `i2c3`, not enabled on the A3.
+  The amp shares the gpz1 I2S lines with the codec (`i2s-pmic-amp-bus` = gpz1-0..4, the mixer's
+  default pin state).
+- Mainline `sound/soc/codecs/tfa989x.c` (9890/95/97, CoolFlux DSP bypass) has the same register
+  layout; the TFA9896 needs its rev (0x96), the vendor `tfa9896_specific` writes (0x06 = 0x000b,
+  0x07 = 0x3e7f, 0x0a = 0x0d8a, 0x48 = 0x0300, 0x88 = 0x0100, clear 0x49 bit 0) and NBCK (0x14 [15:12]).
+- So the codec provides earpiece, headphones, mics and jack only. Its SPK output stays untested.
+
+### Card and I2S limits
+- `simple-audio-card` takes one codec per link: it cannot do mixer + codec + amp. `audio-graph-card2`
+  can (multi-codec ports and codec2codec links). Planned: link 1 I2S0 <-> mixer AP, link 2 codec2codec
+  mixer CODEC side <-> {codec, amp} at 48 kHz.
+- Mainline i2s.c with MI2S = 98.304 MHz: S16_LE gives BFS 32 / RFS 256 (prescaler 8, fine). 24-bit
+  picks BFS 48 / RFS 384 (not an integer divider) and rejects RFS 256/512: AP side is S16_LE for now.
+
+### Codec I2C, read-only probe on the phone (Alpine, nothing written)
+- LDO25 (codec vdd) is on at 1.8 V. hsi2c0 = i2c-4 on this boot.
+- Plain 7-bit 0x04 ACKs (`i2cget -y -a 4 0x04 REG`) with no MCLK: no 10-bit addressing needed.
+- Dump (0x01-0x05 and 0x61-0x62 not read): 0x06-0x0a = 0xff (IRQ masks, all masked); 0x0b-0x0d = 0;
+  every register 0x10-0x7a = 0x00; 0x80-0x8b = 00 00 1f 00 05 c7 33 03 32 00 02 00;
+  **0xd0-0xde all 0x00**.
+- Reading: without MCLK only the jack/detect block (0x80-0x8b) and the IRQ masks are live; the core
+  (and the trim copies 0xd0-0xde) is not loaded yet. The vendor saves the trims only after MCLK on,
+  `EN_PDB_JD_CLK` (0x81 bit 1) and 15 ms. The driver must do the same and must refuse to save an
+  all-zero trim set (it would "restore" zeros later). Re-read the trims once the mixer gives MCLK.
+- The vendor jack ISR touches 0x01-0x0d and 0x80-0x8b while the codec is runtime-suspended (vdd
+  and mixer off), and 0x80-0x8b are never cached: they are on an always-on rail, consistent with the
+  dump above.

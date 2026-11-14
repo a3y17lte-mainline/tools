@@ -350,3 +350,19 @@ Plan: ~/.claude/plans/currently-an-agent-is-joyful-liskov.md (mixer -> TFA9896 a
 - The vendor jack ISR touches 0x01-0x0d and 0x80-0x8b while the codec is runtime-suspended (vdd
   and mixer off), and 0x80-0x8b are never cached: they are on an always-on rail, consistent with the
   dump above.
+
+### Mixer driver and first sound (2026-11-14, on Alpine)
+- Kernel commits: mixer binding + driver (`sound/soc/samsung/exynos7870-audmixer.c`) + dtsi node;
+  tfa989x: TFA9896 binding + support (rev 0x96, vendor init writes). Config: SND_SOC_EXYNOS7870_AUDMIXER,
+  SND_AUDIO_GRAPH_CARD2, SND_SOC_TFA989X as modules (mkconfig).
+- Mixer probes, regmap cache = init table, sysclk 24576005 Hz (asked for target + 0.1 %: AUD_PLL is
+  98304019 Hz, so 24576004 rounds to divider 5), runtime-suspends after playback. 5 s of silence
+  through I2S0 -> mixer took 4.97 s.
+- TFA9896 on i2c3 (i2c-2 on this boot) at 0x34, untouched after power-on: rev word 0x1b96, 0x04 0x8088,
+  0x09 0x004d, 0x0a 0x0592 (vendor POR), **0x14 = 0** (no NBCK write needed, like the 9897 in mainline).
+- Test card (audio-graph-card2: I2S0 <-> mixer AP, codec2codec 48 kHz mixer CODEC side <-> amp, mixer
+  port@1 bitclock/frame master): a 440 Hz tone at -30 dBFS with "AP Playback Volume" 7 (0 dB) is
+  audible on the loudspeaker (user-confirmed). At -50 dBFS (volume 0) it was not audible. During
+  playback the amp status was 0xd85f (PLL locked, clocks stable, amp switching), SYS_CTRL 0x0008.
+- The test DT block is at the end of exynos7870-a3y17lte.dts, uncommitted: the board commit comes
+  with the codec. samsung-i2s.yaml and nxp,tfa989x.yaml need `port` for the graph card.

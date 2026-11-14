@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sat, 14 Nov 2026 21:40:49 +0100
-Subject: [PATCH 3/4] ANDROID: power: supply: s2m-charger: Use
+Subject: [PATCH 3/5] ANDROID: power: supply: s2m-charger: Use
  alarm_start_relative() on 6.18
 
 alarm_start_timer() is new in 7.1 and needs the hrtimer changes behind

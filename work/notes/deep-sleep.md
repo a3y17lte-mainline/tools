@@ -108,6 +108,14 @@ header), mapped at 0x02024000 in Ghidra. The firmware actually runs it 0x10 high
 - STANDBYWFIL2 alone takes cluster 0 down at runtime (suspend.md): only together with the rest of
   the init, and recheck cluster idle afterwards.
 - CMU restore into powered-off domains (G3D/DISPAUD/ISP/MFCMSCL) would abort; the vendor skips them.
+  Mainline: every 7870 CMU has `clk_regs` (samsung clk syscore save/restore), and no 7870 DT uses
+  power domains, so the domains stay on at runtime. Risk left: if the PMU does not bring the domains
+  back on at wake, the syscore CMU restore aborts.
+- GIC distributor save and our CPU_CONFIGURATION notifier run in `mem`: kernel/cpu_pm.c's syscore ops
+  call cpu_pm_enter() + cpu_cluster_pm_enter() before `.enter`.
+- Timer: the arch counter is fed by the MCT FRC. If the FRC loses its value in SLEEP, the counter
+  restarts at 0: exynos4_frc_resume() only restarts it, and the arch timer is SUSPEND_NONSTOP (no
+  `arm,no-tick-in-suspend`). Check counter continuity after the first wake.
 
 ## 6. Survey of the running system (2026-11-14, tools/probes/sleep-survey.sh)
 

@@ -29,7 +29,7 @@ Enable it in a3y17lte_defconfig for the NFC HAL of the Galaxy A3 (2017).
  create mode 100644 include/uapi/linux/s3fwrn5-raw.h
 
 diff --git a/arch/arm64/configs/a3y17lte_defconfig b/arch/arm64/configs/a3y17lte_defconfig
-index 971f12672ad2..43161c88c028 100644
+index f2a41d3b4d48..fdeae9381088 100644
 --- a/arch/arm64/configs/a3y17lte_defconfig
 +++ b/arch/arm64/configs/a3y17lte_defconfig
 @@ -242,6 +242,7 @@ CONFIG_RFKILL_INPUT=y

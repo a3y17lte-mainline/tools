@@ -4,8 +4,8 @@ Status 2026-11-14 (night): **deep sleep works on the clean series**: entry, RTC 
 resume (blanked or on, fbcon bound), touch keys without read errors. 11 of 12 real cycles on the
 series without debug code passed (8 in a row with tools/probes/mem-cycles); one cycle did not
 come back and left no log (section 8.4, treated as a fluke until it repeats). Root causes and
-takeaways: section 9. Still to do: the user's look at the screen and a touch key press after a
-wake, the other wake sources, S2MPU05 sleep modes (needs the user's yes), drain against s2idle.
+takeaways: section 9. User-confirmed 2026-11-14: the screen is fine after a wake, the touch
+keys seem fine too. Still to do: the other wake sources, S2MPU05 sleep modes (needs the user's yes), drain against s2idle.
 
 Kernel (a3y17lte, not pushed; SHAs change with every rebase, so by subject; tags
 a3y17lte-pre-sleep-fold and a3y17lte-pre-sleep-reorder keep the earlier tips):
@@ -393,7 +393,7 @@ What generalises to the next block that loses power (ISP, MFC/MSCL, G3D, audio i
   handler against a controller that does not answer yet. Probe has the right order.
 - Fix: "Input: tm2-touchkey - enable the interrupt after powering up on resume" (Fixes:
   72d1f2346ded). Verified: real `mem` cycle (17.6 s), no read error, the controller answers
-  (register 0x07 reads 0). Not verified yet: a key press after resume (needs a finger), and
+  (register 0x07 reads 0). The user reports the keys seem to work after a wake. Not checked:
   whether the key backlight state matches /sys/class/leds/tm2-touchkey/brightness afterwards
   (the controller powers up with its own default; the driver does not write the state back).
 - The module is loaded from the rootfs: after a driver change run tools/a3-sync-modules.

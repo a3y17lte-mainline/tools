@@ -86,7 +86,7 @@ Not done, roughly in planned order:
   touch keys); 11 of 12 real cycles passed, one unexplained failure. Fixes are committed locally,
   not pushed. Lesson for every other block: a power domain that goes off loses what S-Boot set up
   (content firewall SMC, bring-up order); test it by power cycling the domain at runtime.
-  Open: the user's look at the screen and a touch key press after a wake, other wake sources,
+  Screen after wake user-confirmed. Open: other wake sources,
   S2MPU05 sleep modes (needs the user's yes), drain. Start with work/notes/deep-sleep.md: status
   header, section 9 (root causes and takeaways), sections 7, 8, 10 for details.
 - PDMA, PWM.

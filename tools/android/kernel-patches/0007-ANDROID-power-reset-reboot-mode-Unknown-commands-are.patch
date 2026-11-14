@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sun, 15 Nov 2026 00:56:26 +0100
+Subject: [PATCH] ANDROID: power: reset: reboot-mode: Unknown commands are a
+ normal reboot
+
+Android's init passes the reboot reason as the restart command:
+"userrequested", "shell", or "userrequested,recovery,ui" for "Reboot
+system now" in the recovery. None of these is a reboot mode, so nothing
+was written, and a bootloader that keeps the last mode (Samsung's S-Boot
+stores it until it reads another one) started the recovery again.
+
+Write the "normal" mode for a command that matches no mode.
+---
+ drivers/power/reset/reboot-mode.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/power/reset/reboot-mode.c b/drivers/power/reset/reboot-mode.c
+index fba53f638da0..485fe928e5d8 100644
+--- a/drivers/power/reset/reboot-mode.c
++++ b/drivers/power/reset/reboot-mode.c
+@@ -45,6 +45,15 @@ static unsigned int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
+ 		if (!strcmp(info->mode, cmd_))
+ 			return info->magic;
+ 
++	/*
++	 * Android passes its reboot reason as the command ("userrequested",
++	 * "shell", "userrequested,recovery,ui" from the recovery menu, ...):
++	 * anything that is not a mode is a normal reboot.
++	 */
++	list_for_each_entry(info, &reboot->head, list)
++		if (!strcmp(info->mode, normal))
++			return info->magic;
++
+ 	return 0;
+ }
+ 

@@ -6,8 +6,8 @@ defects that any DISPAUD power loss exposes (section 8): the display content fir
 set up again through the EL3 firmware, and the DSIM has to start the HS clock only after the
 panel reset. Verified by registers on the phone (60 Hz frame counter, sysmmu idle, DSIM INTSRC
 0x01080000, TE present), with the display blanked and with it on + fbcon bound (no panic), with
-and without the debug DISPAUD power cycle. Fixes committed (c65bbc2e01aa DECON firewall,
-ce50f7a5b474 DSIM start order), the debug code is out of the tree (out/deep-sleep-pmu-debug-
+and without the debug DISPAUD power cycle. Fixes committed (d85e140bbeb1 DECON firewall,
+2d1000f7f518 DSIM start order), the debug code is out of the tree (out/deep-sleep-pmu-debug-
 current.patch has the PMU part: abort switch, DISPAUD cycle, watchdog). Open: the user's visual
 confirmation, a run of the series without any debug code, the M_PLL_CTRL1 test,
 tm2-touchkey reads (-6) twice during resume, wake sources, sleep modes of the S2MPU05 rails, drain numbers.
@@ -15,8 +15,8 @@ Kernel commits (a3y17lte, not pushed; old tip tagged a3y17lte-pre-sleep-fold): f
 pinctrl pad retention, c8426396033e A3 power-down pin states (verified: CON_PDN/PUD_PDN = stock),
 7c685396ceec PMU system sleep (CPU0 local PWR_CFG kept on in sleep, as the vendor, folded in),
 645e9b43822e clk: PHY user muxes to OSC for suspend, 4a07eb6a58b7 clk: CMU_MIF top clock enables
-on for suspend (verified run 124), 6b0e9efe6340 imagis power cycle at probe, da7b67cd113b DSIM
-M_PLL_CTRL1, c65bbc2e01aa, ce50f7a5b474. The CPU0 part and the FSYS/ISP mux parts are not
+on for suspend (verified run 124), 6b0e9efe6340 imagis power cycle at probe, fa0b0cd8ce73 DSIM
+M_PLL_CTRL1, d85e140bbeb1, 2d1000f7f518. The CPU0 part and the FSYS/ISP mux parts are not
 verified individually. With the suspend ops in place
 `mem_sleep` defaults to `deep`.
 
@@ -282,12 +282,12 @@ Boot and runtime blank/unblank only work because the state S-Boot set up is stil
   the init (still before the panel reset) failed for the same reason. Vendor kernel and S-Boot:
   PLL, lanes, stop state, esc/byte clocks, CONFIG and timings, panel reset, then HS request +
   standby, then the panel commands.
-- Fix (ce50f7a5b474, 7870 command mode only): no HS request in the clock setup, timings at the
+- Fix (2d1000f7f518, 7870 command mode only): no HS request in the clock setup, timings at the
   end of the init, HS request + standby at the first transfer (or at the output enable if the
   sink sent nothing). Verified on #152: boot, first enable after a power cycle (2x), runtime
   blank/unblank, real deep sleep with the display on and fbcon bound.
-- Open: whether M_PLL_CTRL1 (da7b67cd113b) is needed at all: test build #153 (pll_ctrl1 = 0)
-  is installed, result pending.
+- M_PLL_CTRL1 (fa0b0cd8ce73) is not needed: #153 with pll_ctrl1 = 0 passes twice with 0x98 = 0
+  after the power cycle. The commit stays as "vendor value", reworded, without Fixes:.
 - Earlier "not sufficient" verdicts (deferred HS request, PHY before PLL, ...) were judged on a
   display that the firewall kept dark anyway and with the other defect still in: void.
 
@@ -302,3 +302,19 @@ Boot and runtime blank/unblank only work because the state S-Boot set up is stil
 - A blank from the failed state takes ~30 s (command and vblank timeouts): bound the ssh call.
 - Test with fbcon unbound first (no DPM watchdog panic): `echo 0 >
   /sys/class/vtconsole/vtcon1/bind`, `echo 1 > /sys/class/graphics/fb0/blank`.
+
+### 8.4 Clean series (#154, no debug code): not verified yet
+
+- Boot display fine. Real `mem` with the display on + fbcon bound: cycle 1 (woke after 5.7 s,
+  WAKEUP_STAT 80000001) and cycle 2 (17.5 s) resumed clean (60 Hz frames, INTSRC 0x01080000).
+- Cycle 3 never came back to userspace (mem-none.log not rewritten). The phone was later found
+  freshly booted; the boot in between had panicked at 0.69 s: "exynos-sysmmu 14860000.iommu:
+  14830000.display-controller: [READ] PTW FAULT occurred at 0x67092b00", "Unrecoverable System
+  MMU Fault!" (out/deep-sleep-run154-cycle2-pstore-20261114.txt), then a watchdog reset and a
+  good boot. What reset the phone in cycle 3 is unknown (that log was overwritten; the USB link
+  was also being re-plugged around then).
+- The boot panic is its own problem: the sysmmu got enabled while the DECON was still scanning
+  out S-Boot's framebuffer (physical address, no mapping). First time seen; not understood.
+- The debug builds armed a watchdog before the PSCI call, the clean series does not: a hang in
+  entry or in BL1 stays hung. Repeat the cycles with someone at the phone before calling the
+  series verified.

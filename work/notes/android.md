@@ -188,7 +188,11 @@ headers only, not built in the tree yet):
   nfc_device; genfs: sensor hub SPI path (sysfs_a3_sensors), GPU/bus devfreq
   (sysfs_a3_devfreq), wlan0 (sysfs_net), gpio-keys and hall wakeup (sysfs_wakeup). Open: nodes
   behind an I2C adapter (charger/fuel gauge/TCPC/RTC wakeup sources, typec, extcon) have i2c-N
-  in the path, which follows probe order: needs i2c aliases in the DT first.
+  in the path, which follows probe order: needs i2c aliases in the DT first. To finish after
+  the bus DVFS backport (the user's order, 2026-11-14): those nodes, plus the devfreq paths
+  re-read from the final series (bus-mif).
+- Gatekeeper is installed as the vendor APEX com.android.hardware.gatekeeper.nonsecure (the
+  service binary is installable:false); KeyMint's nonsecure binary installs on its own.
 - Bus DVFS (INT/DISP exynos-bus, MIF later): nothing needed in Android userspace. When the
   mainline series is final: backport-kernel, check ARM_EXYNOS_BUS_DEVFREQ + passive governor in
   a3y17lte_defconfig, check trans_stat under schedutil.

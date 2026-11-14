@@ -1,24 +1,28 @@
 # Deep sleep (suspend-to-RAM, `mem`): how it works on the 7870
 
-Status 2026-11-14 (evening): **entry, RTC wake and display resume work** (kernel #145, debug
-build). Entry hang = gated CMU_MIF top clocks (section 7). Display after sleep = two independent
-defects that any DISPAUD power loss exposes (section 8): the display content firewall has to be
-set up again through the EL3 firmware, and the DSIM has to start the HS clock only after the
-panel reset. Verified by registers on the phone (60 Hz frame counter, sysmmu idle, DSIM INTSRC
-0x01080000, TE present), with the display blanked and with it on + fbcon bound (no panic), with
-and without the debug DISPAUD power cycle. Fixes committed (d85e140bbeb1 DECON firewall,
-2d1000f7f518 DSIM start order), the debug code is out of the tree (out/deep-sleep-pmu-debug-
-current.patch has the PMU part: abort switch, DISPAUD cycle, watchdog). Open: the user's visual
-confirmation, a run of the series without any debug code, the M_PLL_CTRL1 test,
-tm2-touchkey reads (-6) twice during resume, wake sources, sleep modes of the S2MPU05 rails, drain numbers.
-Kernel commits (a3y17lte, not pushed; old tip tagged a3y17lte-pre-sleep-fold): f56de1bae4a3
-pinctrl pad retention, c8426396033e A3 power-down pin states (verified: CON_PDN/PUD_PDN = stock),
-7c685396ceec PMU system sleep (CPU0 local PWR_CFG kept on in sleep, as the vendor, folded in),
-645e9b43822e clk: PHY user muxes to OSC for suspend, 4a07eb6a58b7 clk: CMU_MIF top clock enables
-on for suspend (verified run 124), 6b0e9efe6340 imagis power cycle at probe, fa0b0cd8ce73 DSIM
-M_PLL_CTRL1, d85e140bbeb1, 2d1000f7f518. The CPU0 part and the FSYS/ISP mux parts are not
-verified individually. With the suspend ops in place
-`mem_sleep` defaults to `deep`.
+Status 2026-11-14 (night): **deep sleep works on the clean series**: entry, RTC wake, display
+resume (blanked or on, fbcon bound), touch keys without read errors. 11 of 12 real cycles on the
+series without debug code passed (8 in a row with tools/probes/mem-cycles); one cycle did not
+come back and left no log (section 8.4, treated as a fluke until it repeats). Root causes and
+takeaways: section 9. Still to do: the user's look at the screen and a touch key press after a
+wake, the other wake sources, S2MPU05 sleep modes (needs the user's yes), drain against s2idle.
+
+Kernel (a3y17lte, not pushed; SHAs change with every rebase, so by subject; tags
+a3y17lte-pre-sleep-fold and a3y17lte-pre-sleep-reorder keep the earlier tips):
+- pinctrl: samsung: Add Exynos7870 pad retention control
+- arm64: dts: exynos7870-a3y17lte: Add power-down pin states (CON_PDN/PUD_PDN = stock)
+- clk: samsung: exynos7870: Switch the PHY clock muxes to OSCCLK for suspend (the DISPAUD part is
+  required for the entry; the USB and CSI parts follow the vendor, not tested alone)
+- clk: samsung: exynos7870: Enable the CMU_MIF top clocks for suspend (the entry fix, section 7)
+- soc: samsung: exynos-pmu: Add Exynos7870 system sleep (CPU0 local power configuration kept on
+  for the PSCI call, as the vendor; that part was never tested alone)
+- drm/exynos: exynos7_drm_decon: set up the Exynos7870 content firewall (section 8.1)
+- drm/bridge: samsung-dsim: Defer the HS clock request on Exynos7870 (section 8.2)
+- Input: tm2-touchkey - enable the interrupt after powering up on resume (section 10)
+- Input: imagis - power-cycle the chip if it does not answer at probe
+- Dropped: the DSIM M_PLL_CTRL1 write (0x98 = 0x40000000, vendor and S-Boot value). The display
+  works with the register at 0 (#153, twice). The commit is still in a3y17lte-pre-sleep-reorder.
+With the suspend ops in place `mem_sleep` defaults to `deep`.
 
 Deep sleep is a PMU-sequenced system power-down. The kernel programs the PMU (per-block SYS_PWR
 table, central sequencers, wake masks), GPIO power-down states and pad retention, then calls PSCI
@@ -248,6 +252,8 @@ Boot and runtime blank/unblank only work because the state S-Boot set up is stil
   returned 2, the stuck read completed at once, frame counter running, sysmmu STATUS 0. Issued
   before the enable (display blanked, the DISPAUD bus gates stay on), the second enable is clean.
 - Fix: exynos7_drm_decon makes the call in atomic_enable after the runtime resume (7870 only).
+  For upstream this is a vendor firmware call inside a DRM driver: expect the question whether it
+  belongs in a power domain or firmware driver instead.
 
 ### 8.2 DSIM start order (no TE on the first enable)
 
@@ -282,12 +288,12 @@ Boot and runtime blank/unblank only work because the state S-Boot set up is stil
   the init (still before the panel reset) failed for the same reason. Vendor kernel and S-Boot:
   PLL, lanes, stop state, esc/byte clocks, CONFIG and timings, panel reset, then HS request +
   standby, then the panel commands.
-- Fix (2d1000f7f518, 7870 command mode only): no HS request in the clock setup, timings at the
+- Fix (7870 command mode only): no HS request in the clock setup, timings at the
   end of the init, HS request + standby at the first transfer (or at the output enable if the
   sink sent nothing). Verified on #152: boot, first enable after a power cycle (2x), runtime
   blank/unblank, real deep sleep with the display on and fbcon bound.
-- M_PLL_CTRL1 (fa0b0cd8ce73) is not needed: #153 with pll_ctrl1 = 0 passes twice with 0x98 = 0
-  after the power cycle. The commit stays as "vendor value", reworded, without Fixes:.
+- M_PLL_CTRL1 is not needed: #153 with pll_ctrl1 = 0 passes twice with 0x98 = 0 after the power
+  cycle. The commit was dropped from the series.
 - Earlier "not sufficient" verdicts (deferred HS request, PHY before PLL, ...) were judged on a
   display that the firewall kept dark anyway and with the other defect still in: void.
 
@@ -303,18 +309,91 @@ Boot and runtime blank/unblank only work because the state S-Boot set up is stil
 - Test with fbcon unbound first (no DPM watchdog panic): `echo 0 >
   /sys/class/vtconsole/vtcon1/bind`, `echo 1 > /sys/class/graphics/fb0/blank`.
 
-### 8.4 Clean series (#154, no debug code): not verified yet
+### 8.4 Clean series (no debug code): 11 of 12 cycles, one unexplained failure
 
-- Boot display fine. Real `mem` with the display on + fbcon bound: cycle 1 (woke after 5.7 s,
-  WAKEUP_STAT 80000001) and cycle 2 (17.5 s) resumed clean (60 Hz frames, INTSRC 0x01080000).
-- Cycle 3 never came back to userspace (mem-none.log not rewritten). The phone was later found
-  freshly booted; the boot in between had panicked at 0.69 s: "exynos-sysmmu 14860000.iommu:
-  14830000.display-controller: [READ] PTW FAULT occurred at 0x67092b00", "Unrecoverable System
-  MMU Fault!" (out/deep-sleep-run154-cycle2-pstore-20261114.txt), then a watchdog reset and a
-  good boot. What reset the phone in cycle 3 is unknown (that log was overwritten; the USB link
-  was also being re-plugged around then).
-- The boot panic is its own problem: the sysmmu got enabled while the DECON was still scanning
-  out S-Boot's framebuffer (physical address, no mapping). First time seen; not understood.
-- The debug builds armed a watchdog before the PSCI call, the clean series does not: a hang in
-  entry or in BL1 stays hung. Repeat the cycles with someone at the phone before calling the
-  series verified.
+- #154 (and the same tree reordered as #155/#156): boot display fine; real `mem` with the display
+  on + fbcon bound: 2 + 8 cycles in a row clean (16.7-17.1 s asleep, wake IRQ 54 = RTC alarm,
+  60 fps, INTSRC 0x01080000, no errors), plus single cycles for the touch key tests.
+- One cycle (the third on #154) never came back to userspace. The user did not touch the phone.
+  The phone was later found freshly booted; the boot in between had panicked at 0.69 s:
+  "exynos-sysmmu 14860000.iommu: 14830000.display-controller: [READ] PTW FAULT occurred at
+  0x67092b00", "Unrecoverable System MMU Fault!"
+  (out/deep-sleep-run154-cycle2-pstore-20261114.txt), then a watchdog reset and a good boot.
+  That boot panic overwrote the log of the failed cycle. Treated as a fluke; if it repeats,
+  tools/probes/mem-cycles stops at the failure and saves the pstore console.
+- Not the watchdog racing the resume: BL31's wake code (0x0202fa64) stops the watchdog, clears
+  PMU 0x408/0x40c bit 23 and re-arms it with WTDAT/WTCNT 0xff60, prescaler 0xee, divider 128,
+  reset on: about 30 s at the ~67 MHz clock. The kernel's watchdog resume comes well inside that.
+  It also means a kernel that hangs in resume is reset after ~30 s.
+- The boot panic is its own, unexplained problem: the sysmmu translated while the DECON was
+  still scanning out S-Boot's framebuffer (simple-framebuffer at 0x67000000). Normal boots have
+  the same probe order and no fault. Seen once.
+- An entry that stalls, or a wake that dies in BL1, is not covered by any watchdog on the clean
+  series (the debug builds armed one before the PSCI call): that needs Power+VolDown.
+
+## 9. Root causes and takeaways (2026-11-14)
+
+Three independent defects stood between "the SoC powers down and wakes" and "the phone resumes".
+None of them is a suspend/resume bug in the usual sense: each one is state that the bootloader
+(or the previous session) had set up and that mainline never sets up itself.
+
+| Symptom | Root cause | Fix |
+|---|---|---|
+| `mem` never powers down, sequencer stalls at 0x2d | drivers gate CMU_MIF top clocks at suspend; the PMU sequence needs all of them running (and the DSI PHY muxes on OSC) | clk suspend_regs, as the vendor topmux_enable() |
+| after wake: 7 frames, then no frame completes | display content firewall lost with DISPAUD; every DECON/sysmmu memory read blocks until EL3 programs it again | firmware call at DECON enable, as the vendor |
+| after wake: panel sends no TE, DSI commands time out | from a reset DSIM, mainline starts the HS clock before the panel is out of reset and programs timings/standby after the panel commands | HS request + standby at the first transfer, timings at init |
+| "tm2-touchkey failed to read i2c data: -6" at resume | resume enables the IRQ before the supplies are back | power up, then enable the IRQ (section 10) |
+
+What generalises to the next block that loses power (ISP, MFC/MSCL, G3D, audio in DISPAUD):
+
+1. **A power domain that goes off is a cold boot for that block, without the bootloader.** Boot
+   and runtime PM prove nothing about it: registers survive a software reset and a clock stop.
+   Test bring-up from true reset on its own: power cycle the domain at runtime (PMU
+   xxx_CONFIGURATION 0 / 0xf, vendor blkpwr sequence) instead of going through system sleep. The
+   failures here reproduced in 30 s that way, against 5 min per kernel + sleep cycle.
+2. **Diff against the vendor at the power-on boundary, not only register by register.** Reading
+   every register showed "all equal" for both display defects: one was secure state (not
+   readable), the other was order (not a value). The vendor's runtime-resume and enable paths
+   list what the hardware needs after power-on: here an SMC, a QoS write (not needed), mux
+   handling, and a strict bring-up order. Grep the vendor driver for exynos_smc() first:
+   MSCL, JPEG, MFC and G3D have the same firewall call with their own IDs (include/linux/smc.h
+   PROT_*), so each of them will need it after their domain was off.
+3. **Find the stuck stage before trying fixes.** Counters and status bits located it: the DECON
+   frame counter (0x7fc), VSTATUS, the frame FIFO level, the sysmmu STATUS and TLB readback, the
+   bridge QCH busy bit. "Stuck at the first memory read with an empty TLB" pointed at the memory
+   path, and the firewall was the only thing in it that could not be read back.
+4. **With more than one defect, an end-to-end verdict is worthless.** Every earlier "not
+   sufficient" was judged on a display that another defect kept dark. Judge each change on the
+   earliest signal of its own stage (a status bit, a counter), and re-test old negatives once a
+   blocker is gone.
+5. **Replay a sequence by hand before rebuilding.** With the driver idle (display blanked) the
+   DSIM bring-up could be poked step by step from the shell (dsim-steps.sh) and variants
+   compared in seconds. For reductions, one build with a switch per sub-change (module
+   parameters) replaced a build per variant.
+6. **Check that the precondition happened.** Suspends were refused twice (alarmtimer -16), so
+   the domain was never cycled and a "pass" meant nothing. The test now checks for "PM: sleep
+   aborted" / "woke up" and for a reset-value register (DSIM CLKCTRL 0xff) and reports INVALID
+   otherwise (ds-reduce.sh).
+7. **Mind where upstream puts a step for this SoC.** The 7870 is not in
+   samsung_dsim_hw_is_exynos(), so the DSIM init runs in pre_enable, before the panel is
+   powered. A first clean rewrite put the fix where it looked natural and failed for exactly
+   the original reason; the switch build passing with its prints off showed the difference was
+   in the code, not in timing.
+8. **A reset after a crash can cost the evidence.** The one failed cycle was followed by a boot
+   that panicked and overwrote pstore. For long runs, stop at the first failure and save the log
+   (mem-cycles); a second reset in a row loses it.
+
+## 10. Touch keys at resume (fixed 2026-11-14)
+
+- Symptom: "tm2-touchkey 0-0020: failed to read i2c data: -6" twice, 30 and 42 ms after every
+  wake from `mem` (never in s2idle).
+- Cause (upstream code, since the driver was added): tm2_touchkey_resume() calls enable_irq()
+  first and then switches the supplies on and waits 150 ms. After `mem` an interrupt is pending
+  when the IRQ is enabled, and the controller raises another while it starts; both run the
+  handler against a controller that does not answer yet. Probe has the right order.
+- Fix: "Input: tm2-touchkey - enable the interrupt after powering up on resume" (Fixes:
+  72d1f2346ded). Verified: real `mem` cycle (17.6 s), no read error, the controller answers
+  (register 0x07 reads 0). Not verified yet: a key press after resume (needs a finger), and
+  whether the key backlight state matches /sys/class/leds/tm2-touchkey/brightness afterwards
+  (the controller powers up with its own default; the driver does not write the state back).
+- The module is loaded from the rootfs: after a driver change run tools/a3-sync-modules.

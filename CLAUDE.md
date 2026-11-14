@@ -80,11 +80,13 @@ Not done, roughly in planned order:
   (the tracker db can't be reached from Claude Code). Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
   Details, tools and traps: work/notes/suspend.md.
-- Deep sleep (`mem`, 2026-11-14): entry, RTC wake and display resume work on a debug build; the
-  fixes are committed locally (not pushed). Any DISPAUD power loss needs the content firewall SMC
-  (exynos7_drm_decon) and the DSIM HS clock request after the panel reset. Open: the user's visual
-  confirmation, a run without debug code, wake sources, touch key read errors at resume, PMIC
-  sleep modes, drain. Start with work/notes/deep-sleep.md (status header, sections 7 and 8).
+- Deep sleep (`mem`, 2026-11-14): works on the clean series (entry, RTC wake, display resume,
+  touch keys); 11 of 12 real cycles passed, one unexplained failure. Fixes are committed locally,
+  not pushed. Lesson for every other block: a power domain that goes off loses what S-Boot set up
+  (content firewall SMC, bring-up order); test it by power cycling the domain at runtime.
+  Open: the user's look at the screen and a touch key press after a wake, other wake sources,
+  S2MPU05 sleep modes (needs the user's yes), drain. Start with work/notes/deep-sleep.md: status
+  header, section 9 (root causes and takeaways), sections 7, 8, 10 for details.
 - PDMA, PWM.
 - Audio COD3026X (shared with every 7870 phone). Prerequisites (AUD_PLL fix, ADMA, resets) are
   researched (2026-11-12): start with work/notes/next-areas.md, then audio.md.
@@ -175,7 +177,7 @@ Keep series small: one commit per logical change, follow-ups folded in.
   with ArtifactData (read first, pin if_version) whenever patches change, are regrouped, sent or reviewed,
   following "Series and tracker hygiene" below.
 - Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master =
-  v7.4-rc2; 94 as of 2026-11-13)
+  v7.4-rc2; 105 as of 2026-11-14)
 
 ## Display (command-mode panel, working 2026-11-09)
 

@@ -21,6 +21,9 @@ Bare-metal S-Boot payload probes for the Galaxy A3 2017 (no UART needed).
                  system sleep, enables the display and prints PASS/FAIL from the registers (frame
                  counter, TE pin, DSIM INTSRC). Reports INVALID when the power cycle did not
                  happen. Arguments only matter on the switch builds (deep-sleep.md section 8.2).
+  mem-cycles     host side: N deep-sleep cycles on the phone, one result line per cycle (time asleep,
+                 wake IRQ, frame rate, DSIM status, errors). Stops at the first cycle that comes
+                 back as a new boot and saves that boot's pstore console to out/.
   ssp-probe.c    userspace sensor hub probe (phone, Linux): WHOAMI, FIRMWARE_REV and
                  SENSOR_SCANNING over spidev + GPIO chardev, read commands only; never touches the
                  MCU reset or BOOT0 lines. Build with ./ssp-probe-build (needs the kernel uapi

@@ -1,0 +1,25 @@
+#!/bin/bash
+# Host side: N deep-sleep cycles on the phone (display as it is), one result line per cycle.
+# Stops at the first cycle that does not come back as the same boot and saves the pstore
+# console of the boot before to out/. Usage: mem-cycles [N] (default 8)
+N=${1:-8}
+OUT=$(dirname "$0")/../../out
+up() { ssh -o ConnectTimeout=3 a3 'cut -d" " -f1 /proc/uptime' 2>/dev/null; }
+for i in $(seq 1 "$N"); do
+	u0=$(up) || { echo "cycle $i: phone not reachable before the cycle"; exit 2; }
+	ssh a3 'dmesg -c >/dev/null; sh /root/s2idle.sh none mem quiet >/dev/null' || exit 2
+	sleep 8		# entry is 2 s after the script returns
+	t=0; u1=
+	while [ $t -lt 40 ]; do u1=$(up) && break; sleep 3; t=$((t+1)); done
+	if [ -z "$u1" ]; then echo "cycle $i: no answer within 2 min (hang, or USB not handed back)"; exit 1; fi
+	if [ "${u1%.*}" -lt "${u0%.*}" ]; then
+		f=$OUT/deep-sleep-cycles-fail-$(date +%Y%m%d-%H%M%S)-pstore.txt
+		ssh a3 'cat /sys/fs/pstore/console-ramoops-0' > "$f" 2>/dev/null
+		echo "cycle $i: REBOOTED (uptime $u0 -> $u1), RST_STAT $(ssh a3 /usr/local/bin/peek 0x10480404), pstore saved to $f"
+		exit 1
+	fi
+	sleep 4
+	ssh a3 'P=/usr/local/bin/peek; a=$(($($P 0x148307fc | cut -d" " -f2))); sleep 1; b=$(($($P 0x148307fc | cut -d" " -f2)))
+		echo "cycle '"$i"': $(dmesg | grep -o "Timekeeping suspended for [0-9.]* seconds") wake irq $(cat /sys/power/pm_wakeup_irq 2>/dev/null) frames +$((b-a))/s INTSRC $($P 0x14800034 | cut -d" " -f2) errors $(dmesg | grep -c -E "timed out|WARNING|vblank wait")"
+		dmesg > /root/mem-cycle-last.dmesg; sync'
+done

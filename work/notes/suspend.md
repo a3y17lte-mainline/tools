@@ -1,8 +1,9 @@
 # Suspend (s2idle) on the A3: state 2026-11-14
 
 s2idle (`echo freeze > /sys/power/state`) works: RTC alarm and power key wake, Wi-Fi loaded,
-11 of 11 cycles without the old CPU0 hold, with every tick frozen (2026-11-14). Deep sleep (`mem`): researched,
-not implemented yet; see deep-sleep.md.
+11 of 11 cycles without the old CPU0 hold, with every tick frozen (2026-11-14). Deep sleep (`mem`) works too
+since 2026-11-14 (entry, RTC wake, display, touch keys): deep-sleep.md. With the suspend ops in
+place `mem_sleep` defaults to `deep`; s2idle.sh selects `s2idle` or `deep` itself.
 
 ## The two bugs
 

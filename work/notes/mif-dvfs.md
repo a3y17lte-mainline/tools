@@ -1,28 +1,23 @@
 # Bus DVFS: MIF (DRAM controller), INT, DISP (research 2026-11-14)
 
-Status (2026-11-15): Stage 0, 1 (INT + DISP) and 2 (MIF) done and tested on Alpine. Stage 3 (lower the
-750 mV BUCK2 floor) is blocked: the unused ISP domain is powered at the CAM 533 MHz level, which needs
-750 mV on this chip (section 0b). Kernel groups BE, BF, BG (stage 1), BH, BI, BJ (stage 2).
+Status (2026-11-15): all stages done and tested on Alpine. BUCK2 idles at 637.5 mV (DISP sets it;
+was the 750 mV floor), 687.5 mV at MIF 902. Kernel groups BE, BF, BG (INT/DISP), BH, BI, BJ (MIF),
+BK (ISP power domain + 600 mV floor). Open: series-lint warns that the floor commit edits lines of
+50097ce159f1 (X, 750 mV floor) and 2523d25f1471 (BG comment); folding it there would undervolt the
+intermediate commits, so the order needs a decision (section 0c).
 
-## 0. Stage 1 result (INT/DISP)
+## 0c. Stage 3 result (ISP off, floor 600 mV)
 
-- Design change from the plan, on evidence: stock runs INT and DISP at their MINIMUM (134 MHz) all
-  the time (stock DT freq_info min 134; DECON BTS requests only MIF; audio asks no INT; no USB INT
-  lock in the stock DT). So the buses are exynos-bus devices with the powersave governor (lowest
-  OPP, raised only by QoS: sysfs min_freq / future interconnect), not passive from cpufreq.
-- bus-int = CLKCMU_FSYS_BUS 199.875/159.9/133.25 MHz (INT 334/200/134 voltages); MFC/MSCL pinned to
-  133.25 MHz with assigned-clock-rates (no driver). bus-disp = CLKCMU_DISPAUD_BUS 199.875/133.25.
-  Real rates: BUS_PLL 1599 MHz (/2 = 799.5), MEDIA_PLL 1332.5 (/2 = 666.25).
-- ASV on this unit: INT 600/612.5/662.5 mV, DISP 637.5/656.25 mV (debugfs opp/platform-bus-*).
-- OPP core fix: dev_pm_opp_adjust_voltage() now applies the voltage of the active OPP, otherwise a
-  powersave bus keeps the DT worst case (781/800 mV) for good.
-- Measured: eMMC direct read 21.7 MB/s at FSYS 133 MHz vs 21.9 at 200 (not the limit). Display
-  healthy (DSIM INTSRC 0x01080000). BUCK2 still at the 750 mV floor (MIF has no vote yet).
-
-Sources: vendor `drivers/soc/samsung/pwrcal/S5E7870/{S5E7870-dfs.c,S5E7870-drampara.c,S5E7870-asv.c}`,
-`drivers/devfreq/exynos/exynos7870_bus_{mif,int,disp}.c`, stock DT `devfreq_*@170000x0`, the ECT
-(`tools/ect-parse out/ect-a3y17lte.bin mif int disp minlock timing`, saved in
-`out/ect-a3y17lte-mif.txt`), and a peek survey of this unit (`out/mif-survey-20261114.txt`).
+- pd_isp (samsung,exynos7870-pd -> exynos5433-pd, PMU 0x10484040); cmu_isp in it with runtime PM
+  (exynos_arm64_register_cmu_pm for CMU nodes with power-domains). CMU_ISP gates no longer critical.
+- Trap: the ISP domain only completes its power-down while its input clocks from CMU_MIF
+  (gout_mif_cmu_isp_vra/cam/isp, 0x10460864/68/6c) run. With them gated (what the CMU runtime
+  suspend does) STATUS stays at 0x000c000c and the PD driver times out. Fix: those gates are
+  critical; their rates set to the CAM 167 level (MEDIA/2 / 4 = 166.56 MHz) by assigned-clocks.
+  ISP_OPTION 0x1 (boot value) and 0x2 (vendor) both work. Off = STATUS 0x00170000.
+- Tests: genpd isp off-0 from boot, memtester 16M at MIF 902/676/275 under the real voltages,
+  3 mem cycles clean, quiet audio tone fine (user-confirmed), display 60 fps.
+- Testing trap: tools/phone-sh cuts commands after ~20 s (exit 124); run long ones over plain ssh.
 
 ## 0a. Stage 2 result (MIF, exynos7870-dmc)
 

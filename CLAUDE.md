@@ -96,11 +96,11 @@ Not done, roughly in planned order:
   Screen after wake user-confirmed. Open: other wake sources,
   S2MPU05 sleep modes (needs the user's yes), drain. Start with work/notes/deep-sleep.md: status
   header, section 9 (root causes and takeaways), sections 7, 8, 10 for details.
-- Bus DVFS (2026-11-15): INT + DISP buses (exynos-bus, powersave like stock) and MIF (DRAM
-  controller, our exynos7870-dmc, follows the CPUs via the ECT MINLOCK map, 275-902 MHz, tested incl.
-  memtester and mem cycles) done, per-chip ASV voltages; groups BE-BJ. Left: the 750 mV BUCK2 floor
-  stays until the unused ISP power domain is powered down (it runs at CAM 533 MHz = 750 mV on this
-  chip). Start with work/notes/mif-dvfs.md (status header, sections 0a/0b).
+- Bus DVFS (2026-11-15, done): INT + DISP buses (exynos-bus, powersave like stock), MIF (DRAM
+  controller, our exynos7870-dmc, follows the CPUs via the ECT MINLOCK map, 275-902 MHz), per-chip
+  ASV voltages, unused ISP power domain off; BUCK2 idles at 637.5 mV instead of 750. Groups BE-BK.
+  Open: series-lint warning on the BUCK2 floor commit (ordering vs X's 750 mV floor). Details:
+  work/notes/mif-dvfs.md (status header, sections 0a-0c).
 - PDMA, PWM.
 - Audio: nothing open. 192 kHz is deliberately not implemented. BT audio needs no audio-driver work
   (A2DP over HCI); the hardware SCO PCM path (QCA9377 -> mixer BT port) only matters for calls:
@@ -407,8 +407,7 @@ Keep series small: one commit per logical change, follow-ups folded in.
   copy the .apk over ssh, `sudo apk add --allow-untrusted ./x.apk` (kernel install rewrites /boot via
   boot-deploy). The pmaports kernel APKBUILD `_commit` must be a commit pushed to the gh fork.
 - GPU DVFS: kernel groups S (G3D PLL clk) and T (OPP table, cooling, GPU supply), installed. BUCK2
-  feeds G3D + MIF/INT/DISP/CAM; the bootloader leaves it at 750 mV and nothing votes for the
-  buses, so no GPU voltage may go below 750 mV. Check: /sys/class/devfreq/11400000.gpu/trans_stat.
+  feeds G3D + MIF/INT/DISP/CAM; since 2026-11-15 every user votes (ISP powered off), floor 600 mV. Check: /sys/class/devfreq/11400000.gpu/trans_stat.
 - Userspace: pmaports forks `temp/mesa` (999926.2.6: Midgard compiler fixes + renderonly leak fix;
   aarch64 only, rusticl/NVK off) and `temp/gtk4.0` (99994.24.1: adaptive gradient supersampling),
   9999 version prefix so Alpine cannot replace them: rebase on every Alpine mesa/gtk4.0 upgrade.

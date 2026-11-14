@@ -1,12 +1,11 @@
 # Deep sleep (suspend-to-RAM, `mem`): how it works on the 7870
 
-Status 2026-11-14: kernel side written, not yet run on the phone. Kernel commits (a3y17lte):
-f56de1bae4a3 pinctrl pad retention, c8426396033e A3 power-down pin states, 53f0f832d75a PMU
-system sleep (exynos7870-pmu.c: SYS_PWR table, wake masks, sleep-window options, suspend ops).
-Next: install on Alpine, check the PDN registers against section 6, `s2idle.sh core mem`, then a
-real `s2idle.sh none mem` with the user at the phone. Left for later: vendor clock prep (top-mux
-gates, USB PHY mux, BUS_PLL off), PMIC sleep modes, current measurement. With the suspend ops in
-place `mem_sleep` defaults to `deep`: don't ship to pmOS before deep sleep is verified.
+Status 2026-11-14 (afternoon): real `mem` entry hangs; the PMU central sequencer starts and
+stops at its state 0x2d (section 7). Kernel commits (a3y17lte, not pushed): f56de1bae4a3 pinctrl
+pad retention, c8426396033e A3 power-down pin states (verified: CON_PDN/PUD_PDN = stock),
+53f0f832d75a PMU system sleep + fixup (CPU0 local PWR_CFG kept on in sleep, as the vendor),
+1e2e1051e92b clk: PHY user muxes to OSC for suspend. pm_test platform/core pass. With the
+suspend ops in place `mem_sleep` defaults to `deep`: don't ship to pmOS before it works.
 
 Deep sleep is a PMU-sequenced system power-down. The kernel programs the PMU (per-block SYS_PWR
 table, central sequencers, wake masks), GPIO power-down states and pad retention, then calls PSCI
@@ -139,3 +138,41 @@ Raw output: out/sleep-survey-20261114.txt (read only: peek + i2cget -f, Alpine, 
 - S2MPU05: enable bits [7:6] = 3 (always on) on every BUCK and LDO, unlike the stock initial modes
   (BUCK1 and most LDOs 0x1 = off in sleep, BUCK2-5 0x2 = low power). Nothing switches off in sleep
   until the regulator step: safe first, savings later.
+
+## 7. Entry hang analysis (2026-11-14)
+
+Probes (debug-only code in exynos7870_suspend_enter, not in the series):
+- Watchdog armed right before the PSCI call (PMU 0x408/0x40c bit 23 cleared, WTCON 0x7739,
+  WTCNT 0xabe0 = ~10 s at ~4.4 kHz): a stall in BL31's WFI loop self-resets (RST_STAT bit 23);
+  a real power-down would stop the watchdog (PERI clocks stop). Result: self-reset, so the SoC
+  never powered down. RTC and power key wake did nothing in the runs without it.
+- Pending IRQ before the call (CNTV fires at once, `exynos_pmu.dbg_abort=1`): BL31 takes its
+  ISR_EL1 abort path and returns -3 ("PM: sleep aborted"); the phone stays up. So both secure
+  suspend hooks and the iRAM save pass; the hang is after: GICC_CTLR off (0x104e2000 [1:0] = 0),
+  set/way clean+inv of all levels (0x02031c74), checksum, CPUECTLR.SMPEN = 0, WFI forever.
+- PMUDBG registers survive a watchdog reset (control: a plain runtime watchdog reset leaves
+  CENTRAL_SEQ 0, NONCPU 0x00080000, L2 0, CPU0 0x105b0000, other CPUs 0x104b0000):
+
+  | PMUDBG (PMU +)           | after the sleep hang | plain WDT reset |
+  |--------------------------|----------------------|-----------------|
+  | CENTRAL_SEQ_STATUS       | 0x002d0000           | 0               |
+  | CENTRAL_SEQ_MIF_STATUS   | 0                    | 0               |
+  | CPUCL0_CPU0              | 0x100b0000           | 0x105b0000      |
+  | CPUCL0_L2 / CPUCL1_L2    | 0x10000000 / 0x10080000 | 0 / 0        |
+  | CPUCL0_NONCPU / CL1      | 0x000e0000 / 0x005e0000 | 0x00080000   |
+
+  Cluster 1 = its measured "off" values (cpuidle.md). Cluster 0 matches SLEEP's targets
+  (L2_SYS_PWR 0x7 keeps L2 on; CPU/NONCPU 0x8). So the central sequencer itself stops at state
+  0x2d and never starts the MIF sequencer. No decoding of the state numbers exists in the vendor
+  tree (PMUDBG only appears in the register headers).
+
+Ruled out by evidence: SYS_PWR table and option registers (129/129 + 4 equal to the vendor
+SLEEP column), CPU/NONCPU/L2/duration options (bit-equal to syspwr_init), IDLE_IP_MASK (reset
+0xffffffff = vendor SLEEP), ALIVEIRAM_OPTION bit 4 (0x11: BL1 would take the warm path), top
+CMU gates and domain bus/APB gates (all on), USE_L2QACTIVE (already off), all four domains on.
+BL31 afflvl 3 skips the core/cluster flush+CCI routine and calls the sleep routine directly,
+the same for the vendor kernel (its finisher passes afflvl 3, id 0, type 0, nothing else).
+
+Remaining vendor differences, not yet tested: BUS_PLL off + MIF mux / FSYS_BUS divider /
+DECON VCLK mux before SLEEP; genpd has G3D/ISP/MFCMSCL/DISPAUD already off in the vendor;
+CP and GNSS are running in the vendor (here: never booted; CP/GNSS central sequencers idle).

@@ -108,7 +108,7 @@ is not either: it lacks our Midgard compiler fixes and the renderonly fix.
 ## HALs (checked against android-17.0.0_r1 / lineage-24.0)
 
 Real: health example (power_supply), usb example (/sys/class/typec), bluetooth default (HCI user channel via mgmt), wifi, LineageOS
-light (scans /sys/class/backlight), keymint/gatekeeper .nonsecure. No-op: power example.
+light (scans /sys/class/backlight), keymint/gatekeeper .nonsecure.
 Gadget example hard-codes 11110000.dwc3: not used, init.usb.configfs.rc path instead.
 hardware/samsung (lineage-24.0) has no dtbhtool any more: DTBH is built by the device packer.
 
@@ -137,5 +137,58 @@ headers only, not built in the tree yet):
   headphones, main-mic MIC1, second-mic MIC2, headset-mic MIC3). Control names and enum items
   checked against the phone's card. Jack: ASoC input device "a3y17lte Headset"
   (config_useDevInputEventForAudioJack). The loudspeaker's "Speaker Switch" is a card pin switch
-  (mainline group BD: audio-graph-card2 parses pin-switches; tested on Alpine). Open: effects HAL;
+  (mainline group BD: audio-graph-card2 parses pin-switches; tested on Alpine). Open:
   "Mono Mix" for the earpiece is (L+R)/2 (verify by ear).
+- power (2026-11-14, aidl/power, IPower V7): cpufreq policy limits of policy0/4 (init rc chowns
+  scaling_min/max_freq to system). INTERACTION boost: min = first OPP >= 1.0 GHz (1014000) for
+  durationMs (default 100 ms, max 2 s). LAUNCH: min = max OPP, 5 s cap. LOW_POWER: max =
+  1014000. Boosts ignored when not interactive / device idle / low power. No hint sessions
+  (everything ADPF returns EX_UNSUPPORTED_OPERATION).
+- effects (2026-11-14, aidl/audio-effect): AOSP's EffectFactory.cpp + EffectMain.cpp copied
+  unchanged (the AOSP binary is installable:false, no filegroup); outside an APEX they fall back
+  to /vendor/etc/audio_effects_config.xml and /vendor/lib64/soundfx. Libraries: bundle, downmix,
+  dynamics processing, loudness enhancer, pre-processing, reverb, visualizer. VERIFY at the
+  first build that these library modules install to /vendor outside the APEX.
+- sensors (2026-11-14, aidl/sensors, ISensors V3): Sensors.h/.cpp = AOSP default service (FMQ,
+  wake lock queue; libsensorsexampleimpl is not visible to devices), Sensor.h/.cpp ours.
+  - IIO devices by name (ssp-accelerometer, -gyroscope, -magnetometer, -pressure, -light,
+    -proximity). Buffer sensors: all scan elements on (the drivers push whole samples), layout
+    from scan_elements/*_type + *_index, scale from sysfs, rate through the sampling_frequency
+    attribute (10..200 ms). current_timestamp_clock is set to boottime; if that fails the
+    arrival time is used.
+  - Units: accel/gyro as IIO; mag Gauss x 100 = uT; pressure kPa x 10 = hPa; light lux,
+    on-change. Mag status is ACCURACY_MEDIUM (the hub does not pass its accuracy on).
+  - Proximity: IIO event fd (rising = near 0 cm, falling = far 5 cm), wake-up + on-change; the
+    kernel sends the current state when the events are switched on.
+  - Tested 2026-11-14 on Alpine with a harness around Sensor.cpp (static aarch64 build in a
+    scratch Alpine root): accel z 9.6 m/s2 at 21 ms and 100 ms periods, gyro, mag |B| ~95 uT
+    (uncalibrated after boot), pressure 992.5 hPa, light, prox far at enable; boottime
+    timestamps; no events after disable. The barometer delivers every 180 ms whatever is set
+    (minDelay 180 ms).
+  - ueventd lists every attribute the HAL writes (the attribute name is literal).
+  - Not done: step counter, significant motion, tilt/pickup (the hub has them, the kernel
+    driver does not); uncalibrated variants; whether the proximity interrupt wakes the phone
+    from suspend on Android.
+- NFC (2026-11-14, aidl/nfc, INfc V2): libnfc-nci needs raw NCI, so the Android kernel has
+  ANDROID: "nfc: s3fwrn5: Add a raw NCI character device" (tools/android/kernel-patches/0005,
+  CONFIG_NFC_S3FWRN5_RAW=y): the chip is not registered with the NCI core; /dev/s3fwrn5 gives
+  one NCI packet per read/write, one opener, ioctl S3FWRN5_RAW_IOC_POWER (0 off, 1 power cycle
+  into NCI mode), off on close. No firmware mode from userspace.
+  - HAL: reader thread does power on + FW_CFG `2F 28 01 12` (wait for `4F 28 01 00`, one
+    retry with a power cycle), then OPEN_CPLT; all events and data come from that thread.
+  - getConfig: nfaProprietaryCfg from stock (15693 = 0x80, MIFARE = 0x81, B' 0x81, dual 0x82,
+    Kovio 0x8a, polls 0x70/0x74, listen 0xf4); stock's extra byte 0x90 has no AIDL field
+    (protocolChineseId left 0xff). All routes to the host; libnfc-nci.conf in /vendor/etc with
+    no EEs. Features: nfc, nfc.hce, com.nxp.mifare.
+  - NOT tested on hardware: the kernel patch is compile-tested only (Alpine runs the mainline
+    kernel, which keeps the NCI core path). HCE is new ground: drop the feature if it fails.
+  - The wake (FIRM) line stays asserted while NFC is on, as with the kernel NCI stack; stock
+    toggles it for sleep. Measure the idle drain.
+- SELinux labels (2026-11-14, no rules): contexts for the new services, /dev/s3fwrn5 =
+  nfc_device; genfs: sensor hub SPI path (sysfs_a3_sensors), GPU/bus devfreq
+  (sysfs_a3_devfreq), wlan0 (sysfs_net), gpio-keys and hall wakeup (sysfs_wakeup). Open: nodes
+  behind an I2C adapter (charger/fuel gauge/TCPC/RTC wakeup sources, typec, extcon) have i2c-N
+  in the path, which follows probe order: needs i2c aliases in the DT first.
+- Bus DVFS (INT/DISP exynos-bus, MIF later): nothing needed in Android userspace. When the
+  mainline series is final: backport-kernel, check ARM_EXYNOS_BUS_DEVFREQ + passive governor in
+  a3y17lte_defconfig, check trans_stat under schedutil.

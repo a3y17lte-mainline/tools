@@ -7,9 +7,44 @@
 81280d39a2f9  dt-bindings: exynos-pmu: allow mipi-phy subnode for Exynos7870 PMU
 3abd9b087a4c  dt-bindings: exynos-sysreg: add exynos7870 sysregs
 fe02894a1930  arm64: dts: exynos7870: add DSI support
+be961cdb8ed3  dt-bindings: arm: samsung: Galaxy J7 (2016)
+5d692f20de63  arm64: dts: exynos: Galaxy J7 (2016) (41dadc6f7815 touches it)
 41dadc6f7815  arm64: dts: exynos7870: Move I2C address/size-cells to DTSI
+873fa6bd9a4f  exclude=arch/arm64/boot/dts/exynos/exynos8855.dtsi  align continued properties
+6b68ca6fe0c8  arm64: dts: exynos7870: Re-order properties to match coding style
 135b55014109  dt-bindings: arm: samsung: Galaxy J5 (2017)
 a3a20c5f4e10  arm64: dts: exynos: Galaxy J5 (2017)
+
+# Non-constant field_get()/field_prep() (used by the S2MU005 mfd and our s2mu004-tcpc):
+# the bitfield helpers plus the drivers that defined their own
+dbfe51513aae  clk: at91: pmc: #undef field_{get,prep}() before definition
+7996cbdb3f84  crypto: qat - #undef field_get() before local definition
+d51b09a0feb6  EDAC/ie31200: #undef field_get() before local definition
+d1e1a7271e97  gpio: aspeed: #undef field_{get,prep}() before local definition
+27856d2b2b0f  iio: dac: ad3530r: #undef field_prep() before local definition
+8a838dabf145  iio: mlx90614: #undef field_{get,prep}() before local definition
+2fc00c008e90  pinctrl: ma35: #undef field_{get,prep}() before local definition
+138ab44108fa  soc: renesas: rz-sysc: #undef field_get() before local definition
+85a8ff118531  ALSA: usb-audio: #undef field_{get,prep}() before local definition
+2a6c045640c3  bitfield: Add less-checking __FIELD_{GET,PREP}()
+c1c6ab80b25c  bitfield: Add non-constant field_{prep,get}() helpers
+
+# *alloc_obj()/*alloc_flex() helpers our drivers use (headers only, not the treewide conversion)
+2932ba8d9c99  slab: Introduce kmalloc_obj() and family
+e4c8b46b924e  slab: Introduce kmalloc_flex() and family
+29a86e8818a8  devres: Provide kmalloc_obj*-style API for devm_kmalloc
+e19e1b480ac7  add default_gfp() helper macro and use it in the new *alloc_obj() helpers
+ff566742e9cf  mm: Move default_gfp() into gfp_types.h
+
+# mfd sec rework that the S2MU005 support sits on (S2MPG10/11 parts are gs101-only but
+# keep the files upstream-shaped); the RTC change goes with the alarm IRQ resource
+ee19b52c31b3  mfd: sec: Use chained IRQs for s2mpg10
+44c603f35cad  mfd: sec: Drop a stray semicolon
+153ae5c52b70  mfd: sec: Add rtc alarm IRQ as platform device resource
+c70aee3dd854  rtc: s5m: query platform device IRQ resource for alarm IRQ
+b31583a1a9ab  mfd: sec: Drop now unused struct sec_pmic_dev::irq_data
+b60c2dba6d3c  mfd: sec: Fix IRQ domain names duplication
+3a17ba6557e2  mfd: sec: Add support for S2MPG11 PMIC via ACPM
 
 # S2MU005 PMIC stack (mfd base for the S2MU004 work)
 d74b4fcc8093  dt-bindings: power: supply: S2MU005 fuel gauge
@@ -20,6 +55,17 @@ e491ebea157f  mfd: sec: Add support for S2MU005 PMIC
 cf5d7a55d3b6  dt-bindings: extcon: S2M series PMIC extcon
 7e541f6dbd05  power: supply: S2M series PMIC charger
 38c8b37600b6  power: supply: s2mu005-battery: return errors from dev_err_probe()
+
+# ssp_sensors state the A3 hub patches were written against (incl. a remove fix)
+dcc80f2fdff7  iio: ssp_sensors: cleanup codestyle warning
+a9ecd9a12175  iio: ssp_sensors: cleanup codestyle check
+eedf7602fbd9  iio: ssp_sensors: cancel delayed work_refresh on remove
+74c3923344c6  iio: ssp_sensors: cleanup codestyle warning
+97caa67b1c68  iio: common: ssp: remove SSP_CHAN_TIMESTAMP() macro
+
+# Used by our drivers: regmap sparse flat cache (S2MU005/S2MU004 mfd), Samsung DSI panel helpers
+9c7f7262bc1a  regmap: add flat cache with sparse validity
+b990db9a0176  exclude=drivers/gpu/drm/panel/panel-samsung-s6e3fc2x01.c,drivers/gpu/drm/panel/panel-samsung-s6e8fc0-m1906f9.c  drm/panel: samsung: Add shared test key helpers
 
 # Fixes the series relies on
 5a759b120e31  phy: exynos5-usbdrd: fix USB 2.0 HS PHY tuning values for Exynos7870

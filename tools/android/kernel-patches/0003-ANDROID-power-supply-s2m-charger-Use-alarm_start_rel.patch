@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sat, 14 Nov 2026 21:40:49 +0100
+Subject: [PATCH 3/4] ANDROID: power: supply: s2m-charger: Use
+ alarm_start_relative() on 6.18
+
+alarm_start_timer() is new in 7.1 and needs the hrtimer changes behind
+hrtimer_start_range_ns_user(). The charger watchdog alarm does not use
+its return value, so alarm_start_relative() does the same here.
+---
+ drivers/power/supply/s2m-charger.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/power/supply/s2m-charger.c b/drivers/power/supply/s2m-charger.c
+index 8a6ff8ea7643..c37820a3969c 100644
+--- a/drivers/power/supply/s2m-charger.c
++++ b/drivers/power/supply/s2m-charger.c
+@@ -514,8 +514,8 @@ static void s2mu004_chgr_wdt_work(struct work_struct *work)
+ 		online = 0;
+ 
+ 	if (online) {
+-		alarm_start_timer(&priv->wdt_alarm,
+-				  ktime_set(S2MU004_CHGR_WDT_INTERVAL_S, 0), true);
++		alarm_start_relative(&priv->wdt_alarm,
++				     ktime_set(S2MU004_CHGR_WDT_INTERVAL_S, 0));
+ 	} else {
+ 		alarm_try_to_cancel(&priv->wdt_alarm);
+ 		queue_delayed_work(system_freezable_wq, &priv->wdt_work,

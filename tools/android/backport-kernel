@@ -58,18 +58,34 @@ def setup():
 
 
 def prereq_steps():
-    want = []
+    want, excl = [], {}
     for line in PREREQS.read_text().splitlines():
         line = line.split("#", 1)[0].split()
         if line:
-            want.append(git("rev-parse", "--verify", line[0] + "^{commit}"))
+            sha = git("rev-parse", "--verify", line[0] + "^{commit}")
+            want.append(sha)
+            for tok in line[1:]:
+                if tok.startswith("exclude="):
+                    excl[sha] = tok[len("exclude="):].split(",")
     # upstream topological order
     order = git("rev-list", "--reverse", "--topo-order", "v6.18..torvalds/master").split()
     pos = {c: i for i, c in enumerate(order)}
     missing = [c for c in want if c not in pos]
     if missing:
         sys.exit(f"not in v6.18..torvalds/master: {missing}")
-    return [["pick", c] for c in sorted(want, key=pos.get)]
+    return [["pick", c, excl.get(c, [])] for c in sorted(want, key=pos.get)]
+
+
+def drop_excluded(sha, patterns):
+    """Resolve conflicts in files the base does not have (exclude=) by dropping them."""
+    import fnmatch
+    dropped = []
+    for path in git("diff", "--name-only", "--diff-filter=U").split():
+        if any(fnmatch.fnmatch(path, p) for p in patterns):
+            git("rm", "-q", "--cached", path)
+            (KDIR / path).unlink(missing_ok=True)
+            dropped.append(path)
+    return dropped
 
 
 def series_steps():
@@ -99,10 +115,27 @@ def prefix_last(prefix):
 
 def run(st):
     while st["next"] < len(st["steps"]):
-        kind, arg = st["steps"][st["next"]]
+        kind, arg = st["steps"][st["next"]][:2]
         if kind == "pick":
-            rc = git("cherry-pick", "-x", "--allow-empty", arg, check=False, capture=False)
-            if rc:
+            rc = git("cherry-pick", "-x", arg, check=False, capture=False)
+            excl = st["steps"][st["next"]][2] if len(st["steps"][st["next"]]) > 2 else []
+            if rc and excl:
+                dropped = drop_excluded(arg, excl)
+                if dropped and not git("diff", "--name-only", "--diff-filter=U"):
+                    git("-c", "core.editor=true", "cherry-pick", "--continue")
+                    prefix_last("BACKPORT: ")
+                    msg = git("log", "-1", "--format=%B")
+                    git("commit", "--amend", "-q", "--no-verify", "-m",
+                        msg + "\n[dropped, not in the base: " + ", ".join(dropped) + "]")
+                    rc = None
+            if rc is None:
+                pass
+            elif rc and not git("diff", "--name-only", "--diff-filter=U") and \
+                    git("diff", "--cached", "--quiet", check=False, capture=False) == 0:
+                # already in the base (ACK takes stable backports): nothing to apply
+                git("cherry-pick", "--skip")
+                print(f"skip {arg[:12]}: already in the base")
+            elif rc:
                 if not git("diff", "--name-only", "--diff-filter=U"):
                     # rerere resolved everything
                     git("-c", "core.editor=true", "cherry-pick", "--continue")
@@ -112,7 +145,7 @@ def run(st):
                     save(st)
                     sys.exit(f"conflict picking {arg}: resolve, `git add`, then "
                              "backport-kernel continue")
-            else:
+            elif not rc:
                 prefix_last("UPSTREAM: ")
         else:
             rc = git("am", "-3", "--keep-cr", arg, check=False, capture=False)
@@ -149,12 +182,13 @@ def main():
         run(st)
     elif cmd == "continue":
         st = json.loads(STATE.read_text())
-        kind, arg = st["steps"][st["next"]]
+        kind, arg = st["steps"][st["next"]][:2]
         if kind == "pick":
             git("-c", "core.editor=true", "cherry-pick", "--continue")
             prefix_last("BACKPORT: ")
-        else:
+        elif (KDIR / ".git/rebase-apply").exists():
             git("am", "--continue")
+        # else: the step was applied by hand (e.g. `git am -3` again after fetching objects)
         st["next"] += 1
         st.pop("conflict", None)
         save(st)
@@ -164,7 +198,7 @@ def main():
         print(f"base {st['base'][:12]}  series {st['series'][:12]}  "
               f"step {st['next']}/{len(st['steps'])}")
         if st["next"] < len(st["steps"]):
-            print("next:", *st["steps"][st["next"]])
+            print("next:", *st["steps"][st["next"]][:2])
     else:
         sys.exit(__doc__)
 

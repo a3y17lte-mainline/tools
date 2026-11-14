@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sat, 14 Nov 2026 21:42:22 +0100
+Subject: [PATCH 4/4] ANDROID: iio: ssp_sensors: Adapt to 6.18 APIs
+
+- include <linux/mod_devicetable.h> for the platform_device_id tables:
+  in 6.18 <linux/platform_device.h> does not pull it in
+- iio_device_try_claim_buffer_mode() is new in 7.1; 6.18 has
+  iio_device_claim_buffer_mode(), which returns 0 on success
+---
+ drivers/iio/accel/ssp_accel_sensor.c    | 1 +
+ drivers/iio/gyro/ssp_gyro_sensor.c      | 1 +
+ drivers/iio/proximity/ssp_prox_sensor.c | 2 +-
+ 3 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iio/accel/ssp_accel_sensor.c b/drivers/iio/accel/ssp_accel_sensor.c
+index bc1809ae1a91..9fc0cd502cd6 100644
+--- a/drivers/iio/accel/ssp_accel_sensor.c
++++ b/drivers/iio/accel/ssp_accel_sensor.c
+@@ -7,6 +7,7 @@
+ #include <linux/iio/iio.h>
+ #include <linux/iio/buffer.h>
+ #include <linux/iio/kfifo_buf.h>
++#include <linux/mod_devicetable.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+diff --git a/drivers/iio/gyro/ssp_gyro_sensor.c b/drivers/iio/gyro/ssp_gyro_sensor.c
+index 473e1ee9dd5c..853089ead086 100644
+--- a/drivers/iio/gyro/ssp_gyro_sensor.c
++++ b/drivers/iio/gyro/ssp_gyro_sensor.c
+@@ -7,6 +7,7 @@
+ #include <linux/iio/iio.h>
+ #include <linux/iio/buffer.h>
+ #include <linux/iio/kfifo_buf.h>
++#include <linux/mod_devicetable.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+diff --git a/drivers/iio/proximity/ssp_prox_sensor.c b/drivers/iio/proximity/ssp_prox_sensor.c
+index a73200cffb7a..e4ed4a9767f2 100644
+--- a/drivers/iio/proximity/ssp_prox_sensor.c
++++ b/drivers/iio/proximity/ssp_prox_sensor.c
+@@ -192,7 +192,7 @@ static int ssp_prox_write_event_config(struct iio_dev *indio_dev,
+ 		return ret;
+ 	}
+ 
+-	if (!iio_device_try_claim_buffer_mode(indio_dev))
++	if (iio_device_claim_buffer_mode(indio_dev))
+ 		return -EBUSY;
+ 	ret = ssp_prox_set_events(indio_dev, state, true);
+ 	iio_device_release_buffer_mode(indio_dev);

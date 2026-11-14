@@ -1,0 +1,46 @@
+#!/bin/bash
+# mkconfig: generate arch/arm64/configs/a3y17lte_defconfig in the Android kernel tree.
+#
+#   work/config-a3y17lte (mainline/Alpine config: all the hardware)
+#   + tools/android/android-base.config        Android 17 requirements (kernel/configs)
+#   + tools/android/android-base-arm64.config  the conditional ones that apply here
+#   + tools/android/a3y17lte-android.config    S-Boot/first-stage/Android device needs
+#
+# Then reports every requirement the result misses (a symbol the 6.18 tree lacks, or one a
+# dependency turned off). Writes the savedefconfig into the tree; commit it as "ANDROID:".
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+SRC=$ROOT/src/android/kernel/samsung/exynos7870
+O=$ROOT/out/android/kernel
+F=$ROOT/tools/android
+FRAGS=("$F/android-base.config" "$F/android-base-arm64.config" "$F/a3y17lte-android.config")
+MAKE=(make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1)
+
+mkdir -p "$O"
+cp "$ROOT/work/config-a3y17lte" "$O/.config"
+(cd "$SRC" && ARCH=arm64 LLVM=1 scripts/kconfig/merge_config.sh -m -O "$O" "$O/.config" "${FRAGS[@]}" >/dev/null)
+"${MAKE[@]}" olddefconfig
+
+miss=0
+for frag in "${FRAGS[@]}"; do
+	while IFS= read -r line; do
+		case "$line" in
+		CONFIG_*=*) sym=${line%%=*}; want=$line ;;
+		"# CONFIG_"*" is not set") sym=${line#\# }; sym=${sym%% *}; want="# $sym is not set" ;;
+		*) continue ;;
+		esac
+		have=$(grep -E "^($sym=|# $sym is not set)" "$O/.config" || true)
+		if [[ "$want" == *" is not set" ]]; then
+			[[ -z "$have" || "$have" == "$want" ]] && continue
+		else
+			[[ "$have" == "$want" ]] && continue
+			# a built-in requirement met by a module is still a miss; =y vs =m reported
+		fi
+		echo "unmet: $want (have: ${have:-absent}) [$(basename "$frag")]"
+		miss=$((miss + 1))
+	done < "$frag"
+done
+
+"${MAKE[@]}" savedefconfig
+cp "$O/defconfig" "$SRC/arch/arm64/configs/a3y17lte_defconfig"
+echo "a3y17lte_defconfig written; $miss unmet requirement(s)"

@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sat, 14 Nov 2026 21:20:40 +0100
+Subject: [PATCH 1/4] ANDROID: arm64: dts: a3y17lte: S-Boot DTB selection and
+ Wi-Fi/BT addresses
+
+S-Boot loads boot.img directly and picks the DTB from its DTBH table by
+model_info-chip and model_info-hw_rev; it refuses to boot without them.
+The values are those of the stock rev02 DTB.
+
+Android does not read EFS, so give Wi-Fi and Bluetooth the made-up
+addresses the Alpine setup uses. Without one, hci_qca leaves hci0
+unconfigured (the controller only reports its NVM default) and the
+Bluetooth HAL never sees it.
+---
+ arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts b/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
+index bb2c4a4a0cd9..673d7c82dde7 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
++++ b/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
+@@ -17,6 +17,16 @@
+ / {
+ 	model = "Samsung Galaxy A3 (2017)";
+ 	compatible = "samsung,a3y17lte", "samsung,exynos7870";
++
++	/*
++	 * S-Boot picks the DTB from the DTBH table in boot.img by these, and
++	 * fails without them. Values from the stock rev02 DTB of this unit.
++	 */
++	model_info-chip = <7870>;
++	model_info-platform = "android";
++	model_info-subtype = "samsung";
++	model_info-hw_rev = <2>;
++	model_info-hw_rev_end = <255>;
+ 	chassis-type = "handset";
+ 
+ 	aliases {
+@@ -776,6 +786,8 @@ &mmc1 {
+ 	wifi@1 {
+ 		compatible = "qcom,ath10k";
+ 		reg = <1>;
++		/* made up: the real address is in EFS, which Android does not use */
++		mac-address = [02 a3 17 00 00 02];
+ 	};
+ };
+ 
+@@ -1119,6 +1131,8 @@ &serial1 {
+ 
+ 	bluetooth {
+ 		compatible = "qcom,qca9377-bt";
++		/* 02:A3:17:00:00:01, made up like the Wi-Fi address (byte-reversed) */
++		local-bd-address = [01 00 00 17 a3 02];
+ 		pinctrl-0 = <&bt_enable>;
+ 		pinctrl-names = "default";
+ 

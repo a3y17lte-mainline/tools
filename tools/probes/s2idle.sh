@@ -1,6 +1,8 @@
 #!/bin/sh
-# s2idle test run on the phone (Alpine, root). Usage: s2idle.sh LEVEL [FLAG...]
-#   LEVEL = freezer | devices | platform | none   (/sys/power/pm_test)
+# s2idle / suspend-to-RAM test run on the phone (Alpine, root). Usage: s2idle.sh LEVEL [FLAG...]
+#   LEVEL = freezer | devices | platform | processors | core | none   (/sys/power/pm_test)
+#   mem   = deep sleep (mem_sleep "deep", state "mem") instead of s2idle; also writes a
+#           marker to /dev/pmsg0 before the entry (see work/notes/deep-sleep.md)
 #   wfi   = disable cpuidle state1 (core power-down) on all CPUs first
 #   quiet = no pm_print_times (the 16 KiB pstore console then keeps entry + wake)
 #   nowd  = stop the hardware watchdog, so a hang stays up long enough for the
@@ -11,10 +13,16 @@
 # suspend runs detached because USB/ssh drop. Result: /root/s2idle-LEVEL.log,
 # or after a hang /sys/fs/pstore/console-ramoops-0 on the next boot.
 set -u
-LEVEL=${1:?usage: s2idle.sh freezer|devices|platform|none [wfi] [quiet] [nowd] [probe]}
+LEVEL=${1:?usage: s2idle.sh freezer|devices|platform|processors|core|none [mem] [wfi] [quiet] [nowd] [probe]}
 shift
 FLAGS=" $* "
+STATE=freeze
 LOG=/root/s2idle-$LEVEL.log
+case $FLAGS in *" mem "*)
+	STATE=mem
+	LOG=/root/mem-$LEVEL.log
+	echo deep > /sys/power/mem_sleep || exit 1 ;;
+esac
 
 rc-service acpid stop >/dev/null 2>&1   # power key would run poweroff after resume
 echo N > /sys/module/printk/parameters/console_suspend
@@ -41,14 +49,16 @@ echo +20 > /sys/class/rtc/rtc0/wakealarm
 
 setsid sh -c "
 	sleep 2
-	echo freeze > /sys/power/state; echo \"state write: \$?\" >> $LOG
+	echo \"$STATE entry \$(cut -d' ' -f1 /proc/uptime) pm_test=$LEVEL\" > /dev/pmsg0
+	echo $STATE > /sys/power/state; echo \"state write: \$?\" >> $LOG
 	$PROBE
 	{ echo; echo wakeup_irq: \$(cat /sys/power/pm_wakeup_irq 2>/dev/null)
 	  cat /sys/power/suspend_stats/* 2>/dev/null | head -20
 	  echo; cat /sys/kernel/debug/wakeup_sources; echo; dmesg; } >> $LOG 2>&1
 	echo none > /sys/power/pm_test
+	echo s2idle > /sys/power/mem_sleep
 	for d in /sys/devices/system/cpu/cpu*/cpuidle/state1/disable; do echo 0 > \"\$d\"; done
 	rc-service acpid start >/dev/null 2>&1
 	sync
 " </dev/null >/dev/null 2>&1 &
-echo "suspending in 2 s (pm_test=$LEVEL, flags:$FLAGS), log: $LOG"
+echo "suspending ($STATE) in 2 s (pm_test=$LEVEL, flags:$FLAGS), log: $LOG"

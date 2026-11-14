@@ -1,8 +1,12 @@
 # Deep sleep (suspend-to-RAM, `mem`): how it works on the 7870
 
-Status 2026-11-14: researched (vendor kernel + BL1/BL31 RE), not implemented. Plan order:
-survey (read only) -> pinctrl pad retention -> DTS sleep pins -> PMU sleep table -> suspend ops ->
-staged tests (pm_test platform/core, then real mem) -> clocks/regulators/measurement.
+Status 2026-11-14: kernel side written, not yet run on the phone. Kernel commits (a3y17lte):
+f56de1bae4a3 pinctrl pad retention, c8426396033e A3 power-down pin states, 53f0f832d75a PMU
+system sleep (exynos7870-pmu.c: SYS_PWR table, wake masks, sleep-window options, suspend ops).
+Next: install on Alpine, check the PDN registers against section 6, `s2idle.sh core mem`, then a
+real `s2idle.sh none mem` with the user at the phone. Left for later: vendor clock prep (top-mux
+gates, USB PHY mux, BUS_PLL off), PMIC sleep modes, current measurement. With the suspend ops in
+place `mem_sleep` defaults to `deep`: don't ship to pmOS before deep sleep is verified.
 
 Deep sleep is a PMU-sequenced system power-down. The kernel programs the PMU (per-block SYS_PWR
 table, central sequencers, wake masks), GPIO power-down states and pad retention, then calls PSCI

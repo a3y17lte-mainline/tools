@@ -97,8 +97,9 @@ Not done, roughly in planned order:
   S2MPU05 sleep modes (needs the user's yes), drain. Start with work/notes/deep-sleep.md: status
   header, section 9 (root causes and takeaways), sections 7, 8, 10 for details.
 - PDMA, PWM.
-- Audio follow-ups: UCM2 for pmOS, BT SCO through the mixer BT port, 192 kHz, jack wake,
-  volume up/down buttons with a 4-button headset.
+- Audio follow-ups: Bluetooth audio (A2DP and SCO over HCI need no kernel work; SCO over the
+  mixer BT port does). 192 kHz is skipped (card c2c link fixed at 48 kHz, TFA9896 max 48 kHz,
+  no audible benefit; steps in audio.md).
 - GPU follow-ups: sending the Mesa/GTK patches (see GPU section); build + shader-db the Mesa
   branches on main before the MR. Per-chip GPU voltages done and installed 2026-11-12 (group X).
 - Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.

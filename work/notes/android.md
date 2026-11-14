@@ -65,6 +65,11 @@ hand, `backport-kernel continue`.
 
 ## S-Boot direct boot (facts from TWRP's image + sboot.bin strings; not yet tested with our kernel)
 
+- S-Boot size limits (disassembly of the boot-image loader in mmcblk0boot0, 0x5cda0-0x5ce1c;
+  hit 2026-11-15 with the first LineageOS recovery, "Invalid RAMDISK LENGTH"): page-aligned
+  ramdisk <= 0xe00000 (14 MiB); kernel + ramdisk + 0x1000 <= 0x3d7ff00, the same again with
+  the dt added. So BOARD_RAMDISK_USE_XZ (recovery ramdisk 15.1 MB gzip -> 8.9 MB xz, kernel
+  RD_XZ=y); mkbootimg_samsung.py refuses images over the limits.
 - Boot image header v0, page 2048, raw arm64 Image (S-Boot cannot decompress), gzip ramdisk,
   DTBH v2 dt.img chosen by model_info-chip (7870) / hw_rev (2) / hw_rev_end, optional
   SEANDROIDENFORCE trailer. No AVB, dtbo, vendor_boot or bootconfig support.

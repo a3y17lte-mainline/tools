@@ -41,8 +41,9 @@ blobs come from the read-only `mainline` remote = src/linux) -> tools/android/ke
 regeneration replays them with no manual step (verified). After resolving a new conflict by
 hand, `backport-kernel continue`.
 
-- Series: 134 commits of src/linux master..a3y17lte (regenerated 2026-11-14 with the audio
-  commits, 188 steps, no new conflicts).
+- Series: 136 commits of src/linux master..a3y17lte (regenerated 2026-11-14 with the audio
+  commits and pin-switches, 190 steps; the card2 pin-switches commit needed the 6.18 helper
+  signatures (card, goto err): resolution in rr-cache).
 - Prerequisites (50): Exynos7870 DTS (DSI, J5/J7, I2C cells, property style), the field_get()
   series, the *alloc_obj/flex helpers (ACK has kmalloc_obj itself), the mfd sec S2MPG10/11 rework +
   rtc-s5m alarm IRQ, the S2MU005 stack, ssp_sensors state, regmap REGCACHE_FLAT_S, the Samsung
@@ -135,6 +136,6 @@ headers only, not built in the tree yet):
   stereo only; connected devices pick a libaudioroute path (mixer_paths.xml: speaker, earpiece,
   headphones, main-mic MIC1, second-mic MIC2, headset-mic MIC3). Control names and enum items
   checked against the phone's card. Jack: ASoC input device "a3y17lte Headset"
-  (config_useDevInputEventForAudioJack). Open: the loudspeaker has no switch (TFA9896 has none,
-  audio-graph-card2 does not parse pin-switches), so it plays with every output; effects HAL;
+  (config_useDevInputEventForAudioJack). The loudspeaker's "Speaker Switch" is a card pin switch
+  (mainline group BD: audio-graph-card2 parses pin-switches; tested on Alpine). Open: effects HAL;
   "Mono Mix" for the earpiece is (L+R)/2 (verify by ear).

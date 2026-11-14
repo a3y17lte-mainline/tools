@@ -76,7 +76,23 @@ BOOT boot.img; RECOVERY U-Boot (later Lineage recovery); SYSTEM super (system, s
 product, vendor as EROFS, one group of 4000 MiB - 4 MiB, non-A/B); CACHE /cache; HIDDEN /metadata
 (needs the user's yes); USERDATA /data f2fs + FBE. EFS is not mounted.
 
-## Graphics
+## Graphics (checked against android-17.0.0_r1 sources, 2026-11-14)
 
-Mesa Panfrost (GLES 3.1; no Vulkan on Midgard) + minigbm + drm_hwcomposer. The Mali blob HALs of
-the community trees are not usable.
+Mesa Panfrost (GLES 3.1; no Vulkan on Midgard) + drm_hwcomposer. The Mali blob HALs of the
+community trees are not usable.
+- AOSP 17 external/mesa3d (26.1.0-devel, meson2hermetic Android.bp) builds only gfxstream: no
+  EGL/gallium/kmsro/Panfrost. AOSP minigbm (allocator-service.minigbm, mapper.minigbm) has no
+  Exynos DRM + Panfrost backend; gbm_mesa is GloDroid's fork. drm_hwcomposer is fine
+  (android.hardware.composer.hwc3-service.drm).
+- So Mesa + gralloc need our own integration: GloDroid aospext (meson via Android.mk, last
+  updated 2025-08) or a Soong integration of our Mesa branch. Undecided.
+
+## HALs (checked against android-17.0.0_r1 / lineage-24.0)
+
+Real: health example (power_supply), usb example (/sys/class/typec), audio AIDL example (stub
++ r_submix until the codec), bluetooth default (HCI user channel via mgmt), wifi, LineageOS
+light (scans /sys/class/backlight), keymint/gatekeeper .nonsecure. No-op: power example.
+Fakes, not used: vibrator example (LineageOS's is timed_output; ours is input FF: write one),
+thermal example (constant 30.1 C: write one over the soc-thermal zone). Gadget example
+hard-codes 11110000.dwc3: not used, init.usb.configfs.rc path instead.
+hardware/samsung (lineage-24.0) has no dtbhtool any more: DTBH is built by the device packer.

@@ -85,7 +85,7 @@
  },
  "AU": {
   "code": "47eb20c27b0c9281",
-  "text": "319b4dc8454e70f4"
+  "text": "46759d7e2be12a04"
  },
  "AV": {
   "code": "c88274e8ac06af9e",
@@ -93,15 +93,35 @@
  },
  "AW": {
   "code": "72908dc22958ca32",
-  "text": "27302f699d851325"
+  "text": "45d2c4fb2bfa9e90"
  },
  "AX": {
   "code": "22071e4381765fe6",
   "text": "db794d29de7a1a61"
  },
+ "AY": {
+  "code": "dec6be7a2105b769",
+  "text": "1ccd2fc78b17016c"
+ },
+ "AZ": {
+  "code": "d033c4fcbb90e927",
+  "text": "2b00c91507d23310"
+ },
  "B": {
   "code": "b7d3d9019143bf9c",
   "text": "fb83e3d6ba3f6f89"
+ },
+ "BA": {
+  "code": "4e7230b323ce08db",
+  "text": "1e8cf3152208311f"
+ },
+ "BB": {
+  "code": "3b6eec69b6fe03d1",
+  "text": "a8402bec4f682805"
+ },
+ "BC": {
+  "code": "8117954f52e81697",
+  "text": "fe27f1b6b293659a"
  },
  "C": {
   "code": "e28424ed6eb71db1",

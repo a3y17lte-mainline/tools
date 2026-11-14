@@ -382,3 +382,13 @@ Plan: ~/.claude/plans/currently-an-agent-is-joyful-liskov.md (mixer -> TFA9896 a
 - Earpiece works (user-confirmed): right-channel tone at -30 dBFS, "Mono Mix" = Right, "Speaker Amp
   Input" = Left (the amp only plays left), "Earpiece Switch" on, "Earpiece Playback Volume" 0.
   During playback: 0x17 0x11, 0x37 0x80, 0x40 0x79, 0x50 0x10, 0x76 0x08, 0xd4 = 0xd7 (0x00).
+- Headphones work (user-confirmed, headset in the jack, "Headphone Switch" on by hand: no jack
+  detection yet). During playback: 0x17 0x12, 0x30/0x31 0x1a (-20 dB, set by the driver like the
+  vendor), 0x36 0x84 (HPL<-DACL, HPR<-DACR), 0x54 0xc1 (DNC on, HP alone), 0xd4/0xd5 = saved trims.
+- Capture works: test card routing IN1/IN2 <- MICBIAS1, IN3 <- MICBIAS2. 60 s recording, ADCL = MIC3
+  (headset), ADCR = MIC1 (main): speech clearly above a ~-75 dBFS floor on both (MIC1 speech about
+  -30..-37 dBFS rms; MIC3 clipped, but the mic was at the user's lips). Defaults after probe: MICn
+  Boost 2 (20 dB), MICn Volume 11, ADC volume 126 (0 dB). MIC2 not tested yet.
+- Kernel commits: codec binding + driver (EP, HP, MIC1-3). Jack/buttons get folded into the driver
+  commit. Still to do: MIC2, jack + buttons (IRQ gpa0-4, ADC ch2), board DT commit (card + port
+  properties in samsung-i2s.yaml and nxp,tfa989x.yaml), s2idle/mem with audio, tracker groups.

@@ -34,6 +34,9 @@ Bare-metal S-Boot payload probes for the Galaxy A3 2017 (no UART needed).
   iio-events.c   prints IIO events of a device (like the kernel's iio_event_monitor; the phone's
                  Alpine has no libc headers). Build with ./iio-events-build, copy to /usr/local/bin.
   ssp-cap.sh     60 s capture: proximity events + magnetometer/accelerometer buffers (header).
+  nfc-poll.c     minimal Linux NFC netlink client (Alpine has no neard/nfctool): nfc-poll up|down,
+                 nfc-poll poll SECONDS prints the targets found (protocols, SENS_RES/SEL_RES, UID).
+                 Build with ./nfc-poll-build, copy to /usr/local/bin. See work/notes/nfc.md.
 
 Build (from this directory):
   aarch64-linux-gnu-gcc -nostdlib -nostartfiles -Wl,-Ttext=0 -Wl,--build-id=none -o rebootdl.elf rebootdl.S

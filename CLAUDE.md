@@ -15,7 +15,7 @@ Read these first:
    tab output is ~55 KB of XML and gets saved to a file: strip the tags with a short python script.
    Its "Phase" status lines lag behind this file; this file wins.
 3. Upstream tracker, an HTML artifact with a db: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r.
-   42 groups (A..AO, Dp; U/V/W are Mesa/GTK) covering all 105 local kernel commits; none sent yet.
+   45 groups (A..AR, Dp; U/V/W are Mesa/GTK) covering all 112 local kernel commits; none sent yet.
    Waves: 1 = standalone, 2 = needs nothing unsent, 3 = board DT/drivers that depend on others, rfc.
    Don't summarise the groups here (that copy went stale): export and print them instead,
    `ArtifactData list groups out_dir=DIR`, then `tools/tracker-check DIR --show`.
@@ -50,6 +50,10 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
 - RTC + torch (2026-11-13): S2MPU05 RTC via mainline rtc-s5m (config only; hctosys + alarm IRQ),
   RT8547 flash LED (our leds-rt8547 + ExpressWire multi-bit write) as `white:flash`: torch 1-5
   (25-125 mA) and strobe. Tracker groups AG/AH. See work/notes/rtc-torch.md.
+- NFC (2026-11-14): Samsung S3NRN80 on hsi2c4 via mainline s3fwrn5 + our S3NRN80 support (FW_CFG
+  26 MHz before CORE_RESET, proprietary RF protocols) and the PMU NFC reference clock (exynos-clkout).
+  Reader mode: tags read with tools/probes/nfc-poll (no neard on Alpine). Never install
+  sec_s3fwrn5_firmware.bin. Tracker groups AP/AQ/AR. See work/notes/nfc.md.
 - GPU (2026-11-11): Panfrost on Mali-T830 with DVFS 343–1001 MHz (worst-case voltages, GPU cooling),
   patched Mesa + GTK on the installed postmarketOS (Phosh). See the GPU section.
 
@@ -76,7 +80,7 @@ Not done, roughly in planned order:
   NULL deref (group AI), and the CPUCL0 watchdog resuming from its reset values (s3c2410_wdt
   resume order vs the PMU automatic disable, fixed 2026-11-14; the old CPU0 hold is gone, so
   every tick freezes now). Wake sources: RTC/charger alarm, power key, USB plug (S2MU004 PMIC,
-  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-14, 105 commits). If
+  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-14, 112 commits). If
   ArtifactData is not offered in a session, record tracker changes in out/tracker/ledger.md. Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
   Details, tools and traps: work/notes/suspend.md.
@@ -177,7 +181,7 @@ Keep series small: one commit per logical change, follow-ups folded in.
   with ArtifactData (read first, pin if_version) whenever patches change, are regrouped, sent or reviewed,
   following "Series and tracker hygiene" below.
 - Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master =
-  v7.4-rc2; 105 as of 2026-11-14)
+  v7.4-rc2; 112 as of 2026-11-14)
 
 ## Display (command-mode panel, working 2026-11-09)
 

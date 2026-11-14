@@ -15,7 +15,7 @@ Read these first:
    tab output is ~55 KB of XML and gets saved to a file: strip the tags with a short python script.
    Its "Phase" status lines lag behind this file; this file wins.
 3. Upstream tracker, an HTML artifact with a db: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r.
-   33 groups (A..AF, Dp; U/V/W are Mesa/GTK) covering all 97 local kernel commits; none sent yet.
+   42 groups (A..AO, Dp; U/V/W are Mesa/GTK) covering all 105 local kernel commits; none sent yet.
    Waves: 1 = standalone, 2 = needs nothing unsent, 3 = board DT/drivers that depend on others, rfc.
    Don't summarise the groups here (that copy went stale): export and print them instead,
    `ArtifactData list groups out_dir=DIR`, then `tools/tracker-check DIR --show`.
@@ -76,10 +76,8 @@ Not done, roughly in planned order:
   NULL deref (group AI), and the CPUCL0 watchdog resuming from its reset values (s3c2410_wdt
   resume order vs the PMU automatic disable, fixed 2026-11-14; the old CPU0 hold is gone, so
   every tick freezes now). Wake sources: RTC/charger alarm, power key, USB plug (S2MU004 PMIC,
-  2026-11-14); sensor hub, touch keys and BT verified after resume. Tracker changes are pending in the local out/tracker/ledger.md:
-  the tracker db is far behind the branch (2026-11-14: 181 stale SHAs, new commits and a new
-  system sleep group missing; ArtifactData does reach it, when the tool is offered). Sync it
-  from the ledger, remapping by subject, before any push. Charging continues across suspend (the
+  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-14, 105 commits). If
+  ArtifactData is not offered in a session, record tracker changes in out/tracker/ledger.md. Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
   Details, tools and traps: work/notes/suspend.md.
 - Deep sleep (`mem`, 2026-11-14): works on the clean series (entry, RTC wake, display resume,

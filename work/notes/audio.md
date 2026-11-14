@@ -6,11 +6,11 @@ Speaker (TFA9896), earpiece, headphones, MIC1/MIC2/MIC3, jack plug + headset mic
 play button all work on Alpine with the committed series (groups AS-AX prerequisites, AY mixer, AZ
 TFA9896, BA codec, BB graph bindings, BC A3 sound DT); s2idle, mem and display blank pass with the
 card loaded. Card "a3y17lte" (audio-graph-card2). Details and test log: section 12. Follow-up:
-Bluetooth audio. Not planned: UCM2 (pmOS not a priority), jack wake (the IRQ works), 4-button test.
-192 kHz not planned (no audible benefit; pending the user's call): it would need the mixer AP DAI at 192 kHz with
-sysclk 49.152 MHz and HQ_EN, the codec MQS sequence (0x53, DNC off, DAC reset on the way back),
-and a card where the mixer->codec c2c link follows the rate (card2 parses one fixed `rate`; would
-need several c2c params or DPCM); the TFA9896 stops at 48 kHz, so it is headphones-only.
+none planned now. Decisions (user): 192 kHz is deliberately NOT implemented. Bluetooth audio
+needs no audio-driver work: A2DP (music, also on Android) is software over HCI. Only SCO (calls,
+headset mic) could use the hardware PCM path QCA9377 -> mixer BT port (gpz0, stock "route-ap-bt");
+revisit with the modem/call work, and check first whether SCO over HCI on the QCA9377 is enough.
+Also not planned: UCM2 (pmOS not a priority), jack wake (the IRQ works), 4-button headset test.
 
 ## Earlier status (2026-11-14): prerequisites done and verified on the phone
 

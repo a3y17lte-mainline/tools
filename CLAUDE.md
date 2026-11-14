@@ -76,8 +76,10 @@ Not done, roughly in planned order:
   NULL deref (group AI), and the CPUCL0 watchdog resuming from its reset values (s3c2410_wdt
   resume order vs the PMU automatic disable, fixed 2026-11-14; the old CPU0 hold is gone, so
   every tick freezes now). Wake sources: RTC/charger alarm, power key, USB plug (S2MU004 PMIC,
-  2026-11-14); sensor hub, touch keys and BT verified after resume. Tracker changes are pending in the local out/tracker/ledger.md
-  (the tracker db can't be reached from Claude Code). Charging continues across suspend (the
+  2026-11-14); sensor hub, touch keys and BT verified after resume. Tracker changes are pending in the local out/tracker/ledger.md:
+  the tracker db is far behind the branch (2026-11-14: 181 stale SHAs, new commits and a new
+  system sleep group missing; ArtifactData does reach it, when the tool is offered). Sync it
+  from the ledger, remapping by subject, before any push. Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
   Details, tools and traps: work/notes/suspend.md.
 - Deep sleep (`mem`, 2026-11-14): works on the clean series (entry, RTC wake, display resume,

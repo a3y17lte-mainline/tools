@@ -1,8 +1,8 @@
 # Suspend (s2idle) on the A3: state 2026-11-14
 
 s2idle (`echo freeze > /sys/power/state`) works: RTC alarm and power key wake, Wi-Fi loaded,
-11 of 11 cycles without the old CPU0 hold, with every tick frozen (2026-11-14). Deep sleep (`mem`) needs the vendor PMU sleep sequences and is
-not started.
+11 of 11 cycles without the old CPU0 hold, with every tick frozen (2026-11-14). Deep sleep (`mem`): researched,
+not implemented yet; see deep-sleep.md.
 
 ## The two bugs
 

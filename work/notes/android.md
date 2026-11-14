@@ -65,6 +65,14 @@ hand, `backport-kernel continue`.
 
 ## S-Boot direct boot (facts from TWRP's image + sboot.bin strings; not yet tested with our kernel)
 
+- First recovery boots (2026-11-15): LineageOS recovery runs (display, touch, keys, battery
+  level). Found on the way: CONFIG_LSM had no selinux (first-stage init aborts: no selinuxfs);
+  EXT4_FS_SECURITY missing (ext4 mounts fail with EOPNOTSUPP under SELinux: /cache);
+  a plain reboot returned to recovery: S-Boot follows PMU INFORM3, the vendor kernel writes
+  0x12345670 there on every normal reboot -> mode-normal in the reboot-mode node (ANDROID:
+  patch 0006 for now; TODO the same in the mainline series, it is an exynos7870.dtsi fix).
+  Not done: vendor also writes INFORM2 = 0x12345678 on reboot ("LPM mode prevention": no
+  charging-mode boot when a cable is in). Open: no adb device seen from the recovery yet.
 - S-Boot size limits (disassembly of the boot-image loader in mmcblk0boot0, 0x5cda0-0x5ce1c;
   hit 2026-11-15 with the first LineageOS recovery, "Invalid RAMDISK LENGTH"): page-aligned
   ramdisk <= 0xe00000 (14 MiB); kernel + ramdisk + 0x1000 <= 0x3d7ff00, the same again with

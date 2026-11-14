@@ -110,9 +110,10 @@ uses the voltage of the level above 667 MHz (`sw_volt_table`), and it posts the 
 to the modem mailbox (no modem here).
 
 Open questions before Stage 2:
-- The switching clock. The vendor table says 1334 MHz with mux 0/div 0 (= 667 MHz MIF), but BUS_PLL
-  runs at 1599 MHz on this unit. Find the PHY_CLK2X parent 1 in `S5E7870-cmu.c` and check its rate
-  (a peek of the relevant PLL/div) before any switch.
+- Switching clock (resolved 2026-11-14): PHY_CLK2X parent 1 = MUX_CLK_MIF_PHY_SWITCH (0x214, sel 0 =
+  MEDIA_PLL, 1 = MEDIA_PLL/2). MEDIA_PLL CON0 0xa0cd0400 = P4 M205 S0 = 1332.5 MHz, i.e. the
+  vendor's "1334 MHz" switch -> 666 MHz MIF. MEDIA_PLL is fixed (shared with other CMU outputs), so
+  the switch path needs no PLL change. (0x10460180 is an unmapped hole: peek SIGBUS, harmless.)
 - How the CMU PAUSE handshake interacts with the PMU sleep sequence (`mem`). The suspend path should
   go back to the boot level and timing set 0 first.
 

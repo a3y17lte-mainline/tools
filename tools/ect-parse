@@ -3,7 +3,7 @@
 
 S-Boot leaves the ECT at 0x90000000 (0x14000 bytes) on the Exynos 7870. Dump it with
 `/tmp/dump 0x90000000 0x14000` (tools/peek) while the a3y17lte DTS reserves that range.
-Port of the PLL, DVFS, ASV and GEN parts of vendor drivers/soc/samsung/ect_parser.c.
+Port of the PLL, DVFS, ASV, GEN, MINLOCK and TIMING parts of vendor drivers/soc/samsung/ect_parser.c.
 
   ect-parse FILE [DOMAIN-SUBSTRING ...]   (default filter: cpucl)
 """
@@ -108,6 +108,43 @@ def parse_gen(d, base):
     return out
 
 
+def parse_minlock(d, base):
+    """CPU-to-MIF minimum locks: per domain, (cpu kHz, MIF minimum kHz) pairs."""
+    _, _, doms = named_list(R(d, base))
+    out = {}
+    for name, off in doms:
+        r = R(d, base + off)
+        n = r.u32()
+        out[name] = [(r.u32(), r.u32()) for _ in range(n)]
+    return out
+
+
+# Column names of the 7870 DRAM timing table (vendor pwrcal S5E7870-drampara.c).
+TIMING_COLS = (
+    "drex_tick_granularity drex_mr4_sensing_cyc drex_dqs_osc_start_cyc "
+    "drex_termination_control drex_winconfig_write_odt drex_timing_row0 drex_timing_row1 "
+    "drex_timing_data_aclk drex_timing_data_mclk drex_timing_power0 drex_timing_power1 "
+    "drex_timing_etc1 pause_mrs0 pause_mrs1 pause_mrs2 pause_mrs3 pause_mrs4 "
+    "phy_dvfs_con0_set1 phy_dvfs_con0_set0 phy_dvfs_con0_set1_mask phy_dvfs_con0_set0_mask "
+    "phy_dvfs_con1_set1 phy_dvfs_con1_set0 phy_dvfs_con1_set1_mask phy_dvfs_con1_set0_mask "
+    "phy_dvfs_con2_set1 phy_dvfs_con2_set0 phy_dvfs_con2_set1_mask phy_dvfs_con2_set0_mask "
+    "phy_dvfs_con3_set1 phy_dvfs_con3_set0 phy_dvfs_con3_set1_mask phy_dvfs_con3_set0_mask"
+).split()
+
+
+def parse_timing(d, base):
+    """DRAM timing tables keyed by memory type (PMU DREX_CALIBRATION2 & 0xffff)."""
+    r = R(d, base)
+    parser_version, version, n = r.u32(), r.u32(), r.u32()
+    sizes = [(r.u32(), r.u32()) for _ in range(n)]
+    out = {}
+    for mem, off in sizes:
+        t = R(d, base + off)
+        nparam, nlevel = t.u32(), t.u32()
+        out[mem] = [[t.u32() for _ in range(nparam)] for _ in range(nlevel)]
+    return parser_version, version, out
+
+
 def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
@@ -154,6 +191,23 @@ def main():
                 for i, (f, uv) in enumerate(zip(dom["freqs"], t["uv"])):
                     en = t["level_en"][i] if t["level_en"] else "-"
                     print(f"   {f:9d} {en:>2}  " + " ".join(str(v) for v in uv))
+
+    if "MINLOCK" in blocks and want("minlock"):
+        for name, pairs in parse_minlock(d, blocks["MINLOCK"]).items():
+            print(f"\nMINLOCK {name}: (cpu_kHz -> MIF min kHz, 0 = no lock)")
+            for cpu, mif in pairs:
+                print(f"   {cpu:8d} -> {mif}")
+
+    if "TIMING" in blocks and want("timing"):
+        pv, tv, tables = parse_timing(d, blocks["TIMING"])
+        print(f"\nTIMING parser v{pv} version {tv}: {len(tables)} memory type(s)")
+        for mem, levels in tables.items():
+            print(f"  memory type {mem:#06x}: {len(levels)} levels x {len(levels[0])} params"
+                  " (level 0 = highest MIF level)")
+            names = TIMING_COLS if len(levels[0]) == len(TIMING_COLS) else \
+                [f"p{i}" for i in range(len(levels[0]))]
+            for i, nm in enumerate(names):
+                print(f"   {nm:26s} " + " ".join(f"{lv[i]:#010x}" for lv in levels))
 
     if "GEN" in blocks:
         for name, rows in parse_gen(d, blocks["GEN"]).items():

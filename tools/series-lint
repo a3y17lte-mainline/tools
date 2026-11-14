@@ -24,7 +24,9 @@ import sys
 
 USER = "Martin Štrobl <recordyletsplays@gmail.com>"
 # patches carried from others: author and their sign-offs are theirs
-CARRIED = {"extcon: add support for Samsung S2M series PMIC extcon devices"}
+CARRIED = {"extcon: add support for Samsung S2M series PMIC extcon devices",
+           # mainline fix after v7.4-rc2 (d00ba321499c), drop when rebasing onto rc3
+           "ASoC: soc-core: reset rtd->num_components after allocation"}
 # small follow-ups to earlier local commits that were reviewed and are separate changes on purpose
 REVIEWED_FOLLOWUPS = {
     "arm64: dts: exynos7870: Add GPU cooling",                       # group T, not CPU cooling
@@ -94,7 +96,8 @@ def main():
         carried = subj in CARRIED
         if author != USER and not carried:
             err(f"author {author}")
-        if BAD_AI.search(body) or (BAD_TAGS.search(body) and not carried):
+        # carried patches keep their upstream message verbatim
+        if not carried and (BAD_AI.search(body) or BAD_TAGS.search(body)):
             err("attribution/sign-off/AI line in the message")
         if SPAM_SUBJ.match(subj):
             err("fixup/wip subject: fold it")

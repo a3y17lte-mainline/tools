@@ -1,12 +1,34 @@
 # Audio on Exynos 7870 / Galaxy A3 2017: research for clean drivers
 
-Researched 2026-11-12. Sources: vendor `sound/soc/codecs/cod3026x.c` (+ `.h`),
-`sound/soc/codecs/exynos-audmixer-v2.c` (+ `exynos-audmixer-regs.h`; the A3 builds
-`CONFIG_SND_SOC_EXYNOS_AUDMIXER_VER=2`), `sound/soc/samsung/universal7870-cod3026-v2.c` (the
-machine driver actually built), `sound/soc/samsung/lpass-exynos7870.c`, `sound/soc/samsung/i2s.c`,
-`drivers/soc/samsung/pwrcal/S5E7870/` (clocks), stock DT, stock `/system/etc/mixer_paths.xml`.
-Nothing was run on the phone. Everything here except section 9 (board) is the same on every
-7870 phone with the Samsung reference audio (J5 2017 included).
+## Status (2026-11-14): prerequisites done and verified on the phone
+
+Kernel (branch a3y17lte, tracker groups AS-AX), config: PL330_DMA, RESET_SIMPLE built in;
+SOUND/SND_SOC/SND_SOC_SAMSUNG/SND_SAMSUNG_I2S/SND_SIMPLE_CARD/DMATEST modules (mkconfig).
+- AS: AUD_PLL -> pll_36xx. The rate table is the ECT's (`tools/ect-parse out/ect-a3y17lte.bin PLL`): P1 M30
+  K16213, S2/3/4 = 196608039 / 98304019 / 49152009 Hz. That replaces the P3 M91 K-16898 values
+  worked out in section 3. S-Boot leaves exactly the 98304019 setting (CON0 0xa01e0103, CON1 0x3f55,
+  LOCK 0xbb8). clk_summary now reads 98304019 (it was 97.5 MHz without K).
+- AT: `samsung,exynos7870-dispaud-reset` on reset-simple, with a 100 us .reset (reset_us in the match data).
+- AU: I2S `samsung,exynos7870-i2s` (i2sv5_i2s1_regs, NEED_RSTCLR, no SEC_DAI); its optional reset is pulsed at probe.
+- AV: pl330 pulses its reset at probe. **Why:** after a warm reboot (RST_STAT bit 29 SWRESET) S-Boot
+  hands the ADMA over dead: every register reads 0 (pl330 sees 1 channel, 0 peripherals), although
+  0x148f1000 reads 0 (released) and the gates are on. It is dead even with the ADMA node disabled,
+  so the kernel does not cause it, and one reset pulse revives it. Under the NFC kernel (probably a
+  cold boot) it was alive. The vendor pulses all audio resets at every DISPAUD power-up; the I2S,
+  and later the mixer, need the same.
+- AW: DT nodes. The ADMA periphid is pinned (0x00341330, read back on the phone) because the AMBA
+  bus reads the ID before the driver can pulse the reset. I2S0 is disabled until a board adds a card.
+- AX: carried mainline fix d00ba321499c. Since 4dd10fbbeb9c, `devm_kzalloc_flex()` presets
+  `rtd->num_components`, so every ASoC card registered without a PCM device. Drop it at the rc3 rebase.
+Verified 2026-11-14 on Alpine:
+- dmatest gave 0 failures, after warm reboots and after deep sleep.
+- A test-only DT (I2S0 + simple-audio-card + `linux,spdif-dit`, SND_SOC_SPDIF=m; not committed)
+  played 5 s of 48 kHz S16_LE silence in 4.97 s with 40 ADMA IRQs (GIC hwirq 105).
+- s2idle and deep sleep cycles were fine (RTC wake, display connected).
+Phone state from S-Boot (section 10 reads): every DISPAUD audio gate is on, 0x148f1000 = 0, and
+PMU 0x80 = 0. The MI2S divider is 1 (98.3 MHz), the MIXER divider is 2, and both MUXes select AUD_PLL.
+Next: the S1402X mixer driver (section 7). It must pulse its reset like the I2S does. Then the
+COD3026X codec.
 
 ## 1. The chain
 

@@ -18,6 +18,8 @@ Status 2026-11-14: planning done, repos created, kernel backport starting. Full 
 | kernel_samsung_exynos7870 | src/android/kernel/samsung/exynos7870 | lineage-24.0 |
 | device_samsung_a3y17lte | src/android/device/samsung/a3y17lte | lineage-24.0 |
 | vendor_samsung_a3y17lte | src/android/vendor/samsung/a3y17lte | lineage-24.0 |
+| external_mesa (to be created) | src/android/external/mesa | lineage-24.0 |
+| external_minigbm (to be created) | src/android/external/minigbm | lineage-24.0 |
 
 - vendor_samsung_a3y17lte is **public by the user's decision** (2026-11-14): it carries the 4 firmware
   files of device/.../proprietary-files.txt (Wi-Fi/BT; the rest of work/firmware stays local).
@@ -25,7 +27,8 @@ Status 2026-11-14: planning done, repos created, kernel backport starting. Full 
   blob:none clone could not be pushed; 4.25 GB, pushed in history steps under GitHub's 2 GB
   limit). Remotes: origin = ACK, torvalds = kernel.org (prerequisites), mainline = src/linux
   (fetch only), gh = GitHub. It never shares a worktree, .config or out dir with src/linux.
-- Device tree: lineage.dependencies pulls the kernel, vendor and hardware/samsung (dtbhtoolExynos).
+- Device tree: lineage.dependencies pulls the kernel and vendor. android-host-arm64's local
+  manifest has all five: device, vendor, kernel, external/mesa, external/minigbm.
 - Android tooling lives in tools/android/ and touches nothing the mainline work uses.
 
 ## Kernel: tools/android/backport-kernel (status 2026-11-14: builds clean, not booted yet)
@@ -76,23 +79,51 @@ BOOT boot.img; RECOVERY U-Boot (later Lineage recovery); SYSTEM super (system, s
 product, vendor as EROFS, one group of 4000 MiB - 4 MiB, non-A/B); CACHE /cache; HIDDEN /metadata
 (needs the user's yes); USERDATA /data f2fs + FBE. EFS is not mounted.
 
-## Graphics (checked against android-17.0.0_r1 sources, 2026-11-14)
+## Graphics (decided 2026-11-14: our Mesa)
 
-Mesa Panfrost (GLES 3.1; no Vulkan on Midgard) + drm_hwcomposer. The Mali blob HALs of the
-community trees are not usable.
-- AOSP 17 external/mesa3d (26.1.0-devel, meson2hermetic Android.bp) builds only gfxstream: no
-  EGL/gallium/kmsro/Panfrost. AOSP minigbm (allocator-service.minigbm, mapper.minigbm) has no
-  Exynos DRM + Panfrost backend; gbm_mesa is GloDroid's fork. drm_hwcomposer is fine
-  (android.hardware.composer.hwc3-service.drm).
-- So Mesa + gralloc need our own integration: GloDroid aospext (meson via Android.mk, last
-  updated 2025-08) or a Soong integration of our Mesa branch. Undecided.
+Mesa Panfrost (GLES 3.1; no Vulkan on Midgard: panvk does not support it) + minigbm +
+drm_hwcomposer. The Mali blob HALs of the community trees are not usable, and AOSP/upstream Mesa
+is not either: it lacks our Midgard compiler fixes and the renderonly fix.
+- AOSP 17 external/mesa3d (meson2hermetic Android.bp) builds only gfxstream: left alone (other
+  projects reference its modules). Our Mesa is a second tree, `external/mesa`
+  (a3y17lte-mainline/external_mesa, full upstream history, branch lineage-24.0 = the a3-26.2.6
+  series, same patches as the pmOS fork). It builds with upstream's android/Android.mk
+  (BOARD_MESA3D_USES_MESON_BUILD, runs host meson with the Android clang): libEGL_mesa,
+  libGLESv1_CM_mesa, libGLESv2_mesa, libgallium_dri. Module names do not clash with mesa3d's.
+- Panfrost precompiles CL kernels (libpan) with mesa_clc + vtn_bindgen2 + panfrost_compile,
+  which need LLVM + SPIRV-LLVM-Translator: android-host-arm64 setup.sh builds them natively from
+  external/mesa into /usr/local/bin, the device passes -Dmesa-clc=system -Dprecomp-compiler=system.
+  The same options build here in 48 s (Fedora, LLVM 23; libclc not needed).
+- minigbm: our fork a3y17lte-mainline/external_minigbm replaces AOSP's (remove-project in the
+  local manifest): one commit adds `exynos` to the dumb-buffer drivers (render node, WC
+  non-contiguous GEM through the IOMMU; DECON scans out, Panfrost imports by PRIME). Small enough
+  to send to ChromiumOS minigbm. Mesa picks the GPU with drm.gpu.vendor_name=panfrost.
+- Kernel: DMABUF_HEAPS + DMABUF_HEAPS_SYSTEM added (minigbm, Codec2).
+- sphal libraries (Mesa, mapper.minigbm, libdrm, libui, libgralloctypes, mapper@4.0) labelled
+  same_process_hal_file: VERIFY the list with readelf -d after the first build.
 
 ## HALs (checked against android-17.0.0_r1 / lineage-24.0)
 
 Real: health example (power_supply), usb example (/sys/class/typec), audio AIDL example (stub
 + r_submix until the codec), bluetooth default (HCI user channel via mgmt), wifi, LineageOS
 light (scans /sys/class/backlight), keymint/gatekeeper .nonsecure. No-op: power example.
-Fakes, not used: vibrator example (LineageOS's is timed_output; ours is input FF: write one),
-thermal example (constant 30.1 C: write one over the soc-thermal zone). Gadget example
-hard-codes 11110000.dwc3: not used, init.usb.configfs.rc path instead.
+Gadget example hard-codes 11110000.dwc3: not used, init.usb.configfs.rc path instead.
 hardware/samsung (lineage-24.0) has no dtbhtool any more: DTBH is built by the device packer.
+
+Ours, in device/samsung/a3y17lte/aidl/ (written 2026-11-14, compile-checked against mock
+headers only, not built in the tree yet):
+- vibrator (IVibrator V4): regulator-haptic is an input FF device (FF_RUMBLE) at one voltage
+  (LDO32 3.325 V min = max), so on/off only. One endless effect (replay.length 0: ff-memless
+  plays until stopped; closing the fd erases it), timing by the HAL. TICK 10, CLICK 20,
+  HEAVY_CLICK 30 ms, DOUBLE_CLICK 20 + 100 + 20 ms, strength scales 0.75/1/1.25: tune by feel.
+- thermal (IThermal V3): zones by type. soc-thermal = CPU, GPU and SKIN (virtual skin sensor:
+  ThermalManagerService uses SKIN only); battery-thermal = BATTERY. Cooling devices
+  cpufreq-cpu0/4 (CPU), devfreq-11400000.gpu (GPU).
+
+| Sensor | LIGHT | MODERATE | SEVERE | CRITICAL | EMERGENCY | SHUTDOWN |
+|---|---|---|---|---|---|---|
+| CPU/GPU (soc) | | | 76 (kernel passive) | | | 110 (kernel critical) |
+| SKIN (soc, starting values) | 60 | 66 | 72 | 76 | 95 | 105 |
+| BATTERY | | | 50 | | | 60 |
+
+  2 C hysteresis; polling 5 s, 1 s once anything is above NONE. Test: emul_temp on soc-thermal.

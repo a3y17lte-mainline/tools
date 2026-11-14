@@ -41,6 +41,8 @@ blobs come from the read-only `mainline` remote = src/linux) -> tools/android/ke
 regeneration replays them with no manual step (verified). After resolving a new conflict by
 hand, `backport-kernel continue`.
 
+- Series: 134 commits of src/linux master..a3y17lte (regenerated 2026-11-14 with the audio
+  commits, 188 steps, no new conflicts).
 - Prerequisites (50): Exynos7870 DTS (DSI, J5/J7, I2C cells, property style), the field_get()
   series, the *alloc_obj/flex helpers (ACK has kmalloc_obj itself), the mfd sec S2MPG10/11 rework +
   rtc-s5m alarm IRQ, the S2MU005 stack, ssp_sensors state, regmap REGCACHE_FLAT_S, the Samsung
@@ -104,8 +106,7 @@ is not either: it lacks our Midgard compiler fixes and the renderonly fix.
 
 ## HALs (checked against android-17.0.0_r1 / lineage-24.0)
 
-Real: health example (power_supply), usb example (/sys/class/typec), audio AIDL example (stub
-+ r_submix until the codec), bluetooth default (HCI user channel via mgmt), wifi, LineageOS
+Real: health example (power_supply), usb example (/sys/class/typec), bluetooth default (HCI user channel via mgmt), wifi, LineageOS
 light (scans /sys/class/backlight), keymint/gatekeeper .nonsecure. No-op: power example.
 Gadget example hard-codes 11110000.dwc3: not used, init.usb.configfs.rc path instead.
 hardware/samsung (lineage-24.0) has no dtbhtool any more: DTBH is built by the device packer.
@@ -127,3 +128,13 @@ headers only, not built in the tree yet):
 | BATTERY | | | 50 | | | 60 |
 
   2 C hysteresis; polling 5 s, 1 s once anything is above NONE. Test: emul_temp on soc-thermal.
+- audio (2026-11-14, aidl/audio): the AOSP example services are APEX-only and their primary
+  module is the emulator's (StreamPrimary paces and skips buffers). Ours links
+  libaudioserviceexampleimpl (Config, r_submix, usb) with its own "default" module: StreamAlsa
+  streams (like USB) on card "a3y17lte" PCM 0 (found via /proc/asound/a3y17lte), 48 kHz S16
+  stereo only; connected devices pick a libaudioroute path (mixer_paths.xml: speaker, earpiece,
+  headphones, main-mic MIC1, second-mic MIC2, headset-mic MIC3). Control names and enum items
+  checked against the phone's card. Jack: ASoC input device "a3y17lte Headset"
+  (config_useDevInputEventForAudioJack). Open: the loudspeaker has no switch (TFA9896 has none,
+  audio-graph-card2 does not parse pin-switches), so it plays with every output; effects HAL;
+  "Mono Mix" for the earpiece is (L+R)/2 (verify by ear).

@@ -1,11 +1,21 @@
 # Deep sleep (suspend-to-RAM, `mem`): how it works on the 7870
 
-Status 2026-11-14 (afternoon): real `mem` entry hangs; the PMU central sequencer starts and
-stops at its state 0x2d (section 7). Kernel commits (a3y17lte, not pushed): f56de1bae4a3 pinctrl
-pad retention, c8426396033e A3 power-down pin states (verified: CON_PDN/PUD_PDN = stock),
-53f0f832d75a PMU system sleep + fixup (CPU0 local PWR_CFG kept on in sleep, as the vendor),
-1e2e1051e92b clk: PHY user muxes to OSC for suspend. pm_test platform/core pass. With the
-suspend ops in place `mem_sleep` defaults to `deep`: don't ship to pmOS before it works.
+Status 2026-11-14 (evening): **entry, RTC wake and display resume work** (kernel #145, debug
+build). Entry hang = gated CMU_MIF top clocks (section 7). Display after sleep = two independent
+defects that any DISPAUD power loss exposes (section 8): the display content firewall has to be
+set up again through the EL3 firmware, and the DSIM has to start the HS clock only after the
+panel reset. Verified by registers on the phone (60 Hz frame counter, sysmmu idle, DSIM INTSRC
+0x01080000, TE present), with the display blanked and with it on + fbcon bound (no panic), with
+and without the debug DISPAUD power cycle. Open: the user's visual confirmation, reducing the
+DSIM change to the minimal set and cleaning the debug code out, tm2-touchkey reads (-6) twice
+during resume, wake sources, sleep modes of the S2MPU05 rails, drain numbers.
+Kernel commits (a3y17lte, not pushed): f56de1bae4a3 pinctrl pad retention, c8426396033e A3
+power-down pin states (verified: CON_PDN/PUD_PDN = stock), 53f0f832d75a PMU system sleep + fixup
+c68dd03b80bc (CPU0 local PWR_CFG kept on in sleep, as the vendor), 1e2e1051e92b clk: PHY user
+muxes to OSC for suspend, 7b2d45d8a4ae clk: CMU_MIF top clock enables on for suspend (verified
+run 124), 0c1e0e72b5eb imagis power cycle at probe, 16dabf2568fe DSIM M_PLL_CTRL1. The fixup and
+1e2e1051e92b's FSYS/ISP parts are not verified individually. With the suspend ops in place
+`mem_sleep` defaults to `deep`.
 
 Deep sleep is a PMU-sequenced system power-down. The kernel programs the PMU (per-block SYS_PWR
 table, central sequencers, wake masks), GPIO power-down states and pad retention, then calls PSCI
@@ -139,19 +149,11 @@ Raw output: out/sleep-survey-20261114.txt (read only: peek + i2cget -f, Alpine, 
   (BUCK1 and most LDOs 0x1 = off in sleep, BUCK2-5 0x2 = low power). Nothing switches off in sleep
   until the regulator step: safe first, savings later.
 
-## 7. Entry hang analysis (2026-11-14)
+## 7. Entry hang: gated CMU_MIF top clocks (solved 2026-11-14)
 
-Probes (debug-only code in exynos7870_suspend_enter, not in the series):
-- Watchdog armed right before the PSCI call (PMU 0x408/0x40c bit 23 cleared, WTCON 0x7739,
-  WTCNT 0xabe0 = ~10 s at ~4.4 kHz): a stall in BL31's WFI loop self-resets (RST_STAT bit 23);
-  a real power-down would stop the watchdog (PERI clocks stop). Result: self-reset, so the SoC
-  never powered down. RTC and power key wake did nothing in the runs without it.
-- Pending IRQ before the call (CNTV fires at once, `exynos_pmu.dbg_abort=1`): BL31 takes its
-  ISR_EL1 abort path and returns -3 ("PM: sleep aborted"); the phone stays up. So both secure
-  suspend hooks and the iRAM save pass; the hang is after: GICC_CTLR off (0x104e2000 [1:0] = 0),
-  set/way clean+inv of all levels (0x02031c74), checksum, CPUECTLR.SMPEN = 0, WFI forever.
-- PMUDBG registers survive a watchdog reset (control: a plain runtime watchdog reset leaves
-  CENTRAL_SEQ 0, NONCPU 0x00080000, L2 0, CPU0 0x105b0000, other CPUs 0x104b0000):
+Symptom: with the SYS_PWR table, options and sleep pins all equal to the vendor SLEEP setup,
+`mem` never powered down; the debug watchdog (below) self-reset the phone ~10 s after the
+PSCI call. PMUDBG after that reset (control: a plain runtime watchdog reset):
 
   | PMUDBG (PMU +)           | after the sleep hang | plain WDT reset |
   |--------------------------|----------------------|-----------------|
@@ -161,18 +163,126 @@ Probes (debug-only code in exynos7870_suspend_enter, not in the series):
   | CPUCL0_L2 / CPUCL1_L2    | 0x10000000 / 0x10080000 | 0 / 0        |
   | CPUCL0_NONCPU / CL1      | 0x000e0000 / 0x005e0000 | 0x00080000   |
 
-  Cluster 1 = its measured "off" values (cpuidle.md). Cluster 0 matches SLEEP's targets
-  (L2_SYS_PWR 0x7 keeps L2 on; CPU/NONCPU 0x8). So the central sequencer itself stops at state
-  0x2d and never starts the MIF sequencer. No decoding of the state numbers exists in the vendor
-  tree (PMUDBG only appears in the register headers).
+The CPU side reached its SLEEP targets; the central sequencer stopped at state 0x2d and never
+started the MIF sequencer. (No decoding of the state numbers exists in the vendor tree.)
 
-Ruled out by evidence: SYS_PWR table and option registers (129/129 + 4 equal to the vendor
-SLEEP column), CPU/NONCPU/L2/duration options (bit-equal to syspwr_init), IDLE_IP_MASK (reset
-0xffffffff = vendor SLEEP), ALIVEIRAM_OPTION bit 4 (0x11: BL1 would take the warm path), top
-CMU gates and domain bus/APB gates (all on), USE_L2QACTIVE (already off), all four domains on.
-BL31 afflvl 3 skips the core/cluster flush+CCI routine and calls the sleep routine directly,
-the same for the vendor kernel (its finisher passes afflvl 3, id 0, type 0, nothing else).
+**Cause.** At suspend our drivers gate their top-level clocks. The vendor kernel force-enables
+all of them before every non-AFTR sleep: topmux_enable() in pwrcal/S5E7870/S5E7870-syspwr.c sets
+bit 21 of CMU_MIF 0x264..0x2cc (CLK_CON_MUX_CLKCMU_*) and bit 0 of 0x864..0x8cc
+(CLK_ENABLE_CLKCMU_*, 27 registers). A snapshot of 344 CMU registers at sleep entry showed seven
+enables at 0: FSYS_MMC0/1/2 (0x888/0x88c/0x890), FSYS_USB20DRD_REFCLK (0x89c),
+PERI_UART_BTWIFIFM (0x8a4), PERI_UART_DEBUG (0x8a8), PERI_SPI_SENSORHUB (0x8c0). All mux gates
+(bit 21) were already on, all 10 PLLs enabled and locked, no mux stuck. Forcing the enables on
+(debug switch, nothing else changed) gave the first real sleep and RTC wake (status header).
 
-Remaining vendor differences, not yet tested: BUS_PLL off + MIF mux / FSYS_BUS divider /
-DECON VCLK mux before SLEEP; genpd has G3D/ISP/MFCMSCL/DISPAUD already off in the vendor;
-CP and GNSS are running in the vendor (here: never booted; CP/GNSS central sequencers idle).
+**Fix** (own commit, upstream code): `mif_suspend_regs` in clk-exynos7870.c writes 1 to the 25
+CLK_CON_GAT_MIF_CMU_* enables mainline defines in 0x864..0x8cc (0x894/0x898 UFSUNIPRO are not in
+mainline and were on anyway), like `top_suspend_regs` in clk-exynos5433.c; the samsung clk
+syscore resume restores the saved values. Whether all of them are needed or only the seven is
+untested; the vendor and Exynos5433 force all. Verify on the phone: the debug line "DBG MIF
+CLK_ENABLE ... off mask" must read 0 (without the fix: 0x00834e00). Verified 2026-11-14,
+kernel #124 (commit + watchdog/abort debug only, no dbg_topgate): mask 00000000, "PM: woke up,
+WAKEUP_STAT 80000001", "Timekeeping suspended for 16.800 seconds", wake IRQ 54 = gpa0-2 (S2MPU05,
+RTC alarm), devices resumed in 3.6 s; then the same display failure as the first wake (DSI xfer
+timeout -> vblank WARN -> flip_done -> DPM watchdog panic at +20 s). The screen was on at entry
+(fb0 `blank` read 4, but the screen was lit: that attribute is not a reliable state).
+Log: out/deep-sleep-run124-pstore-20261114.txt.
+
+Shown NOT needed for entry (each tested with the gates forced on, or ruled out before):
+BUS_PLL off / MIF mux / FSYS_BUS divider / DECON VCLK mux prep (vendor syspwr_prepare), media
+power domains off before sleep (vendor genpd state), CP/GNSS central sequencers enabled, EINT
+and wake mask changes, IDLE_IP_MASK, ALIVEIRAM_OPTION, USE_L2QACTIVE. BL31 afflvl 3 calls its
+sleep routine (0x0202e8f0) directly, as for the vendor; it writes no clock or SYS_PWR register.
+
+**Probes that found it** (debug-only, the full set is saved as
+out/deep-sleep-debug-full-20261114.patch; the working tree now keeps only the first two):
+- Watchdog armed right before the PSCI call (PMU 0x408/0x40c bit 23 cleared, WTCON 0x7739,
+  WTCNT 0xabe0 = ~10 s): a stall self-resets (RST_STAT bit 23), a real power-down stops it.
+- `exynos_pmu.dbg_abort=1`: a pending CNTV IRQ makes BL31 return -3 ("PM: sleep aborted"), so
+  the whole entry path runs without sleeping (secure hooks, iRAM save, then GICC off, set/way
+  clean, SMPEN = 0, WFI).
+- PMUDBG (0x10480f00 central, 0xf04 MIF, 0xf08.. CPUs, 0xf30/34 L2, 0xf38/3c NONCPU) are the
+  STATUS registers latched at a warm reset; they survive a watchdog reset, Power+VolDown clears
+  them.
+- CMU snapshot of the vendor cmusfr.h register list at entry, printed after resume (344 lines:
+  floods the 16 KiB pstore, which is why it was removed).
+
+## 8. Display after a DISPAUD power loss (solved 2026-11-14)
+
+Symptom: after a real deep sleep the display never came back; with fbcon bound the resume hit
+the 20 s DPM watchdog. Two symptoms: the first enable after the wake got no TE from the panel
+and DSI commands timed out; a second enable (blank/unblank) sent exactly 7 frames and stalled.
+
+**It is not about system sleep.** A local DISPAUD power-off/on alone reproduces both, in 30 s
+and with no sleep: `echo 1 > /sys/module/exynos_pmu/parameters/dbg_abort` (debug build; BL31
+refuses the sleep after the kernel has cycled DISPAUD, "PM: sleep aborted", timekeeping
+suspended 0.002 s), display blanked, `s2idle.sh none mem quiet`, then unblank. Check that the
+cycle happened ("PM: sleep aborted" in dmesg and DSIM CLKCTRL 0x14800010 = 0x000000ff): a
+suspend refused earlier (alarmtimer -16) leaves DISPAUD untouched and the test means nothing.
+Boot and runtime blank/unblank only work because the state S-Boot set up is still there.
+
+### 8.1 Content firewall (the "7 frames, then stall")
+
+- The 7 frames are background only: the plane is committed after the enable. The stall is the
+  DECON's first memory read. Stalled state: DECON VIDCON1 (0x14830600) = 0x00006600 (ACTIVE,
+  line 0), frame FIFO 0x1483052c = 0, frame counter 0x148307fc = 7 (it counts at 60 Hz when
+  working), sysmmu STATUS 0x14860008 = 0xa for good (working: 0, rarely 0x8) and an empty sysmmu
+  L1 TLB (0x14860750 select, 0x754/0x75c/0x764: all 0; working: 8 valid entries), bridge
+  QCH_CTRL ASYNCM_LH_DISPAUD_MIF_D_RT (CMU_MIF 0x2020) busy bit 10 set for good. So the sysmmu's
+  first page table walk never completes.
+- Everything readable is equal to the working state: DECON 0-0x2000, DSIM, the whole sysmmu
+  page, all of CMU_DISPAUD, DREX 0x10400000-0x400, SYSREG_MIF. Only SYSREG_DISPAUD 0x148f0600
+  (DISPAUD_QOS_CON) differs, 0x00444444 after the power loss against S-Boot's 0x00444aaa (DECON
+  AxQoS 0xA, vendor BTS default). Restoring it by hand changes nothing: QoS is not the cause.
+- Cause: the display **content firewall** (CFW, clock gate CMU_DISPAUD 0x818
+  "SECURE_CFW_DISP"), a secure block between DISPAUD and the memory bus. It loses its state with
+  the domain and blocks every read until the EL3 firmware programs it again. The vendor DECON
+  driver does that after every power-on, right after its runtime resume (decon_core.c, two
+  call sites): `exynos_smc(MC_FC_SET_CFW_PROT 0x82002040, MC_FC_DRM_SET_CFW_PROT 0x10000000,
+  DECON_CFW_OFFSET 3, 0)`, expected return 2 (SMC_TZPC_OK). MSCL and JPEG do the same with
+  their own IDs (include/linux/smc.h PROT_*, "CFW permission").
+- Proof: tools/probes/cfw-disp (one-shot module, makes that SMC) on the stalled display:
+  returned 2, the stuck read completed at once, frame counter running, sysmmu STATUS 0. Issued
+  before the enable (display blanked, the DISPAUD bus gates stay on), the second enable is clean.
+- Fix: exynos7_drm_decon makes the call in atomic_enable after the runtime resume (7870 only).
+
+### 8.2 DSIM start order (no TE on the first enable)
+
+- Trace (debug prints of the DSIM registers at each init step): after a power loss the DSIM
+  starts from reset values (CLKCTRL 0xff, PLL/PHY registers 0, the PHY clock user muxes
+  0x148d0224/0x228 mid-switch: 0x04201000, status 0). At boot and at runtime the PLL, PHY and
+  CLKCTRL values of the previous session survive SWRST and the runtime suspend.
+- Replaying the bring-up by hand (/root/dsim-steps.sh on the phone: one poke per named step,
+  display blanked; the DSIM is readable while blanked):
+  - mainline order (SWRST, PLL, CLKCTRL with esc/byte clocks and the HS request, PHY, CONFIG,
+    lanes): INTSRC bit 0 at the lane enable. Bit 0 is ErrContentLP1 (LP1 contention) in the
+    older Samsung DSIM headers. DPHY_STATUS 0x40f at once (clock lane HS-ready).
+  - without SWRST: same. With the lanes enabled before the esc/byte clocks (vendor order): no
+    contention flag, with or without SWRST. The HS request then takes the clock lane to
+    HS-ready (0x40f) at once, also in the vendor order: that is normal.
+- Kernel tests, first enable after a verified power cycle:
+  - PHYCTRL + PHY timing before the PLL enable (#143): no change.
+  - lanes before the esc/byte clocks (#144): contention flag gone, still no TE.
+  - panel commands in LP mode (#144, dbg_lpm): still no TE, so not the HS data path.
+  - plus the HS clock request (and standby) only at the first transfer, after the panel has
+    been powered and reset with the lanes in stop state (#145): **works**.
+- So mainline requests the HS clock before the panel is out of reset; from a reset DSIM the
+  clock lane then really is in HS when the panel starts, and the panel never syncs (no TE). The
+  vendor kernel and S-Boot: PLL, lanes, wait for stop state, esc/byte clocks, CONFIG, panel
+  reset, then HS request + standby.
+- Not known yet: which of the #145 changes are needed beyond the late HS request (lanes before
+  clocks, DSIM init before the panel power, timings at init, clearing a stale HS request).
+- Earlier "not sufficient" verdicts (deferred HS request, PHY before PLL, ...) were judged on a
+  display that the firewall kept dark anyway and with the other defect still in: void.
+
+### 8.3 Tools and traps
+
+- /root/disp-all.sh (DECON 0-0x2000, DSIM, sysmmu, DISPAUD sysreg, all of CMU_DISPAUD),
+  /root/mem-path.sh (DREX, SYSREG_MIF, SYSREG_DISPAUD), /root/dsim-steps.sh; dumps in
+  out/ds-*-141-*.txt, working diff of #145 in out/deep-sleep-display-work-145.patch.
+- Health check without looking at the screen: frame counter 0x148307fc rising by ~60/s, sysmmu
+  STATUS 0x14860008 = 0, DSIM INTSRC 0x14800034 = 0x01080000, TE pin gpe0-2 high in 2-6 of 300
+  samples of 0x139b01a4.
+- A blank from the failed state takes ~30 s (command and vblank timeouts): bound the ssh call.
+- Test with fbcon unbound first (no DPM watchdog panic): `echo 0 >
+  /sys/class/vtconsole/vtcon1/bind`, `echo 1 > /sys/class/graphics/fb0/blank`.

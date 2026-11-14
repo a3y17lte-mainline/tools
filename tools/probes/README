@@ -8,6 +8,15 @@ Bare-metal S-Boot payload probes for the Galaxy A3 2017 (no UART needed).
                  the vendor SMC, prints them, then refuses to load. Build with the kernel's Kbuild
                  (make ARCH=arm64 -C <kernel out dir> M=$PWD/asv-fuse) and insmod on the phone.
                  Superseded in practice by exynos7870-asv, which logs the group at boot.
+  cfw-disp/      kernel module (not a payload): makes the vendor DECON driver's content firewall SMC
+                 (MC_FC_SET_CFW_PROT, group 3) once, prints the result (2 = ok), then refuses to
+                 load. Unblocks the DECON's memory reads after a DISPAUD power loss on kernels
+                 without the exynos7_drm_decon fix (work/notes/deep-sleep.md section 8.1). Build as
+                 asv-fuse; insmod with the display enabled or blanked.
+  dsim-steps.sh  phone, Linux, display blanked: DSIM bring-up by hand, one poke per named step
+                 (phyon swrst pll phy fifo cfg lanes clk hs ... off), printing LINK/DPHY status,
+                 INTSRC, CLKCTRL and CONFIG after each. Found the lane/clock order defect
+                 (deep-sleep.md section 8.2). Only meaningful right after a DISPAUD power cycle.
   ssp-probe.c    userspace sensor hub probe (phone, Linux): WHOAMI, FIRMWARE_REV and
                  SENSOR_SCANNING over spidev + GPIO chardev, read commands only; never touches the
                  MCU reset or BOOT0 lines. Build with ./ssp-probe-build (needs the kernel uapi

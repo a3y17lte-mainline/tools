@@ -17,7 +17,7 @@ Bluetooth HAL never sees it.
  1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts b/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
-index bb2c4a4a0cd9..673d7c82dde7 100644
+index ab1139a8dadf..6db769873fd8 100644
 --- a/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
 +++ b/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
 @@ -17,6 +17,16 @@
@@ -37,7 +37,7 @@ index bb2c4a4a0cd9..673d7c82dde7 100644
  	chassis-type = "handset";
  
  	aliases {
-@@ -776,6 +786,8 @@ &mmc1 {
+@@ -938,6 +948,8 @@ &mmc1 {
  	wifi@1 {
  		compatible = "qcom,ath10k";
  		reg = <1>;
@@ -46,7 +46,7 @@ index bb2c4a4a0cd9..673d7c82dde7 100644
  	};
  };
  
-@@ -1119,6 +1131,8 @@ &serial1 {
+@@ -1288,6 +1300,8 @@ &serial1 {
  
  	bluetooth {
  		compatible = "qcom,qca9377-bt";

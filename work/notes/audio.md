@@ -7,7 +7,7 @@ play button all work on Alpine with the committed series (groups AS-AX prerequis
 TFA9896, BA codec, BB graph bindings, BC A3 sound DT); s2idle, mem and display blank pass with the
 card loaded. Card "a3y17lte" (audio-graph-card2). Details and test log: section 12. Follow-up:
 Bluetooth audio. Not planned: UCM2 (pmOS not a priority), jack wake (the IRQ works), 4-button test.
-192 kHz skipped (user agreed it is not worth it): it would need the mixer AP DAI at 192 kHz with
+192 kHz not planned (no audible benefit; pending the user's call): it would need the mixer AP DAI at 192 kHz with
 sysclk 49.152 MHz and HQ_EN, the codec MQS sequence (0x53, DNC off, DAC reset on the way back),
 and a card where the mixer->codec c2c link follows the rate (card2 parses one fixed `rate`; would
 need several c2c params or DPCM); the TFA9896 stops at 48 kHz, so it is headphones-only.

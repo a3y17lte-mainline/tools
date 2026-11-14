@@ -15,7 +15,7 @@ Read these first:
    tab output is ~55 KB of XML and gets saved to a file: strip the tags with a short python script.
    Its "Phase" status lines lag behind this file; this file wins.
 3. Upstream tracker, an HTML artifact with a db: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r.
-   51 groups (A..AX, Dp; U/V/W are Mesa/GTK) covering all 123 local kernel commits; none sent yet.
+   56 groups (A..BC, Dp; U/V/W are Mesa/GTK) covering all 134 local kernel commits; none sent yet.
    Waves: 1 = standalone, 2 = needs nothing unsent, 3 = board DT/drivers that depend on others, rfc.
    Don't summarise the groups here (that copy went stale): export and print them instead,
    `ArtifactData list groups out_dir=DIR`, then `tools/tracker-check DIR --show`.
@@ -56,6 +56,11 @@ Working (all on v7.4-rc2 + branch a3y17lte; rebased 2026-11-09, old tip tagged a
   sec_s3fwrn5_firmware.bin. Tracker groups AP/AQ/AR. See work/notes/nfc.md.
 - GPU (2026-11-11): Panfrost on Mali-T830 with DVFS 343–1001 MHz (worst-case voltages, GPU cooling),
   patched Mesa + GTK on the installed postmarketOS (Phosh). See the GPU section.
+- Audio (2026-11-14): I2S0 -> S1402X mixer (our driver) -> COD3026X codec (our driver: earpiece,
+  headphones, MIC1-3, jack + buttons) and TFA9896 loudspeaker amp (tfa989x, DSP bypass) on i2c3,
+  one audio-graph-card2 card "a3y17lte". S16_LE 48 kHz. The speaker is NOT on the codec. Tested on
+  Alpine incl. s2idle, mem, display blank. Groups AS-AX, AY-BC. Start with work/notes/audio.md
+  (status header, then section 12). Trap: the mixer registers need APB_AUD (else async SError).
 
 Not done, roughly in planned order:
 - Display re-enable bug FIXED (2026-11-12, user-confirmed): "exynos-dsi: PLL failed to stabilize" on
@@ -80,7 +85,7 @@ Not done, roughly in planned order:
   NULL deref (group AI), and the CPUCL0 watchdog resuming from its reset values (s3c2410_wdt
   resume order vs the PMU automatic disable, fixed 2026-11-14; the old CPU0 hold is gone, so
   every tick freezes now). Wake sources: RTC/charger alarm, power key, USB plug (S2MU004 PMIC,
-  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-14, 123 commits). If
+  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-14, 134 commits). If
   ArtifactData is not offered in a session, record tracker changes in out/tracker/ledger.md. Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
   Details, tools and traps: work/notes/suspend.md.
@@ -92,10 +97,8 @@ Not done, roughly in planned order:
   S2MPU05 sleep modes (needs the user's yes), drain. Start with work/notes/deep-sleep.md: status
   header, section 9 (root causes and takeaways), sections 7, 8, 10 for details.
 - PDMA, PWM.
-- Audio COD3026X (shared with every 7870 phone). Prerequisites done and verified 2026-11-14
-  (groups AS-AX): AUD_PLL fix, DISPAUD resets, ADMA (dmatest), I2S0 (timed playback into a dummy
-  codec). After a warm reboot the audio blocks only respond after a reset pulse. Next: the S1402X
-  mixer, then the codec. Start with the audio.md status header.
+- Audio follow-ups: UCM2 for pmOS, BT SCO through the mixer BT port, 192 kHz, jack wake,
+  volume up/down buttons with a 4-button headset.
 - GPU follow-ups: sending the Mesa/GTK patches (see GPU section); build + shader-db the Mesa
   branches on main before the MR. Per-chip GPU voltages done and installed 2026-11-12 (group X).
 - Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.
@@ -183,7 +186,7 @@ Keep series small: one commit per logical change, follow-ups folded in.
   with ArtifactData (read first, pin if_version) whenever patches change, are regrouped, sent or reviewed,
   following "Series and tracker hygiene" below.
 - Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master =
-  v7.4-rc2; 123 as of 2026-11-14, including the carried mainline fix d00ba321499c
+  v7.4-rc2; 134 as of 2026-11-14, including the carried mainline fix d00ba321499c
   (group AX, ASoC cards had no PCM): drop it when rebasing onto rc3)
 
 ## Display (command-mode panel, working 2026-11-09)

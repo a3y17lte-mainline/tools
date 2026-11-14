@@ -1,6 +1,14 @@
 # Audio on Exynos 7870 / Galaxy A3 2017: research for clean drivers
 
-## Status (2026-11-14): prerequisites done and verified on the phone
+## Status (2026-11-14, evening): audio works
+
+Speaker (TFA9896), earpiece, headphones, MIC1/MIC2/MIC3, jack plug + headset mic detection and the
+play button all work on Alpine with the committed series (groups AS-AX prerequisites, AY mixer, AZ
+TFA9896, BA codec, BB graph bindings, BC A3 sound DT); s2idle, mem and display blank pass with the
+card loaded. Card "a3y17lte" (audio-graph-card2). Details and test log: section 12. Follow-ups: UCM2,
+BT SCO, 192 kHz, jack wake, 4-button headset test.
+
+## Earlier status (2026-11-14): prerequisites done and verified on the phone
 
 Kernel (branch a3y17lte, tracker groups AS-AX), config: PL330_DMA, RESET_SIMPLE built in;
 SOUND/SND_SOC/SND_SOC_SAMSUNG/SND_SAMSUNG_I2S/SND_SIMPLE_CARD/DMATEST modules (mkconfig).
@@ -392,3 +400,17 @@ Plan: ~/.claude/plans/currently-an-agent-is-joyful-liskov.md (mixer -> TFA9896 a
 - Kernel commits: codec binding + driver (EP, HP, MIC1-3). Jack/buttons get folded into the driver
   commit. Still to do: MIC2, jack + buttons (IRQ gpa0-4, ADC ch2), board DT commit (card + port
   properties in samsung-i2s.yaml and nxp,tfa989x.yaml), s2idle/mem with audio, tracker groups.
+- Jack detection (in the codec driver, fold-in commit): codec IRQ gpa0-4 (level low, pull-up),
+  uncached "det" regmap for 0x01-0x0d / 0x80-0x8b (the main map is cache-only while suspended),
+  ADC ch2 averaged (5 samples, min/max dropped), thresholds in DT as uV (vendor raw x 1.8 V/4095:
+  mic 592000, release 483000, buttons 92000/128000/214000/440000). Input device "a3y17lte Headset":
+  unplug -> SW_HEADPHONE/SW_MICROPHONE 0, plug -> both 1 (mic detected), play button -> KEY_PLAYPAUSE
+  1/0 (user's headset has one button). Events read raw from /dev/input/event2 (no evtest on Alpine).
+- MIC2 is the top mic: talking at the top, MIC2 was 8-11 dB above MIC1.
+- Regressions with the card loaded: s2idle (RTC wake) and deep sleep fine, playback after each at the
+  right speed, codec trims and mixer DMIX restored after mem; display blank/unblank fine, audio plays
+  with the display blanked.
+- Board DT committed (graph card, routing IN1/IN2 <- MICBIAS1, IN3 <- MICBIAS2); dtbs_check needed
+  `dai-format` (not `format`) on endpoints and a card2 binding fix for the codec2codec `rate`.
+- Lesson: a failed build_kernel_img must stop the chain (`set -e`); one install went out with the old
+  modules (harmless, the DT alone booted fine).

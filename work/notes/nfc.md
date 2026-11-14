@@ -92,3 +92,18 @@ Userspace: tools/probes/nfc-poll (no neard in Alpine). Card emulation / eSE: not
 - NCI core open order: ops->open -> ops->init -> CORE_RESET -> ops->setup -> CORE_INIT ->
   ops->post_setup. Commands can't be sent from ops->open (cmd_cnt is only set after it), so
   FW_CFG goes in ops->init to match the HAL.
+
+## Card emulation (HCE) and MIFARE Classic writes (2026-11-14, from code + REA)
+
+- HCE: not possible through the kernel NFC stack. The NCI core only listens for NFC-DEP (P2P)
+  (`nci_start_poll` tm_protocols), no ISO-DEP listen mode and no listen-mode routing. The chip
+  can do it (stock JNI RoutingManager, CE error NTF 0x3f), so on Android it needs the AOSP
+  userspace stack (libnfc-nci) talking raw NCI through a HAL: s3fwrn5 unbound, chip reached via
+  i2c-dev + GPIO chardev (IRQ as line events), plus something kernel-side keeping nfc_clk on.
+- MIFARE Classic read/write: the stock JNI uses NXP's extension framing on the normal data channel
+  (phNciNfc_SendMfReq): authenticate = `40 <block> <flags: key B 0x80 | 0x10 embedded key> [6-byte key]`,
+  exchange = `10` + raw MIFARE command (`30 <blk>` read, `A0 <blk>` + 16 bytes write).
+  nci_transceive passes raw socket payloads through unchanged, so a userspace tool on a raw NFC
+  socket (connect with NFC_PROTO_MIFARE) can use the same frames. Response layout: see stock
+  Mfc_RecvPacket (not yet RE'd). Not tested; neard's MIFARE plugin expects pn533-style raw
+  commands, not this framing.

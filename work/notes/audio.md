@@ -366,3 +366,19 @@ Plan: ~/.claude/plans/currently-an-agent-is-joyful-liskov.md (mixer -> TFA9896 a
   playback the amp status was 0xd85f (PLL locked, clocks stable, amp switching), SYS_CTRL 0x0008.
 - The test DT block is at the end of exynos7870-a3y17lte.dts, uncommitted: the board commit comes
   with the codec. samsung-i2s.yaml and nxp,tfa989x.yaml need `port` for the graph card.
+
+### Codec driver: probe and earpiece (2026-11-14)
+- First codec kernel panicked ~1 s after boot: asynchronous SError in the mixer's mclk unprepare. The codec
+  woke the mixer for MCLK while the I2S was idle, and the mixer registers sit behind
+  `CLK_GOUT_DISPAUD_APB_AUD` (CMU_DISPAUD 0x148d0814 bit 2), which only the I2S held. Proof: gate
+  poked on by hand + mixer forced on -> live register reads fine. Fix folded into the mixer commits:
+  second clock "pclk" = APB_AUD. (`clk_summary`'s first column is the hardware state, not the enable
+  count: read `/sys/kernel/debug/clk/<clk>/clk_enable_count`.)
+- Recovery note: when /boot holds a bad kernel and the user booted .prev from the menu, install the
+  fix with `a3-install-kernel --no-prev` so the good .prev is kept.
+- With MCLK the core comes alive: trims 0xd0-0xde = 22 02 22 24 8c 0d 59 00 00 00 00 5b 58 aa 51
+  (this unit), 0x41 reset value 0xa8 (24-bit, 64 fs, I2S), 0x40 0x59. Mic bias writes read back
+  0x18 = 0x50, 0x82 = 0x07.
+- Earpiece works (user-confirmed): right-channel tone at -30 dBFS, "Mono Mix" = Right, "Speaker Amp
+  Input" = Left (the amp only plays left), "Earpiece Switch" on, "Earpiece Playback Volume" 0.
+  During playback: 0x17 0x11, 0x37 0x80, 0x40 0x79, 0x50 0x10, 0x76 0x08, 0xd4 = 0xd7 (0x00).

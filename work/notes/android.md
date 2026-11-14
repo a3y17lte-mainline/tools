@@ -18,8 +18,8 @@ Status 2026-11-14: planning done, repos created, kernel backport starting. Full 
 | kernel_samsung_exynos7870 | src/android/kernel/samsung/exynos7870 | lineage-24.0 |
 | device_samsung_a3y17lte | src/android/device/samsung/a3y17lte | lineage-24.0 |
 | vendor_samsung_a3y17lte | src/android/vendor/samsung/a3y17lte | lineage-24.0 |
-| external_mesa (to be created) | src/android/external/mesa | lineage-24.0 |
-| external_minigbm (to be created) | src/android/external/minigbm | lineage-24.0 |
+| external_mesa | src/android/external/mesa | lineage-24.0 |
+| external_minigbm | src/android/external/minigbm | lineage-24.0 |
 
 - vendor_samsung_a3y17lte is **public by the user's decision** (2026-11-14): it carries the 4 firmware
   files of device/.../proprietary-files.txt (Wi-Fi/BT; the rest of work/firmware stays local).

@@ -1,9 +1,8 @@
 # Bus DVFS: MIF (DRAM controller), INT, DISP (research 2026-11-14)
 
-Status (2026-11-14): Stage 0 (research) and Stage 1 (INT + DISP) done and tested on Alpine; Stage 2
-(MIF) next. Kernel groups BE (OPP core), BF (exynos-bus without PPMU), BG (ASV + DTS).
-Plan: Stage 2 MIF (exynos7870-dmc devfreq, passive from cpufreq via MINLOCK) -> Stage 3 drop the
-750 mV BUCK2 floor once MIF votes.
+Status (2026-11-15): Stage 0, 1 (INT + DISP) and 2 (MIF) done and tested on Alpine. Stage 3 (lower the
+750 mV BUCK2 floor) is blocked: the unused ISP domain is powered at the CAM 533 MHz level, which needs
+750 mV on this chip (section 0b). Kernel groups BE, BF, BG (stage 1), BH, BI, BJ (stage 2).
 
 ## 0. Stage 1 result (INT/DISP)
 
@@ -24,6 +23,35 @@ Sources: vendor `drivers/soc/samsung/pwrcal/S5E7870/{S5E7870-dfs.c,S5E7870-dramp
 `drivers/devfreq/exynos/exynos7870_bus_{mif,int,disp}.c`, stock DT `devfreq_*@170000x0`, the ECT
 (`tools/ect-parse out/ect-a3y17lte.bin mif int disp minlock timing`, saved in
 `out/ect-a3y17lte-mif.txt`), and a peek survey of this unit (`out/mif-survey-20261114.txt`).
+
+## 0a. Stage 2 result (MIF, exynos7870-dmc)
+
+- Driver drivers/memory/samsung/exynos7870-dmc.c: the vendor CAL sequence (section 6) through the clock
+  framework (new CMU_MIF clocks: PHY_CLK2X/PHY_SWITCH muxes, CCI mux/div, MEM_PLL rate table) plus
+  the CMU pause registers (0x10461004/8, own reg). Timings copied from the bootloader's set 0; per
+  level only tick + PHY DVFS_CON0 (+ fixed CON1-3 and PAUSE_MRS from the ECT).
+- Governor: passive from cpufreq (CPU OPP required-opps = MINLOCK). Own BUCK2 vote; >= 676-level
+  voltage while on the switching clock. ASV MIF group 9: 902 687.5 ... 546-275 600 mV.
+- Suspend: devfreq parks at opp-suspend (902, the bootloader's trained level); the driver holds it
+  until resume (reports, doesn't fail, so the passive governor keeps tracking the CPUs). Generic fix:
+  the passive governor re-evaluates on DEVFREQ_GOV_RESUME (devfreq restores the suspend frequency).
+- Tests 2026-11-15: probe-only boot; one 902->676->902 switch (64 MB md5 stable, registers back to the
+  boot values); 14 transitions incl. 902<->275 with memtester 16M at each (0 fails, MEM_PLL PMS =
+  table); CPU-driven map exact (max over both clusters); 6 mem cycles from 451/275 MHz (display
+  60 fps, DSIM healthy, MIF back to 275 after resume); scaling from boot.
+- Live readback per level: MEM_PLL CON0 1804.4 0xa15b0500, 1670.5 0xa1010400, 1456 0xa0e00400,
+  1352 0xa09c0300, 1092 0xa0a80400, 902.2 0xa15b0501, 549.25 0xa0a90401; PHY DVFS_CON0 0x48000000 at
+  902, 0x49000000 / 0x09000000 elsewhere (bit 27 stays set once the CAL writes it).
+
+## 0b. Stage 3 blocker: the ISP domain
+
+PMU G3D/DISPAUD/ISP/MFCMSCL STATUS (0x10484004/24/44/64) all read 0x0003000f = on: nothing powers
+the media domains down (no PD nodes in the DT, pd_ignore_unused). ISP runs at the CAM 533 MHz level
+(dout_mif_cmu_isp_vra 533, _cam/_isp 399.75), and CAM 533 needs 750 mV for group 7 (ECT table 5;
+the vendor uses the DISP group for CAM). MFCMSCL is covered by INT (MFC/MSCL pinned at 133.25).
+So BUCK2 can only go below 750 mV once the ISP domain is off (vendor: off until the camera opens)
+or its clocks are at the 167 MHz level (needs CMU_ISP + ISP_PLL). Idle need without ISP: MIF 600,
+INT 600, DISP 637.5, GPU 600 -> 637.5 mV.
 
 ## 1. Domains and levels (ECT DVFS block)
 

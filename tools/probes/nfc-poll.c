@@ -5,8 +5,20 @@
  * Usage: nfc-poll up|down [IDX]       power the NFC device IDX (default 0) up or down
  *        nfc-poll poll SECONDS [IDX]  start a reader-mode poll, print each target found
  *                                     (protocols, SENS_RES/SEL_RES, NFCID1 = the tag's UID)
+ *        nfc-poll mfc BLOCK [HEX32]       MIFARE Classic: poll (10 s), authenticate BLOCK with the
+ *                                     default key A FFFFFFFFFFFF, read it; with HEX32 (16 bytes)
+ *                                     write it first, then read it back. Refuses block 0 and the
+ *                                     sector trailers (a bad trailer locks a sector for good).
  * "poll" brings the device up first if needed and stops the poll at the end. Exit status 0 =
  * success / at least one target, 1 = error, 2 = no target before the timeout.
+ *
+ * MIFARE Classic framing of the S3NRN80 (NXP extension, from the stock JNI: phNciNfc_SendMfReq,
+ * Mfc_RecvPacket, phLibNfc_MifareMap): authenticate = 40 <sector> <0x10 embedded key | 0x80 key B>
+ * <6-byte key> (sector = block / 4 below block 128),
+ * reply 40 <status>; exchange = 10 <MIFARE command>, reply 10 <data> <status>; a write is
+ * 10 A0 <block>, then 10 <16 bytes>. Status 0 = OK. Linux's NCI core strips the status byte
+ * of MIFARE frames and turns a bad status into an error (net/nfc/nci/data.c), and the raw
+ * socket adds a 00 byte in front of every reply, so replies here are 40 / 10 <data>.
  *
  * Freestanding static aarch64 (no libc), like iio-events. Build: ./nfc-poll-build
  */
@@ -38,6 +50,9 @@ static long sc(long n, long a, long b, long c, long d, long e, long f)
 #define SOL_SOCKET 1
 #define SO_RCVTIMEO 20
 #define SOL_NETLINK 270
+#define SYS_connect 203
+#define AF_NFC 39
+#define SOCK_SEQPACKET 5
 #define EAGAIN 11
 #define EALREADY 114
 
@@ -61,7 +76,7 @@ static void outhex(const u8 *p, int n)
 static int streq(const char *a, const char *b) { while (*a && *a == *b) a++, b++; return *a == *b; }
 static long atoi_(const char *s) { long v = 0; while (*s >= '0' && *s <= '9') v = v * 10 + *s++ - '0'; return v; }
 
-static int fd, fam, mcast = -1;
+static int fd, fam, mcast = -1, tgt_idx = -1;
 static u32 seq = 1;
 static u8 buf[8192] __attribute__((aligned(4)));
 
@@ -140,7 +155,7 @@ static void fam_attr(struct nlattr *a)
 static void tgt_attr(struct nlattr *a)
 {
 	switch (a->nla_type) {
-	case NFC_ATTR_TARGET_INDEX: out(" target "); outn(*(u32 *)ADATA(a)); break;
+	case NFC_ATTR_TARGET_INDEX: tgt_idx = *(u32 *)ADATA(a); out(" target "); outn(tgt_idx); break;
 	case NFC_ATTR_PROTOCOLS: out(" protocols 0x"); outhex(ADATA(a) + 3, 1); outhex(ADATA(a) + 2, 1);
 		outhex(ADATA(a) + 1, 1); outhex(ADATA(a), 1); break;
 	case NFC_ATTR_TARGET_SENS_RES: out(" sens_res 0x"); outhex(ADATA(a) + 1, 1); outhex(ADATA(a), 1); break;
@@ -187,10 +202,96 @@ static int simple(u8 cmd, u32 idx, u32 protos)
 	return recv_reply(0, 0);
 }
 
-static void set_timeout(long sec)
+static void set_timeout_fd(int f, long sec)
 {
 	long tv[2] = { sec, 0 };
-	sc(SYS_setsockopt, fd, SOL_SOCKET, SO_RCVTIMEO, (long)tv, sizeof(tv), 0);
+	sc(SYS_setsockopt, f, SOL_SOCKET, SO_RCVTIMEO, (long)tv, sizeof(tv), 0);
+}
+static void set_timeout(long sec) { set_timeout_fd(fd, sec); }
+
+static void report(const char *what, int err);
+
+static int hexval(char c)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return -1;
+}
+
+/* one MIFARE exchange on the raw socket: returns the reply length without the rawsock header */
+static int mfc_xfer(int rs, const char *what, const u8 *cmd, int len, u8 *rsp)
+{
+	static u8 r[300];
+	long n;
+
+	out(what); out(" > "); outhex(cmd, len); out("\n");
+	if (sc(SYS_sendto, rs, (long)cmd, len, 0, 0, 0) != len) die("send failed");
+	n = sc(SYS_recvfrom, rs, (long)r, sizeof(r), 0, 0, 0);
+	if (n < 2) { out(what); out(": no reply "); outn(n); out("\n"); return -1; }
+	out(what); out(" < "); outhex(r + 1, n - 1); out("\n");
+	for (int i = 1; i < n; i++) rsp[i - 1] = r[i];
+	return n - 1;
+}
+
+static u8 wr[16];
+
+/* validate the arguments before touching the radio */
+static void mfc_check(long blk, const char *hex)
+{
+	if (blk <= 0 || blk > 63 || (blk + 1) % 4 == 0)
+		die("refusing: block must be 1..62 and not a sector trailer (3, 7, 11, ...)");
+	if (hex) {
+		if (slen(hex) != 32) die("HEX32 must be 32 hex digits (16 bytes)");
+		for (int i = 0; i < 16; i++) {
+			int h = hexval(hex[2 * i]), l = hexval(hex[2 * i + 1]);
+			if (h < 0 || l < 0) die("bad hex");
+			wr[i] = h << 4 | l;
+		}
+	}
+}
+
+static int mfc(long blk, const char *hex, u32 idx)
+{
+	u8 cmd[32], rsp[300];
+	int rs, n;
+
+	rs = sc(SYS_socket, AF_NFC, SOCK_SEQPACKET, NFC_SOCKPROTO_RAW, 0, 0, 0);
+	if (rs < 0) die("nfc raw socket failed");
+	{
+		struct { u16 family, pad; u32 dev, target, proto; } sa =
+			{ AF_NFC, 0, idx, (u32)tgt_idx, NFC_PROTO_MIFARE };
+		long r = sc(SYS_connect, rs, (long)&sa, sizeof(sa), 0, 0, 0);
+		if (r) { report("connect", r); return 1; }
+	}
+	set_timeout_fd(rs, 3);
+
+	/* authenticate the block's sector with key A FFFFFFFFFFFF (embedded key) */
+	cmd[0] = 0x40; cmd[1] = blk >> 2; cmd[2] = 0x10;
+	for (int i = 0; i < 6; i++) cmd[3 + i] = 0xff;
+	n = mfc_xfer(rs, "auth", cmd, 9, rsp);
+	if (n != 1 || rsp[0] != 0x40) die("authentication failed");
+
+	if (hex) {
+		cmd[0] = 0x10; cmd[1] = 0xa0; cmd[2] = blk;
+		n = mfc_xfer(rs, "write", cmd, 3, rsp);
+		if (n < 1 || rsp[0] != 0x10) die("write command refused");
+		cmd[0] = 0x10;
+		for (int i = 0; i < 16; i++) cmd[1 + i] = wr[i];
+		n = mfc_xfer(rs, "data", cmd, 17, rsp);
+		if (n < 1 || rsp[0] != 0x10) die("write data refused");
+	}
+
+	cmd[0] = 0x10; cmd[1] = 0x30; cmd[2] = blk;
+	n = mfc_xfer(rs, "read", cmd, 3, rsp);
+	if (n != 17 || rsp[0] != 0x10) die("read failed");
+	out("block "); outn(blk); out(": "); outhex(rsp + 1, 16); out("\n");
+	if (hex) {
+		for (int i = 0; i < 16; i++)
+			if (rsp[1 + i] != wr[i]) die("read-back MISMATCH");
+		out("read-back matches\n");
+	}
+	return 0;
 }
 
 static void report(const char *what, int err)
@@ -203,7 +304,8 @@ int main(int argc, char **argv)
 	u32 idx;
 	int err;
 
-	if (argc < 2) die("usage: nfc-poll up|down [IDX] | poll SECONDS [IDX]");
+	if (argc < 2) die("usage: nfc-poll up|down [IDX] | poll SECONDS [IDX] | mfc BLOCK [HEX32]");
+	if (streq(argv[1], "mfc") && argc > 2) mfc_check(atoi_(argv[2]), argc > 3 ? argv[3] : 0);
 	fd = sc(SYS_socket, AF_NETLINK, SOCK_RAW, NETLINK_GENERIC, 0, 0, 0);
 	if (fd < 0) die("socket failed");
 	set_timeout(5);
@@ -234,10 +336,12 @@ int main(int argc, char **argv)
 		report(argv[1], err);
 		return err != 0;
 	}
-	if (!streq(argv[1], "poll") || argc < 3) die("usage: nfc-poll up|down [IDX] | poll SECONDS [IDX]");
+	int is_mfc = streq(argv[1], "mfc");
+	if (!(streq(argv[1], "poll") || is_mfc) || argc < 3)
+		die("usage: nfc-poll up|down [IDX] | poll SECONDS [IDX] | mfc BLOCK [HEX32]");
 
-	long secs = atoi_(argv[2]);
-	idx = argc > 3 ? atoi_(argv[3]) : 0;
+	long secs = is_mfc ? 10 : atoi_(argv[2]);
+	idx = is_mfc ? 0 : argc > 3 ? atoi_(argv[3]) : 0;
 	if (mcast < 0) die("no nfc events multicast group");
 	if (sc(SYS_setsockopt, fd, SOL_NETLINK, NETLINK_ADD_MEMBERSHIP, (long)&mcast, 4, 0) < 0)
 		die("cannot join the nfc events group");
@@ -273,6 +377,11 @@ int main(int argc, char **argv)
 	} else {
 		out("no target\n");
 	}
+	if (found && is_mfc) {
+		if (tgt_idx < 0) die("no target index");
+		return mfc(atoi_(argv[2]), argc > 3 ? argv[3] : 0, idx);
+	}
+
 	/* the core ends the poll itself once a target is activated */
 	err = simple(NFC_CMD_STOP_POLL, idx, 0);
 	if (err && !found) report("stop_poll", err);

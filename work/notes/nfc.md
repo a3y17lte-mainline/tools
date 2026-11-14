@@ -100,10 +100,22 @@ Userspace: tools/probes/nfc-poll (no neard in Alpine). Card emulation / eSE: not
   can do it (stock JNI RoutingManager, CE error NTF 0x3f), so on Android it needs the AOSP
   userspace stack (libnfc-nci) talking raw NCI through a HAL: s3fwrn5 unbound, chip reached via
   i2c-dev + GPIO chardev (IRQ as line events), plus something kernel-side keeping nfc_clk on.
-- MIFARE Classic read/write: the stock JNI uses NXP's extension framing on the normal data channel
-  (phNciNfc_SendMfReq): authenticate = `40 <block> <flags: key B 0x80 | 0x10 embedded key> [6-byte key]`,
-  exchange = `10` + raw MIFARE command (`30 <blk>` read, `A0 <blk>` + 16 bytes write).
-  nci_transceive passes raw socket payloads through unchanged, so a userspace tool on a raw NFC
-  socket (connect with NFC_PROTO_MIFARE) can use the same frames. Response layout: see stock
-  Mfc_RecvPacket (not yet RE'd). Not tested; neard's MIFARE plugin expects pn533-style raw
-  commands, not this framing.
+- MIFARE Classic read/write WORKS from userspace (2026-11-14, blank MIFARE Classic 1K, block 4:
+  read, write, read-back in a new session, restored to zeros): `nfc-poll mfc BLOCK [HEX32]`.
+  Framing (stock JNI phNciNfc_SendMfReq, phLibNfc_MifareMap, Mfc_RecvPacket), on a raw NFC socket
+  connected with NFC_PROTO_MIFARE:
+  - authenticate: `40 <SECTOR> <flags> [key]`, sector = block >> 2 below block 128
+    (0x20 + (block - 128) / 16 above). flags = 0x10 embedded 6-byte key, | 0x80 for key B; stock
+    sends one of 4 built-in keys by index (flags = index, no key) when the key is in its table.
+    Sending the block number instead of the sector authenticates the wrong sector: the read then
+    gets the MIFARE NAK 0x4.
+  - exchange: `10 <MIFARE command>`; read `10 30 <blk>` -> `10 <16 bytes>`; write `10 A0 <blk>`
+    -> `10 0a` (ACK), then `10 <16 bytes>` -> `10 0a`.
+  - The chip appends a status byte; the NCI core strips it for NFC_PROTO_MIFARE and turns a bad
+    status into an error (net/nfc/nci/data.c), and rawsock prefixes 00. So replies are `40`
+    (auth OK) and `10 ...`.
+  - nfc-poll refuses block 0 and sector trailers (a bad trailer locks the sector for good).
+  - Kernel caveat: with several tags in the field (state W4_HOST_SELECT), nci_activate_target
+    selects NFC_PROTO_MIFARE as T2T, not this chip's 0x81, so Classic needs a single tag. A
+    driver hook for the select protocol would fix it (not done).
+  - neard's MIFARE plugin expects pn533-style raw commands, not this framing.

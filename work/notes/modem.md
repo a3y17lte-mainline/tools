@@ -2,9 +2,9 @@
 
 Status 2026-11-15 night: **LTE registration and mobile data work** with the user's SIM (O2 CZ),
 from a RAM boot (section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by
-hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive and send work. Incoming call rings and
-can be answered and hung up (no audio yet). Not tried yet: outgoing calls, call audio, IPv6,
-suspend with the modem up, ModemManager, Android. The SIM is the user's own: no PIN tries, nothing sent without
+hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive and send work. Incoming and outgoing
+calls work; call audio works (first test played on the speaker, fixed in the hook, not re-tested;
+uplink not checked). Not tried yet: IPv6, suspend with the modem up, ModemManager, Android. The SIM is the user's own: no PIN tries, nothing sent without
 asking. Earlier the same day:
 Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
@@ -172,6 +172,32 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
 - Next for calls: the voice path. Stock routes call audio through the S1402X mixer's CP port
   (AIF2, see audio.md) driven by the CP's own I2S, and the AP sets the route and volumes when
   the CP's IPC_SND_* messages arrive.
+
+### Call audio (2026-11-15 night)
+
+- Stock route (vendor mixer_paths.xml `route-cp` + `dev-handset`, mixer_gains.xml): mixer
+  enable + SRC2 (modem rate -> 48 kHz), CH2 (modem, IN2) into the digital mixer at 0 dB, CH2
+  output select = AIF4IN (codec mic -> modem uplink); codec: mono mix left, earpiece +2 dB,
+  MIC1 11 + boost 2. The modem is the I2S master of IN2 (gate `CLK_GOUT_DISPAUD_CON_CP2AUD_BCK`).
+- Kernel (fixups on the audmixer driver/binding/dtsi commits): DAPM `MODEMIN`/`MODEMOUT` pins,
+  `SRC2` supply, `cp_bclk` clock supply (new third mixer clock), `DMIX Modem Switch`,
+  `Modem Playback Volume`, `Modem Uplink Source` (Mixer/Codec/Bluetooth); the codec-link
+  hw_params now also sets the mixer sysclk (a call has no AP stream to do it). The existing
+  mixer<->codec codec2codec link carries the call both ways; DAPM powers it from the pins.
+- samsungipcd: sends IPC_SND_AUDIO_PATH_CTRL and the handset volume from
+  `SAMSUNGIPCD_AUDIO_PATH` / `SAMSUNGIPCD_VOICE_VOLUME` (used: 1 = handset, 4), and runs
+  `/usr/libexec/samsungipcd/voicecall.sh` (tools/modem/voicecall.sh) at call start; a line on
+  its stdin = call end.
+- Outgoing call to 800 810 820 (user's choice; toll-free info line): `ATD800810820;`,
+  `+CLCC: 1,0,2` dialling -> `1,0,0` active, hook ran, cp_bclk enabled, sysclk 24.576 MHz,
+  codec DAC/earpiece/ADC powered; the user heard the line. `AT+CHUP` ended it, hook off.
+- It played on the loudspeaker: the TFA9896 amp is on the same codec bus (multi-codec link) and
+  its "Speaker" pin switch is on by default. The hook now turns `Speaker Switch` off for the
+  call and restores it. Not re-tested yet; uplink (does the other side hear the A3's mic?) not
+  checked yet either.
+- The RAM image (`build-ram-img`) now carries all modules (modprobe; load the sound card by
+  modalias: `for a in $(cat /sys/bus/platform/devices/*/modalias /sys/bus/i2c/devices/*/modalias
+  | sort -u); do modprobe -q $a; done`), amixer/aplay/arecord from Alpine, and the hook.
 
 ## 1. Decisions (user, 2026-11-15)
 

@@ -9,6 +9,9 @@
 # (run tools/modem/build-userspace first). Nothing is written to the phone.
 #
 # On the phone afterwards:  insmod /lib/modem/exynos-mailbox.ko; insmod /lib/modem/exynos_modem.ko
+# All other modules of the build are in /lib/modules (modprobe works); amixer/aplay/arecord
+# come from Alpine's alsa-utils (fetched once into out/apk-alsa); the call audio hook
+# tools/modem/voicecall.sh is installed where samsungipcd runs it.
 set -euo pipefail
 ROOT=~/Projects/exynos7870
 SRC=$ROOT/src/linux-modem
@@ -39,6 +42,25 @@ mkdir -p "$T/lib/modem" "$T/usr/local/bin"
 cp "$O/drivers/mailbox/exynos-mailbox.ko" "$O/drivers/net/wwan/exynos_modem/exynos_modem.ko" "$T/lib/modem/"
 cp -a "$US/usr" "$T/"
 rm -rf "$T/usr/include"
+
+nice "${K[@]}" INSTALL_MOD_PATH="$T" INSTALL_MOD_STRIP=1 modules_install > /dev/null
+rm -f "$T"/lib/modules/*/build "$T"/lib/modules/*/source
+
+ALSA=$ROOT/out/apk-alsa
+if ! ls "$ALSA"/alsa-utils-*.apk > /dev/null 2>&1; then
+	mkdir -p "$ALSA"
+	(cd "$ROOT/work/initramfs" && qemu-aarch64-static -L . ./sbin/apk --root "$ROOT/out/modem-sysroot" \
+		--arch aarch64 fetch --no-cache -o "$ALSA" alsa-utils alsa-lib > /dev/null)
+fi
+mkdir -p "$T.alsa"
+for f in "$ALSA"/alsa-utils-*.apk "$ALSA"/alsa-lib-*.apk; do tar -xzf "$f" -C "$T.alsa" 2> /dev/null; done
+mkdir -p "$T/usr/bin" "$T/usr/lib" "$T/usr/share"
+cp -a "$T.alsa"/usr/bin/amixer "$T.alsa"/usr/bin/aplay "$T.alsa"/usr/bin/arecord "$T/usr/bin/"
+cp -a "$T.alsa"/usr/lib/libasound.so.2* "$T/usr/lib/"
+cp -a "$T.alsa"/usr/share/alsa "$T/usr/share/"
+rm -rf "$T.alsa"
+[ -e "$ROOT/tools/modem/voicecall.sh" ] &&
+	install -Dm755 "$ROOT/tools/modem/voicecall.sh" "$T/usr/libexec/samsungipcd/voicecall.sh"
 install -m755 "$ROOT/tools/modem/modem-nv-setup" "$T/usr/local/bin/modem-nv-setup"
 # The current init (the base cpio may be older): reboots into U-Boot if USB never comes up
 install -m755 "$ROOT/tools/initramfs/init" "$T/init"

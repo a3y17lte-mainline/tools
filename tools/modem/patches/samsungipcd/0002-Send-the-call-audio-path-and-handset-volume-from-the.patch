@@ -1,0 +1,87 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sun, 15 Nov 2026 21:56:36 +0100
+Subject: [PATCH] Send the call audio path and handset volume from the
+ environment
+
+The modem only knows where call audio goes from the radio interface
+layer, and samsungipcd set the handset (voice) volume to 0 without
+ever choosing a path.
+
+Read the path (an IPC_SND_AUDIO_PATH value) and the handset volume
+from SAMSUNGIPCD_AUDIO_PATH and SAMSUNGIPCD_VOICE_VOLUME, and send
+them with the other volumes when a call is answered or dialled.
+Without the variables nothing changes.
+---
+ samsung-ipc.c | 44 ++++++++++++++++++++++++++++----------------
+ 1 file changed, 28 insertions(+), 16 deletions(-)
+
+diff --git a/samsung-ipc.c b/samsung-ipc.c
+index 35d1978..d9a1234 100644
+--- a/samsung-ipc.c
++++ b/samsung-ipc.c
+@@ -290,6 +290,32 @@ static const int channel_volumes[4][2] = {
+     {IPC_SND_VOLUME_TYPE_BTVOICE, 0},
+ };
+ 
++//Call audio settings for the modem, from the environment: SAMSUNGIPCD_AUDIO_PATH is the
++//IPC_SND_AUDIO_PATH value (1 handset, 2 headset, 6 speaker, ...), SAMSUNGIPCD_VOICE_VOLUME
++//replaces the volume of the handset (voice) channel. Unset: nothing is sent / the table above.
++static void send_call_audio_setup(struct ipc_client* fmt)
++{
++    const char* path = getenv("SAMSUNGIPCD_AUDIO_PATH");
++    const char* voice = getenv("SAMSUNGIPCD_VOICE_VOLUME");
++    for(int i = 0; i < 4; i++)
++    {
++        struct ipc_snd_spkr_volume_ctrl_data ctrl = {
++            .type = channel_volumes[i][0],
++            .volume = channel_volumes[i][1],
++        };
++        if(voice && *voice && ctrl.type == IPC_SND_VOLUME_TYPE_VOICE)
++            ctrl.volume = atoi(voice);
++        ipc_client_send(fmt, seq_cntr++, IPC_SND_SPKR_VOLUME_CTRL, IPC_TYPE_SET, &ctrl, sizeof(ctrl));
++    }
++    if(path && *path)
++    {
++        struct ipc_snd_audio_path_ctrl_data p = {
++            .path = atoi(path),
++        };
++        ipc_client_send(fmt, seq_cntr++, IPC_SND_AUDIO_PATH_CTRL, IPC_TYPE_SET, &p, sizeof(p));
++    }
++}
++
+ //XXX: length is 8-bit in many requests. we should probably check for overflow when creating them
+ static int net_setup_done; //domain config and attach profile were sent
+ static int early_setup; //do that as soon as the SIM is up, not when the modem says SMS_DEVICE_READY
+@@ -579,26 +605,12 @@ static void* sipc_thread(void* arg)
+                     strncpy(data.number, number, sizeof(data.number));
+                     ipc_client_send(fmt, seq_cntr++, IPC_CALL_OUTGOING, IPC_TYPE_EXEC, &data, sizeof(data));
+                     free(number);
+-                    for(int i = 0; i < 4; i++)
+-                    {
+-                        struct ipc_snd_spkr_volume_ctrl_data ctrl = {
+-                            .type = channel_volumes[i][0],
+-                            .volume= channel_volumes[i][1],
+-                        };
+-                        ipc_client_send(fmt, seq_cntr++, IPC_SND_SPKR_VOLUME_CTRL, IPC_TYPE_SET, &ctrl, sizeof(ctrl));
+-                    }
++                    send_call_audio_setup(fmt);
+                 }
+                 else if(ptr->size)
+                 {
+                     ipc_client_send(fmt, seq_cntr++, IPC_CALL_ANSWER, IPC_TYPE_EXEC, NULL, 0);
+-                    for(int i = 0; i < 4; i++)
+-                    {
+-                        struct ipc_snd_spkr_volume_ctrl_data ctrl = {
+-                            .type = channel_volumes[i][0],
+-                            .volume= channel_volumes[i][1],
+-                        };
+-                        ipc_client_send(fmt, seq_cntr++, IPC_SND_SPKR_VOLUME_CTRL, IPC_TYPE_SET, &ctrl, sizeof(ctrl));
+-                    }
++                    send_call_audio_setup(fmt);
+                     start_voicecall();
+                 }
+                 else
+-- 
+2.56.0
+

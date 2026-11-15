@@ -113,7 +113,8 @@ Not done, roughly in planned order:
   hsi2c0 runs in batcher mode: it is shared with the CP (i2c-exynos5 batcher mode, 2026-11-15).
   A RAM image without USB now reboots itself into U-Boot after ~70 s. With samsungipcd (NV service)
   the modem REGISTERS ON LTE with the user's own SIM (PIN off, slot 1, O2 CZ, unlimited plan) and
-  MOBILE DATA works (APN internet, rmnet0 by hand, ~16 Mbit/s), SMS receive + send work, incoming calls ring/answer/hang up (no audio: voice path not done). Never try a PIN or send
+  MOBILE DATA works (APN internet, rmnet0 by hand, ~16 Mbit/s), SMS receive + send work, incoming and outgoing calls with audio (mixer modem path +
+  samsungipcd hook tools/modem/voicecall.sh; earpiece routing just fixed, uplink untested). Never try a PIN or send
   anything (SMS, data, calls) on that SIM without asking. Details in work/notes/modem.md section 0. Kernel: 10 commits
   (now 13 + fixups) on branch `modem` in the worktree src/linux-modem (mailbox variant, drivers/net/wwan/exynos_modem,
   Samsung's /dev/umts_* + rmnet interface as a local-only front end). Builds, KUnit, series-lint and

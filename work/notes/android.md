@@ -183,10 +183,29 @@ hand, `backport-kernel continue`.
   audio_policy_engine_configuration.xml, and our policy XML had no <volumes>, so the HAL's Config
   returned no volume groups. Fixed by including audio_policy_volumes.xml + default_volume_tables.xml
   (frameworks/av, as cuttlefish does), device 7b57f8b. Needs a rebuild (vendor files).
-  Next, planned (stashed plan): our own light HAL for the touch-key LED (the LineageOS HAL
-  only matches button-backlight*, so dumpsys lights is empty and the keys stay lit), and 3
-  DECON windows with blending (composition efficiency 0.0025: everything goes through the
-  GPU, even status bar + app).
+- Fifth build, prepared 2026-11-15 (NOT yet built or run on the phone):
+  - Touch keys: own light HAL aidl/light (one BUTTONS light on /sys/class/leds/tm2-touchkey,
+    off at service start; LineageOS PowerManagerService then lights it on activity). The
+    LineageOS HAL only matches button-backlight*, so dumpsys lights was empty. The hardware key
+    resources (config_deviceHardwareKeys ...) are lineageos.platform ones: they sat in the
+    android overlay without effect (phone read 64): new overlay LineageResA3y17lte, with
+    config_deviceSupportsButtonBrightnessControl = 1. Device c68ba8a.
+  - DECON overlay planes (mainline tip 06effced9332..8305c90b9e01, cherry-picked onto the
+    Android kernel, lineage-24.0 264ea9b9199c): 3 windows on the 7870 (PRIMARY, OVERLAY,
+    OVERLAY; drm_hwcomposer ignores cursor planes), WINCHMAP0 0x40 = win0 ch 1 (IDMA_G0, the
+    vendor framebuffer's), win1 ch 2 (G1), win2 ch 0; pixel blend mode + alpha on windows 1-2
+    with the vendor equations (BLENDE(win - 1), BLENDCON 8-bit alpha, ALPHA_MUL for plane x
+    pixel alpha), window 0 opaque; windows under 128 bytes per line rejected (vendor rule).
+    One sysmmu serves all channels (stock master_axi_id_list). Compiles in both trees; the
+    blending fix for window 0 is a fixup! commit at both tips (fold with the next batch, then
+    add a tracker group for the 3 commits: the tracker does not know them yet).
+    Baseline before (build 4, /data/local/tmp/bench.sh = Settings scroll, saved in
+    out/android/bench-build4-baseline.txt): 789 frames, 11.2% janky, p50/p90/p99 17/23/57 ms,
+    composition efficiency 0 (all GPU), GPU 10.8 s of ~15 s at 1001 MHz.
+    To check after the build: screen at all (window 0 channel changed from the reset value;
+    recovery uses the same kernel), dumpsys SurfaceFlinger layers DEVICE, colours/alpha of
+    status bar and dialogs (premultiplied), fades (plane alpha), rerun bench.sh. Not done:
+    FIFO underrun reporting and a DISP/INT floor for 3 windows (only if artefacts show).
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from
   the thermistor IIO channel ("batt-temp"), TECHNOLOGY + design values through
   monitored-battery (power supply core). Not run on the phone yet.

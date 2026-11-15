@@ -342,6 +342,16 @@ hand, `backport-kernel continue`.
     planes cannot scale, and drm_hwcomposer then composites all three layers on the GPU. Fix
     to verify on the build: config_wallpaperMaxScale = 1 (device overlay). toybox date has
     no %N: wall times in scripts need another clock.
+  - Back to Alpine for kernel work (modem), prepared 2026-11-15, not flashed: U-Boot on
+    RECOVERY (tools/a3-flash RECOVERY out/images/u-boot-a3y17lte-menu.img, dry run ok, sha256
+    0e43e09b...; built for BOOT, never tried from RECOVERY). Recovery key combo -> U-Boot; its
+    eMMC autoboot finds no extlinux on SYSTEM (super now) and falls through to fastboot; then
+    fastboot boot out/images/linux-a3y17lte-ram-20261115.img (mainline a3y17lte b1c9eda430ea +
+    Alpine initramfs, RAM only, ssh over USB). Normal power-on still boots Android. Undo:
+    a3-flash RECOVERY out/android/new-20261115-1548/recovery.img. No persistent root: an
+    Alpine rootfs on microSD would need build-kernel-img's root option pointed at the card.
+    The modem work is in the worktree src/linux-modem (branch modem, build dir
+    out/linux-modem); it forks from c7f1ab15e265, before today's I2S0 fold and fixes.
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

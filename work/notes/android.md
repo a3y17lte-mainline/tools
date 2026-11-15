@@ -129,6 +129,13 @@ hand, `backport-kernel continue`.
 
 ## Storage layout
 
+Decided 2026-11-15: pmOS is dropped (no image backups of pmOS or Alpine). HIDDEN (stock
+/preload, 60 MiB, copy in backups/20261108-*) becomes /metadata (fstab formattable). Alpine for
+driver tests: U-Boot swapped onto RECOVERY with a3-flash when needed, Alpine on the microSD.
+First install: new recovery via a3-flash -> Format data -> sideload of the full zip from the
+recovery (run by the user). The LOS updater (bootable/deprecated-ota, UpdateDynamicPartitions)
+creates super from the zip's unsparse_super_empty.img when SYSTEM has no LP metadata.
+
 BOOT boot.img; RECOVERY U-Boot (later Lineage recovery); SYSTEM super (system, system_ext,
 product, vendor as EROFS, one group of 4000 MiB - 4 MiB, non-A/B); CACHE /cache; HIDDEN /metadata
 (needs the user's yes); USERDATA /data f2fs + FBE. EFS is not mounted.

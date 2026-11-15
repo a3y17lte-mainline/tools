@@ -287,6 +287,30 @@ hand, `backport-kernel continue`.
     x1 is mem_reqs), 4 services per word: stock = 0xd 0x7 0x9 0x2 0xf 0x9, WOW = word 3 bit 1.
     On the DGX: extract-files.sh needs system/qwlan30.bin and system/otp30.bin in its
     firmware directory, and has to be re-run before the build.
+  - Vendor repo (public, user's decision): stock Wi-Fi firmware container e9670c2, regulatory
+    database 146e764; the build only needs repo sync, extract-files.sh was run here.
+  - Wi-Fi regulatory (device 78e0986): cfg80211 could not load regulatory.db -> world domain
+    for good. Now shipped (wireless-regdb 2026.09.03, /vendor/firmware). Tested live (db from
+    the private firmware path, iw reg reload, reconnect): global domain follows the AP's
+    country IE (CZ, DFS-ETSI). Still restricted: the phy keeps ath's custom world domain of the
+    board data ("country 99": 2402-2472, 5140-5360 and 5715-5860 passive, NO midband), and
+    cfg80211 disables the channels outside it in orig_flags at registration: 100-144 stay
+    "disabled" whatever the country. 36-64 and 149-165 are no-IR (passive scan, usable once
+    a beacon is heard). The user's own 5 GHz network was not in the scan: probably on 100+.
+    Stock (qcacld) ignores the board domain when the host sets a country. Options, undecided:
+    change the regdomain in board.bin, or a kernel-side override. Android's country code is
+    null (no telephony).
+  - Wi-Fi link speed "1 Mbps": cosmetic. ath10k fills the tx bitrate only with
+    WMI_SERVICE_PEER_STATS (not in TLV firmware) or PEER_STATS_INFO (service 116: not set in
+    the stock firmware, bitmap 0xd 7 9 2 f 9 b f b b 4 c 0 0 0 2 0 0 1 0...). Only the rx
+    bitrate of the last frame (beacons, 1 Mbit/s) reaches Android. The firmware's WMI stats
+    event carries peer_tx_rate (ath10k shows it in debugfs fw_stats): a driver change could
+    report that.
+  - GPU floor (device 10557da, not built): power HAL writes the Panfrost devfreq min_freq with
+    the boosts (845 MHz interaction, 1001 launch). bench.sh with a fixed floor: none 12.1% janky
+    / p50 21 ms / gpu p50 13 ms; 676 MHz 8.5% / 15 / 7; 845 MHz 5.6% / 14 / 6 (build 4 with GPU
+    composition: 11.2% / 17 / 5). Whether the framework's boosts cover a scroll as well as a
+    fixed floor is to be measured on the build.
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

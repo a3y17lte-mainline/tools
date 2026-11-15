@@ -72,7 +72,28 @@ hand, `backport-kernel continue`.
   0x12345670 there on every normal reboot -> mode-normal in the reboot-mode node (ANDROID:
   patch 0006 for now; TODO the same in the mainline series, it is an exynos7870.dtsi fix).
   Not done: vendor also writes INFORM2 = 0x12345678 on reboot ("LPM mode prevention": no
-  charging-mode boot when a cable is in). Open: no adb device seen from the recovery yet.
+  charging-mode boot when a cable is in).
+- Reboot mode, complete picture (S-Boot s5p_check_reboot_mode, 0x6de08): S-Boot keeps
+  REBOOT_MODE in its env (PARAM) and only changes it when INFORM3 = 0x1234567x at the next
+  boot. Android passes its reason as the restart command ("userrequested,recovery"), which is
+  no mode -> ANDROID: patch 0007 writes "normal" for unknown commands; 0008 writes "normal"
+  when the driver registers, so a watchdog reset / hang in recovery boots BOOT (Alpine) again
+  (the user's request; confirm on the phone that S-Boot honours it after a watchdog reset).
+  "Reboot to bootloader" (mode-bootloader 0x1234567d) boots BOOT normally.
+- No adb from the recovery (2026-11-15): everything was set up (adbd, gadget bound to
+  13600000.usb, typec device/sink, dwc3 mode device, DCTL run) but UDC "not attached", DSTS
+  link = suspend. Cause: USB D+/D- go through the S2MU004 MUIC switches, which S-Boot leaves
+  open on a normal boot; our U-Boot closes them (a3y17lte_muic_route_usb), which is why Alpine
+  always worked. Values U-Boot leaves: CTRL1 0xc7 = 0x12 (bit4 set, bit2 clear), SWCTRL 0xca =
+  0x24. ANDROID: patch 0009 does the same in extcon-s2m's S2MU004 init. TODO: fold into the
+  mainline S2MU004 extcon commit (group with the MUIC), it is needed without U-Boot.
+- Debug technique that worked: a second cpio (xz) appended to the ramdisk with a replacement
+  init.recovery rc + script, writing to /dev/pmsg0 (pstore pmsg, read on Alpine as
+  /sys/fs/pstore/pmsg-ramoops-0): one "STEP name" line before each read. The console buffer
+  (16 KiB) is useless while recovery's battery polling floods it with avc denials (fixed by
+  sepolicy/vendor/recovery.te). The recovery ramdisk has sh, toybox, getevent, no awk.
+- CACHE holds pmOS_boot: the recovery mounts it rw as /cache at start and exit; a cache wipe
+  or factory reset there erases it.
 - S-Boot size limits (disassembly of the boot-image loader in mmcblk0boot0, 0x5cda0-0x5ce1c;
   hit 2026-11-15 with the first LineageOS recovery, "Invalid RAMDISK LENGTH"): page-aligned
   ramdisk <= 0xe00000 (14 MiB); kernel + ramdisk + 0x1000 <= 0x3d7ff00, the same again with

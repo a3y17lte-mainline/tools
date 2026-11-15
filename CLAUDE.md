@@ -107,8 +107,13 @@ Not done, roughly in planned order:
   revisit with the modem, after checking SCO over HCI.
 - GPU follow-ups: sending the Mesa/GTK patches (see GPU section); build + shader-db the Mesa
   branches on main before the MR. Per-chip GPU voltages done and installed 2026-11-12 (group X).
-- Modem (Shannon 315, 2026-11-15): code written, nothing run on the phone yet. Kernel: 10 commits
-  on branch `modem` in the worktree src/linux-modem (mailbox variant, drivers/net/wwan/exynos_modem,
+- Modem (Shannon 315, 2026-11-15): first starts done from a RAM boot (U-Boot from the U-Boot `modem`
+  branch on RECOVERY, `tools/modem/build-ram-img`): CP control goes through the secure monitor
+  (registers are secure-only), the loader handshake passes, the firmware never reports in. Leading
+  suspect: the PMIC bus hsi2c0 is shared with the CP and must run in batcher mode (written; read
+  path verified on hardware; the write path and booting it need the user's yes). Details in
+  work/notes/modem.md section 0. Kernel: 10 commits
+  (now 13 + fixups) on branch `modem` in the worktree src/linux-modem (mailbox variant, drivers/net/wwan/exynos_modem,
   Samsung's /dev/umts_* + rmnet interface as a local-only front end). Builds, KUnit, series-lint and
   dtbs_check are clean. Not on a3y17lte and not in the tracker: rebase with
   `git rebase --onto a3y17lte 929b94890e8d modem`, then add the groups from out/tracker/ledger.md.

@@ -40,6 +40,9 @@ cp "$O/drivers/mailbox/exynos-mailbox.ko" "$O/drivers/net/wwan/exynos_modem/exyn
 cp -a "$US/usr" "$T/"
 rm -rf "$T/usr/include"
 install -m755 "$ROOT/tools/modem/modem-nv-setup" "$T/usr/local/bin/modem-nv-setup"
+# Optional probes: the modem control register reader and the I2C register reader
+[ -e "$ROOT/tools/probes/cp-ctrl/cp_ctrl.ko" ] && cp "$ROOT/tools/probes/cp-ctrl/cp_ctrl.ko" "$T/lib/modem/"
+[ -e "$ROOT/out/i2c-rd" ] && install -m755 "$ROOT/out/i2c-rd" "$T/usr/local/bin/i2c-rd"
 (cd "$T" && find . -mindepth 1 -print0 | cpio --null -o -H newc -R 0:0 --quiet) | gzip -9 > "$T.cpio.gz"
 cat "$BASE_CPIO" "$T.cpio.gz" > "$T.ramdisk"
 rm -f "$T.cpio.gz"

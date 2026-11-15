@@ -93,6 +93,10 @@ hand, `backport-kernel continue`.
   /data with). Checked and fine: HAL versions against compatibility_matrix.202604 (all in
   range), FBE speed (CPU has aes/pmull/sha2, CRYPTO_AES_ARM64_CE_BLK=y: keep encryption),
   module names (the recovery build's kati + soong pass covered them).
+  First full build (2026-11-15, 2h15): everything built, ota_from_target_files failed ("META/
+  ab_partitions.txt is required for ab_update"): Android 17's board_config.mk turns an unset
+  AB_OTA_UPDATER into true. BoardConfig now sets it false (device 9102785); the images of that
+  build were A/B-flavoured (ro.build.ab_update, update_engine, super metadata): rebuild.
   Open for the first boot: HAL sources are only syntax-checked here; drm_hwcomposer with the
   command-mode panel; HIDDEN/CACHE/USERDATA are formatted by the first boot (formattable).
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from

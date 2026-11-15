@@ -73,7 +73,9 @@ hand, `backport-kernel continue`.
   in rr-cache.
 - ANDROID: 0008 C ashmem (android15-6.6 driver ported: shrinker_alloc, mm_get_unmapped_area,
   ashmem_area_*() and ashmem_memfd_ioctl() like the Rust driver); CONFIG_ASHMEM=y builds it
-  when RUST is off. W=1 clean. Not run on the phone yet.
+  when RUST is off. W=1 clean. Not run on the phone yet. sys.use_memfd dropped with it
+  (device bbcef86): libcutils uses ashmem, its default at vendor API 23. If ashmem fails on
+  the phone: setprop sys.use_memfd true + setprop ctl.restart zygote recovers it live.
 - Optional later: 65c132fa8c93 (dw_mmc DMA threshold, needs adapting to the pre-refactor struct).
 
 ## S-Boot direct boot (facts from TWRP's image + sboot.bin strings; not yet tested with our kernel)

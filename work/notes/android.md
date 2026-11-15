@@ -113,6 +113,13 @@ hand, `backport-kernel continue`.
   v1 cgroup hierarchy") -> dropped ro.lmk.use_minfree_levels; Bluetooth abort on LE_ADV_FILTER
   0xfd57 -> bluetooth.core.le.vendor_capabilities.enabled=false. Device d6a5882..058d81e.
   adb root needs the LineageOS developer option; as shell, setprop works while permissive.
+  Display + Mesa + HWUI + HWC render fine (screenshot of the ANR dialog). NFC: first NfcService
+  brought the chip up (NCI_Version 16), was ANR-killed during the busy first boot, and every
+  restart hung in startup after the routing tables (HAL not deadlocked: binder dump answered,
+  no worker thread) -> the persistent app froze the phone; shell cannot stop a persistent
+  system app (disable-user ignored, uninstall/adbroot need root/system). NFC is gated off in
+  device.mk (A3_ENABLE_NFC) until debugged with Rooted debugging + debuggerd -j.
+  zram: swapon_all failed on max_comp_streams (no such sysfs file on 6.x): option dropped.
   Open for the first boot: HAL sources are only syntax-checked here; drm_hwcomposer with the
   command-mode panel; HIDDEN/CACHE/USERDATA are formatted by the first boot (formattable).
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from

@@ -225,6 +225,24 @@ hand, `backport-kernel continue`.
     where a required device is set (mainline tip 323c233093cb, Fixes: e37440e7e2c2; Android
     lineage-24.0 82cbab17c229). Log: out/android/bootloop-1536/pstore-prev.txt. S-Boot's
     sec_reset.reset_reason was 3 on the boot after the panic, 7 after normal restarts.
+  - Kernel #7 (boot.img + recovery.img from the user, flashed with a3-flash 2026-11-15 15:52;
+    heimdall --resume failed twice after the phone re-enumerated, a fresh session worked):
+    both fixes verified on the phone. adb reboot with the charger online boots Android again
+    (sys.boot.reason reboot,shell, no androidboot.mode), and the whole kernel log of a boot
+    (logcat -b kernel -d: logd keeps it from 0 s, dmesg and pstore have rotated by then) has no
+    "Failed to set required opps" / "Failed to change cpu frequency". One more instance of the
+    old instability was in pstore before the flash: "Initramfs unpacking failed: XZ-compressed
+    data is corrupt" -> "No working init found" right after the failed frequency changes.
+  - Build 5 results: planes work (colours/fades fine by eye; bench composition efficiency 1,
+    GPU 4.4 s at 1001 MHz instead of 10.8 s, but p50/p99 21/73 ms vs 17/57: simple_ondemand now
+    idles the GPU lower, app GPU time p50 13 ms vs 5; out/android/bench-build5.txt), light HAL
+    works (keys off at boot, lit on touch), media volume 0-15.
+  - Audio still open on build 5: (1) pitch: MOD is 0x1000 in hardware at rest (kprobe in
+    i2s_runtime_suspend+0x34), so the assigned RCLK parent never reaches bit 10 although the DT
+    has it; (2) HAL: after an underrun the PCM stays in XRUN, the HAL worker spins
+    ("alsa_device_proxy: available frames(1026) > buffer size(1024), clamped", load 4) and
+    audio is dead until the HAL is killed. (3) Do not read /sys/kernel/debug/clk/clk_summary on
+    this kernel: the phone died during that read (mechanism unconfirmed, log lost).
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

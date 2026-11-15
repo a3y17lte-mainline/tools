@@ -111,8 +111,9 @@ Not done, roughly in planned order:
   branch on RECOVERY, `tools/modem/build-ram-img`): CP control goes through the secure monitor
   (registers are secure-only). The modem BOOTS (state online, PHONE_START) once the PMIC bus
   hsi2c0 runs in batcher mode: it is shared with the CP (i2c-exynos5 batcher mode, 2026-11-15).
-  A RAM image without USB now reboots itself into U-Boot after ~70 s. Next: open FMT/RFS (radio
-  activity starts). Details in work/notes/modem.md section 0. Kernel: 10 commits
+  A RAM image without USB now reboots itself into U-Boot after ~70 s. With samsungipcd (NV service)
+  the modem REGISTERS ON LTE with the user's own SIM (PIN off, slot 1). Never try a PIN or send
+  anything (SMS, data, calls) on that SIM without asking. Details in work/notes/modem.md section 0. Kernel: 10 commits
   (now 13 + fixups) on branch `modem` in the worktree src/linux-modem (mailbox variant, drivers/net/wwan/exynos_modem,
   Samsung's /dev/umts_* + rmnet interface as a local-only front end). Builds, KUnit, series-lint and
   dtbs_check are clean. Not on a3y17lte and not in the tracker: rebase with

@@ -1,8 +1,9 @@
 # Modem: Shannon 315 (SS315AP) on the Exynos 7870
 
-Status 2026-11-15 night: **the modem boots** (section 0): with hsi2c0 in batcher mode the
-firmware sends PHONE_START 1.1 s after power-on and the link is in IPC mode. Next: open the FMT
-and RFS channels (INIT_END, NV service) = the first step with radio activity. Earlier the same day:
+Status 2026-11-15 night: **the modem registers on LTE** with the user's SIM, from a RAM boot
+(section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by hand. Not tried
+yet: SMS, data, calls, suspend. The SIM is the user's own: no PIN tries, nothing sent without
+asking. Earlier the same day:
 Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
 not pushed, not installed, not in the tracker yet: section 8). U-Boot needs one commit first
@@ -114,6 +115,22 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
 - So the PMIC bus is shared with the CP and must be used through the batcher on every board
   with a running modem. The CP mailbox block's 0x10500180 range (stock second reg of hsi2c0)
   was never needed.
+
+### Protocol stack, SIM, network (2026-11-15 night, user's go)
+
+- Clean RAM boot, `samsungipcd /dev/ptyp0` (legacy pty; AT on `/dev/ttyp0`, `stty raw -echo`):
+  it boots the modem itself, opens FMT and RFS, INIT_END goes out, the stack starts.
+- NV service: the modem wrote 0x10b60 bytes at 0x80000 and 0x32d6 at 0x0 right after start:
+  exactly the regions that differ between stock's nv_data.bin and the 2019 backup. Served from
+  the RAM working copy; EFS untouched (mounted ro,noload).
+- Without SIM: `AT+CGSN` returns the IMEI (from NV), `+CSQ: 18`, `+CREG: 1,3` (denied, no SIM),
+  SIM status 0x80 (IPC_SEC_PIN_STATUS_CARD_NOT_PRESENT).
+- SIM inserted while running (user's own SIM, slot 1, PIN off): hot-detected, status
+  0x00 -> 0x82 -> 0x83 (init complete), `+CPIN: READY`; registered: `+CEREG: 1,1` (LTE),
+  `+CGREG: 1,1`, `+CREG: 1,6` (SMS only on the CS side, as on LTE without VoLTE). `+CSQ` reads
+  0,99 on LTE (the proxy's CSQ only covers 2G/3G).
+- The AT port queues unsolicited +CREG/+CGREG/+CEREG reports: the first command after a while
+  returns a long backlog before its own answer.
 
 ## 1. Decisions (user, 2026-11-15)
 

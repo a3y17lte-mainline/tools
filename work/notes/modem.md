@@ -2,8 +2,8 @@
 
 Status 2026-11-15 night: **LTE registration and mobile data work** with the user's SIM (O2 CZ),
 from a RAM boot (section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by
-hand, rmnet0 configured by hand. ~16 Mbit/s download. Not tried yet: SMS, calls, IPv6,
-suspend, ModemManager. The SIM is the user's own: no PIN tries, nothing sent without
+hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive works. Not tried yet: SMS
+send, calls, IPv6, suspend, ModemManager. The SIM is the user's own: no PIN tries, nothing sent without
 asking. Earlier the same day:
 Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
@@ -144,6 +144,12 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
   download (proof.ovh.net/files/100Mb.dat; it is 100 MiB, not 100 Mbit) in 54 s = ~16 Mbit/s,
   rx/tx errors and drops 0, no CP fail/watchdog interrupt, no hsi2c timeout. So the RAW ring,
   multi-frame-free SIPC5 path, flow control and the legacy rmnet netdev hold up under load.
+
+### SMS receive (2026-11-15 night)
+
+- The user sent an SMS to the A3: `IPC_SMS_INCOMING_MSG` in samsungipcd's log, `+CMTI: "ME",0`
+  queued on the AT port, `AT+CMGF=0` + `AT+CMGR=0` returned the PDU (GSM 7-bit, text arrived
+  intact). Decoding the PDU was done on the PC (no PDU tool on the phone).
 
 ## 1. Decisions (user, 2026-11-15)
 

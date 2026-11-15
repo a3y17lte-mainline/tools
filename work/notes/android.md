@@ -206,6 +206,17 @@ hand, `backport-kernel continue`.
     recovery uses the same kernel), dumpsys SurfaceFlinger layers DEVICE, colours/alpha of
     status bar and dialogs (premultiplied), fades (plane alpha), rerun bench.sh. Not done:
     FIFO underrun reporting and a DISP/INT floor for 3 windows (only if artefacts show).
+  - Restart with a cable attached ended in offline charging (user, build 4; confirmed with
+    adb reboot): S-Boot takes "charger present at boot" for a plug-in of a powered-off phone
+    unless PMU INFORM2 (0x808) = 0x12345678, which the vendor sec_reboot.c writes before every
+    restart ("LPM mode prevention") and clears at power-off. Never seen on Alpine: U-Boot
+    ignored androidboot.mode=charger. Fix: reboot notifier in exynos7870-pmu.c (mainline tip
+    19e10510075a, Android lineage-24.0 2bad70122d50). The offline charging screen itself works.
+  - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
+    descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
+    defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake
+    also needs config_deviceHardwareWakeKeys (was not applied before LineageResA3y17lte).
+    To do with the phone on USB: timed s2idle vs deep cycles (RTC wakealarm), USB after each.
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from
   the thermistor IIO channel ("batt-temp"), TECHNOLOGY + design values through
   monitored-battery (power supply core). Not run on the phone yet.

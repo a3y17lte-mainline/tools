@@ -212,6 +212,19 @@ hand, `backport-kernel continue`.
     restart ("LPM mode prevention") and clears at power-off. Never seen on Alpine: U-Boot
     ignored androidboot.mode=charger. Fix: reboot notifier in exynos7870-pmu.c (mainline tip
     19e10510075a, Android lineage-24.0 2bad70122d50). The offline charging screen itself works.
+  - P0, random boot loops (seen on build 5, build 4 has the cause too): kernel panic at ~0.72 s,
+    "CFI failure at ktime_get_update_offsets_now (target: arch_counter_read)" + "stack-protector:
+    Kernel stack is corrupted in: vsnprintf", right after "cpu cpuN: Failed to set required
+    opps: -16" / "cpufreq: __target_index: Failed to change cpu frequency: -16". The CPU OPPs'
+    required-opps (DMC table, read by the devfreq passive governor) are lazily linked; until
+    the DMC table exists, _set_required_opps() returned -EBUSY although the OPP core has no
+    required device for them, on scale-down AFTER clock + regulator were changed and without
+    updating current_opp. cpufreq and hardware then disagree, the next change steps clock and
+    voltage in the wrong order -> undervolted CPU. Alpine never hit it (governor userspace at
+    boot); Android's schedutil scales from 0.63 s. Fix: OPP core checks the pending link only
+    where a required device is set (mainline tip 323c233093cb, Fixes: e37440e7e2c2; Android
+    lineage-24.0 82cbab17c229). Log: out/android/bootloop-1536/pstore-prev.txt. S-Boot's
+    sec_reset.reset_reason was 3 on the boot after the panic, 7 after normal restarts.
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

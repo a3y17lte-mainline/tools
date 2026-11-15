@@ -318,6 +318,17 @@ hand, `backport-kernel continue`.
     / p50 21 ms / gpu p50 13 ms; 676 MHz 8.5% / 15 / 7; 845 MHz 5.6% / 14 / 6 (build 4 with GPU
     composition: 11.2% / 17 / 5). Whether the framework's boosts cover a scroll as well as a
     fixed floor is to be measured on the build.
+  - GPU floor benchmark (2026-11-15, kernel #7, fixed devfreq min_freq; scripts
+    /data/local/tmp/bench2.sh (5 scenarios) and bench3.sh (Settings scroll + Jelly flings over
+    a Wikipedia page); raw output out/android/bench2-floors.txt, bench3-floors.txt). bench3,
+    3 runs per floor, repeat spread about +-1.5 points. Settings janky % / p50 / p95 / p99:
+    343: 15.3/21/57/80, 545: 13.4/19/49/77, 676: 11.0/17/55/78, 728: 10.4/16/59/78,
+    845: 6.3/17/34/58 (1001, one run in bench2: 7.3%). Browser p50/p95: 28/54, 28/50, 29/47,
+    28/48, 21/41. Launcher drawer (29-33% janky at every floor), notification shade and cold
+    starts (~0.9 s) do not react to the GPU floor. Energy per frame estimated as V^2 of the DT
+    OPPs: 343/450/545 share 750 mV (1.00), 676 1.17, 728 1.36, 845 1.52, 1001 1.80.
+    HAL (device 1a15cc6, not built): base 545 MHz, interaction boost 845 MHz, launch 1001.
+    bench2's browser scenario was invalid (shade left open: use cmd statusbar collapse).
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

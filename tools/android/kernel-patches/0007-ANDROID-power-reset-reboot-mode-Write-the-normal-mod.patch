@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sun, 15 Nov 2026 01:20:30 +0100
-Subject: [PATCH 08/11] ANDROID: power: reset: reboot-mode: Write the normal
- mode at boot
+Subject: [PATCH 7/8] ANDROID: power: reset: reboot-mode: Write the normal mode
+ at boot
 
 Samsung's S-Boot remembers the last boot mode until the reboot mode
 register tells it another one. A reset that bypasses the reboot notifier

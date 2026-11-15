@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sat, 14 Nov 2026 21:20:40 +0100
-Subject: [PATCH 01/11] ANDROID: arm64: dts: a3y17lte: S-Boot DTB selection and
+Subject: [PATCH 1/8] ANDROID: arm64: dts: a3y17lte: S-Boot DTB selection and
  Wi-Fi/BT addresses
 
 S-Boot loads boot.img directly and picks the DTB from its DTBH table by
@@ -17,7 +17,7 @@ Bluetooth HAL never sees it.
  1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts b/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
-index 1f716bb18b89..5bf0b33f5959 100644
+index 8ecaf5d126b6..cf39a347cd27 100644
 --- a/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
 +++ b/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dts
 @@ -17,6 +17,16 @@
@@ -37,7 +37,7 @@ index 1f716bb18b89..5bf0b33f5959 100644
  	chassis-type = "handset";
  
  	aliases {
-@@ -943,6 +953,8 @@ &mmc1 {
+@@ -958,6 +968,8 @@ &mmc1 {
  	wifi@1 {
  		compatible = "qcom,ath10k";
  		reg = <1>;
@@ -46,7 +46,7 @@ index 1f716bb18b89..5bf0b33f5959 100644
  	};
  };
  
-@@ -1293,6 +1305,8 @@ &serial1 {
+@@ -1308,6 +1320,8 @@ &serial1 {
  
  	bluetooth {
  		compatible = "qcom,qca9377-bt";

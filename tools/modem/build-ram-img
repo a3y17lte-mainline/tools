@@ -1,0 +1,58 @@
+#!/bin/bash
+# build-ram-img: RAM-only test image for modem work, for `fastboot boot`.
+#
+#   build-ram-img [output.img]
+#
+# Kernel from the `modem` branch (worktree src/linux-modem, build directory out/linux-modem,
+# config = out/linux/.config + the modem options), the usual debug initramfs, and an extra
+# initramfs layer with the modem modules and the userspace from out/modem-userspace
+# (run tools/modem/build-userspace first). Nothing is written to the phone.
+#
+# On the phone afterwards:  insmod /lib/modem/exynos-mailbox.ko; insmod /lib/modem/exynos_modem.ko
+set -euo pipefail
+ROOT=~/Projects/exynos7870
+SRC=$ROOT/src/linux-modem
+O=$ROOT/out/linux-modem
+US=$ROOT/out/modem-userspace
+BASE_CPIO=$ROOT/out/images/initramfs-debug.cpio.gz
+OUT=${1:-$ROOT/out/images/linux-a3y17lte-modem.img}
+K=(make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1)
+
+[ -e "$US/usr/sbin/samsungipcd" ] || { echo "run tools/modem/build-userspace first" >&2; exit 1; }
+[ -e "$BASE_CPIO" ] || { echo "no $BASE_CPIO: run tools/build-kernel-img once" >&2; exit 1; }
+
+mkdir -p "$O"
+cp "$ROOT/out/linux/.config" "$O/.config"
+"$SRC/scripts/config" --file "$O/.config" -e MAILBOX -m EXYNOS_MBOX -m WWAN -m EXYNOS_MODEM \
+	-e EXYNOS_MODEM_LEGACY_ABI
+"${K[@]}" olddefconfig
+for c in EXYNOS_MBOX EXYNOS_MODEM EXYNOS_MODEM_LEGACY_ABI; do
+	grep -q "^CONFIG_$c=" "$O/.config" || { echo "CONFIG_$c did not stick" >&2; exit 1; }
+done
+
+nice "${K[@]}" CC="ccache clang" -j"$(nproc)" Image dtbs modules \
+	> "$ROOT/out/kernel-build-modem.log" 2>&1 || { tail -20 "$ROOT/out/kernel-build-modem.log"; exit 1; }
+
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+mkdir -p "$T/lib/modem" "$T/usr/local/bin"
+cp "$O/drivers/mailbox/exynos-mailbox.ko" "$O/drivers/net/wwan/exynos_modem/exynos_modem.ko" "$T/lib/modem/"
+cp -a "$US/usr" "$T/"
+rm -rf "$T/usr/include"
+install -m755 "$ROOT/tools/modem/modem-nv-setup" "$T/usr/local/bin/modem-nv-setup"
+(cd "$T" && find . -mindepth 1 -print0 | cpio --null -o -H newc -R 0:0 --quiet) | gzip -9 > "$T.cpio.gz"
+cat "$BASE_CPIO" "$T.cpio.gz" > "$T.ramdisk"
+rm -f "$T.cpio.gz"
+
+# Load addresses as in tools/build-kernel-img
+mkbootimg --header_version 2 \
+	--base 0x40000000 --kernel_offset 0x00200000 \
+	--dtb_offset 0x08000000 --ramdisk_offset 0x09000000 \
+	--tags_offset 0x00000100 --second_offset 0x00f00000 \
+	--kernel "$O/arch/arm64/boot/Image" \
+	--dtb "$O/arch/arm64/boot/dts/exynos/exynos7870-a3y17lte.dtb" \
+	--ramdisk "$T.ramdisk" \
+	-o "$OUT"
+rm -f "$T.ramdisk"
+ls -l "$OUT"
+echo "kernel $(cat "$O/include/config/kernel.release") from $(git -C "$SRC" log --oneline -1)"

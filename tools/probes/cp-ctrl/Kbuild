@@ -1,0 +1,1 @@
+obj-m := cp_ctrl.o

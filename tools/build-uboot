@@ -3,14 +3,17 @@
 #
 #   build-uboot [--native-header] [output.img]
 #
+# UBOOT_SRC / UBOOT_OUT select another source tree and build directory (side branches in a
+# worktree, e.g. src/u-boot-modem).
+#
 # By default the arm64 Image header is patched to match Samsung kernels
 # (text_offset 0x80000, flags 0), the layout verified to boot from S-Boot.
 # U-Boot is position independent and never reads its own header.
 # --native-header  keep U-Boot's own header (text_offset 0, flags 0xa); untested.
 set -euo pipefail
 ROOT=~/Projects/exynos7870
-SRC=$ROOT/src/u-boot
-O=$ROOT/out/u-boot
+SRC=${UBOOT_SRC:-$ROOT/src/u-boot}
+O=${UBOOT_OUT:-$ROOT/out/u-boot}
 LEGACY=1
 if [[ "${1:-}" == "--native-header" ]]; then LEGACY=0; shift; fi
 if [[ "${1:-}" == "--legacy-header" ]]; then shift; fi	# old flag, now the default

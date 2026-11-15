@@ -14,6 +14,42 @@ stock `/sbin/cbd` (ramdisk of `backups/*/BOOT.img`), stock `libsec-ril.so`
 (`work/system/SYSTEM.img`), the RADIO/EFS/CPEFS backup images (read-only; never copied into git).
 The vendor code is a register/protocol reference only: the driver is written clean.
 
+## 0. Phone results (2026-11-15, RAM boot of the `modem` kernel through U-Boot on RECOVERY)
+
+Setup: U-Boot from the `modem` U-Boot branch on RECOVERY (`out/images/u-boot-a3y17lte-modem.img`,
+a3-flash, sha256 d7a25b69...; BOOT keeps Android). Recovery key combo -> U-Boot -> no extlinux
+on SYSTEM -> fastboot -> `fastboot boot out/images/linux-a3y17lte-modem.img`
+(`tools/modem/build-ram-img`: modem kernel + debug initramfs + modules in /lib/modem + the
+userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`.
+
+- U-Boot built for BOOT runs from RECOVERY, and with the modem reservations it still boots.
+- Linux reserves the three regions (`/proc/iomem` affff000-b77fffff reserved).
+- **The modem control registers are secure-only.** `peek` of PMU 0x30 (CP_CTRL_NS), 0x34
+  (CP_CTRL_S), 0x50 (CP2AP_MEM_CONFIG), 0x70 (MODAPIF_CONFIG) gives a bus error, and the monitor's
+  generic SFR read (SMC_CMD_REG) refuses them (-1). Readable: CP_STAT 0x38 = 0x110, CP_DEBUG
+  0x3c = 0, CENTRAL_SEQ_CP 0x280 = 0x10000, the five CP SYS_PWR registers = 0xffffffff.
+  The lineage defconfig says "CP_SECURE_BOOT is not set", but `SEC_MODEM_SS310AP` selects it:
+  the stock kernel binary (BOOT backup) contains the secure-path messages ("read Fail",
+  "CP_CTRL Write Fail", "cp_ctrl[0x%08x] -> [0x%08x]") and none of the direct-write ones.
+  So CP_CTRL goes through `SMC 0x82000700`: READ_CTRL = (3, 0, reg), value in bits 31-16, error
+  in bits 15-0; WRITE_CTRL = (4, value, reg), error if > 0; reg 0 = CP_CTRL_S, 1 = CP_CTRL_NS.
+  The driver was changed accordingly (it would have taken a synchronous abort otherwise).
+- READ_CTRL returns error 11 for both registers, on CPU 0 and CPU 4, before any image was
+  verified (`tools/probes/cp-ctrl`). On stock the first request to this service is the
+  unlock/verify pair from cbd, and the kernel only reads CP_CTRL after that (a failed read
+  counts as "not powered" there too), so this is expected to change after the verify request.
+  The same 11 is what the Galaxy S7 write-up got from its first unlock request.
+- Mailbox clock gate CMU_MIF 0x828 = 0x00ffffff (bit 22 on), 0x830 = 1.
+- Bootinfo page 0xaffff000: 280 non-zero bytes. The first ~0x90 bytes look like DRAM
+  initialisation data (LPDDR mode register writes 01 83 00 84 / 02 1c 00 84 / 03 01 00 84 /
+  0b 00 00 84, timing words); after that stale Android heap pointers (0xb4... tagged), because
+  the Android kernel does not reserve the page. The firmware region starts with stale Android
+  memory too. Not yet compared across two cold boots.
+- Both modules load: `exynos-mailbox` (IRQ 401 = SPI 369), `exynos_modem` (all `/dev/umts_*`,
+  `multipdp`, `rmnet0-7`, the fail and watchdog IRQs).
+- `modem-nv-setup`: EFS mounted "ro without journal" (norecovery), NV working copy in
+  /var/lib/modem/nv (RAM in this boot).
+
 ## 1. Decisions (user, 2026-11-15)
 
 - Kernel interface: clean core; a Samsung-compatible front end (`/dev/umts_boot0`, `umts_ipc0`,
@@ -58,7 +94,8 @@ The vendor code is a register/protocol reference only: the driver is written cle
   | 0x0280 | CENTRAL_SEQ_CP_CONFIGURATION | written 0 before a CP reset |
   | 0x1170, 0x11cc, 0x11d0, 0x11d4, 0x11d8 | RESET_AHEAD_CP, CLEANY_BUS, LOGIC_RESET_CP, TCXO_GATE, RESET_ASB_CP SYS_PWR | written 0 before a CP reset |
 
-  The A3 kernel config has CP_SECURE_BOOT off: these are plain PMU writes, not SMCs.
+  CP_CTRL_NS/S are secure-only and go through the secure monitor (section 0); the sequencer and
+  SYS_PWR registers are plain PMU writes.
 - Vendor power sequences (`pmu-cp.c`, `modem_ctrl_ss310ap.c`):
   - on: clear all 64 mailbox registers; write `hw_rev | (dual_sim << 8)` to mailbox register
     0x21; copy 0x800 bytes deliver_cp -> IPC+0x1000; pda_active (mbox 6) = 1; if CP_CTRL_NS.PWRON

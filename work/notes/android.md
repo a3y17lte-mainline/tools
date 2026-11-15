@@ -329,6 +329,19 @@ hand, `backport-kernel continue`.
     OPPs: 343/450/545 share 750 mV (1.00), 676 1.17, 728 1.36, 845 1.52, 1001 1.80.
     HAL (device 1a15cc6, not built): base 545 MHz, interaction boost 845 MHz, launch 1001.
     bench2's browser scenario was invalid (shade left open: use cmd statusbar collapse).
+  - Launcher drawer jank (2026-11-15, kernel #7): not CPU frequency (both clusters pinned at
+    1586 MHz: 29-30% janky as before), not GPU frequency, no blur (never enabled:
+    ro.surface_flinger.supports_background_blur unset, mBlurEnabled=false). framestats: slow
+    frames (37%) = issue draw 22 ms (8.6 fast), GPU completion 20 ms (5), dequeueBuffer 12.5 ms
+    (4), queued behind the previous frame 17 ms; total 72 ms vs 18. simpleperf (no hardware PMU
+    in our DT: -e cpu-clock --trace-offcpu): RenderThread on CPU ~13%, half of its frame work
+    in dequeueBuffer -> BBQBufferQueueProducer::waitForBufferRelease. Panfrost fdinfo (echo 1
+    > /sys/bus/platform/devices/11400000.gpu/profiling): 4.0 s fragment + 0.23 s vertex-tiler
+    for ~350 frames = 11 ms GPU per frame. Cause found: the home screen is all CLIENT: the
+    wallpaper layer is scaled (source 654x1164 -> 720x1280 = config_wallpaperMaxScale 1.10),
+    planes cannot scale, and drm_hwcomposer then composites all three layers on the GPU. Fix
+    to verify on the build: config_wallpaperMaxScale = 1 (device overlay). toybox date has
+    no %N: wall times in scripts need another clock.
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

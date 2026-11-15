@@ -106,6 +106,13 @@ hand, `backport-kernel continue`.
   BOARD_CUSTOM_BOOTIMG := true puts ours into target-files BOOTABLE_IMAGES/ (device 0a23a82).
   Kernel: CPUSETS_V1 was off ("Unknown subsys name 'cpuset'"), added with FUSE_BPF, incfs,
   ANON_VMA_NAME, MGLRU, NLS_UTF8 (from a gki_defconfig diff). BOOT is mmcblk0p10.
+  Second full build (2026-11-15): BOOTS (sys.boot_completed=1, all our HALs running). Fixed
+  after it: system_server "Failed to create ashmem" (no /dev/ashmem; libcutils uses memfd by
+  itself only for ro.vendor.api_level >= 202604, ours is 23) -> sys.use_memfd=true on product
+  (vendor may not set use_memfd_prop); lmkd exiting ("Old kill strategy can only be used with
+  v1 cgroup hierarchy") -> dropped ro.lmk.use_minfree_levels; Bluetooth abort on LE_ADV_FILTER
+  0xfd57 -> bluetooth.core.le.vendor_capabilities.enabled=false. Device d6a5882..058d81e.
+  adb root needs the LineageOS developer option; as shell, setprop works while permissive.
   Open for the first boot: HAL sources are only syntax-checked here; drm_hwcomposer with the
   command-mode panel; HIDDEN/CACHE/USERDATA are formatted by the first boot (formattable).
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from

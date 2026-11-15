@@ -267,6 +267,26 @@ hand, `backport-kernel continue`.
     dead after locking" did not reproduce in 20 s cycles on #7 (seen on the build-4 kernel;
     host log then: descriptor read -110). LineageResA3y17lte now applies (wake keys 1, keys
     19): Home wake to be confirmed by the user.
+  - Wake-on-WLAN (2026-11-15, device d4c3947, not built yet): the stock qwlan30.bin +
+    otp30.bin (raw SGMT images, as the payload of linux-firmware's firmware-sdio-5.bin) wrapped
+    in a QCA-ATH10K container with features wowlan + ignore-otp (device tools/mk_ath10k_fw.py,
+    run by extract-files.sh, output sha256 2db55a8d...). It boots under ath10k (htt-ver 3.32,
+    wmi-op 4) in 1.2 s instead of 4.2 s and reports WMI_TLV_SERVICE_WOW; iw then lists
+    disconnect, magic packet, 22 patterns, net detect ("any" is not offered). With
+    wowlan enable disconnect magic-packet: wiphy_resume 0.107 s instead of 5.2 s, still
+    associated after the wake. The supplicant sets the triggers from
+    /vendor/etc/wifi/wpa_supplicant_overlay.conf (wowlan_triggers=disconnect magic_pkt).
+    Not checked: whether 00061 reports WOW too (its container has no wowlan feature anyway);
+    wake on incoming unicast data needs a pattern (none set: only disconnect/magic packet/
+    the default ath10k events wake the phone); throughput on the stock firmware.
+    How it was tested without a build (firmware from a private path, lost at reboot):
+    echo -n /data/local/tmp/fw > /sys/module/firmware_class/parameters/path, svc wifi disable,
+    unbind/bind mmc1:0001:1 in /sys/bus/sdio/drivers/ath10k_sdio, svc wifi enable.
+    Reading the firmware's service bitmap without ath10k debugfs: kprobe
+    ath10k_core:ath10k_wmi_tlv_op_pull_svc_rdy_ev+0x10c, words at +0..(%x10) (x10 = svc_bmap;
+    x1 is mem_reqs), 4 services per word: stock = 0xd 0x7 0x9 0x2 0xf 0x9, WOW = word 3 bit 1.
+    On the DGX: extract-files.sh needs system/qwlan30.bin and system/otp30.bin in its
+    firmware directory, and has to be re-run before the build.
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

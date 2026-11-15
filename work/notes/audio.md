@@ -10,6 +10,15 @@ none planned now. Decisions (user): 192 kHz is deliberately NOT implemented. Blu
 needs no audio-driver work: A2DP (music, also on Android) is software over HCI. Only SCO (calls,
 headset mic) could use the hardware PCM path QCA9377 -> mixer BT port (gpz0, stock "route-ap-bt");
 revisit with the modem/call work, and check first whether SCO over HCI on the QCA9377 is enough.
+
+Fixed 2026-11-15 (found on Android, pitch ~7 semitones low): the I2S RCLK came from the bus clock.
+I2SMOD bit 10 (RCLKSRC) = 0 selects PCLK on this IP and 1 the audio clock, but the DT gave MI2S as
+both i2s_opclk0 and i2s_opclk1 and never chose a parent, so the probe reset left bit 10 at 0. At the
+S-Boot DISP bus rate (APB ~100 MHz) that played at ~48.8 kHz, close enough to pass the Alpine tests;
+once bus DVFS lowered DISP to 133 MHz, APB = 66.625 MHz / PSR 8 / RFS 256 = 32.53 kHz, matching the
+DMA rate measured on the phone. Fix (folded into "arm64: dts: exynos7870: Add I2S0", group AW):
+opclk0 = APB_AUD, opclk1 = MI2S, and assigned-clock-parents <&i2s0 CLK_I2S_RCLK_SRC> = MI2S
+(as on tm2/odroid/snow). Lesson: check the real rate (hw_ptr over time) and not just "it plays".
 Also not planned: UCM2 (pmOS not a priority), jack wake (the IRQ works), 4-button headset test.
 
 ## Earlier status (2026-11-14): prerequisites done and verified on the phone

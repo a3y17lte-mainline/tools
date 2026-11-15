@@ -174,6 +174,11 @@ hand, `backport-kernel continue`.
   vendor.prop (device 66c9790); tested live (setprop as root, restart media.swcodec,
   mediaserver and zygote; the codec list is built by the lazy media.codeclist.generator).
   Sound confirmed by the user.
+  Then the pitch was ~7 semitones low: the stream ran at 32.5 kHz (hw_ptr over time). kprobes on
+  i2s_trigger (+0x658 MOD, +0x674 PSR inputs; tracing_on must be 1 on Android) showed MOD 0x1000,
+  i.e. RCLKSRC = PCLK, at 66.625 MHz since bus DVFS. A DT fix in the mainline series (group AW; see
+  audio.md status), folded into the Android kernel too (lineage-24.0 0bc47ba9803e, force-pushed).
+  Android has no /dev/mem: kprobes with register-held values replace peek for driver state.
   Next, planned (stashed plan): our own light HAL for the touch-key LED (the LineageOS HAL
   only matches button-backlight*, so dumpsys lights is empty and the keys stay lit), and 3
   DECON windows with blending (composition efficiency 0.0025: everything goes through the

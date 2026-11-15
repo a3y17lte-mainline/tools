@@ -99,6 +99,13 @@ hand, `backport-kernel continue`.
   build were A/B-flavoured (ro.build.ab_update, update_engine, super metadata): rebuild.
   Android may rewrite RECOVERY from boot (install-recovery): fine by the user (2026-11-15),
   RECOVERY holds Lineage recovery anyway.
+  First boot (2026-11-15): bootloop, init rebooted "bootloader,bootstrap-apexd-failed"; cause not
+  seen (S-Boot's loglevel=4 is an early param, our bootconfig loglevel never applied: now a
+  kernel.sysctl.kernel.printk bootconfig entry + printk.devkmsg=on). The installed BOOT was a
+  plain mkbootimg image (no DTBH, bootconfig, SEANDROID): the OTA tools repack boot.img unless
+  BOARD_CUSTOM_BOOTIMG := true puts ours into target-files BOOTABLE_IMAGES/ (device 0a23a82).
+  Kernel: CPUSETS_V1 was off ("Unknown subsys name 'cpuset'"), added with FUSE_BPF, incfs,
+  ANON_VMA_NAME, MGLRU, NLS_UTF8 (from a gki_defconfig diff). BOOT is mmcblk0p10.
   Open for the first boot: HAL sources are only syntax-checked here; drm_hwcomposer with the
   command-mode panel; HIDDEN/CACHE/USERDATA are formatted by the first boot (formattable).
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from

@@ -120,6 +120,31 @@ hand, `backport-kernel continue`.
   system app (disable-user ignored, uninstall/adbroot need root/system). NFC is gated off in
   device.mk (A3_ENABLE_NFC) until debugged with Rooted debugging + debuggerd -j.
   zram: swapon_all failed on max_comp_streams (no such sysfs file on 6.x): option dropped.
+- Third build (2026-11-15): boots in ~1 min, usable ("okay, not great"). CPU/GPU/DRAM clocks OK
+  (MIF pinned at 902 MHz without bus DVFS). All layers are CLIENT (GPU) composition: mainline
+  exynos7 DECON exposes 2 windows (primary + CURSOR, no blend/alpha props, immutable zpos);
+  the 7870 DECON-INT has 3 (stock max_win = 3; vendor WINCHMAP0 / VIDW_ADD0 / BLENDE). Plan:
+  3 windows, overlays, pixel blend mode + alpha, mutable zpos (mainline first). JANK_COMPOSER
+  frames of 50-100 ms: measure GPU composition vs the command-mode commit first.
+  Open issues found that day:
+  - Bluetooth showed no devices: the stack's main thread sat in AServiceManager_waitForService
+    for IBluetoothAudioProviderFactory/default (Hearing Aid init). bluetooth.audio-impl's VINTF
+    fragment declares it, but only the old combined audio service called
+    createIBluetoothAudioProviderFactory(). Fixed: our audio service calls it (device cacd142).
+    Not yet: an A2DP output path (bluetooth module in the audio HAL + policy config).
+  - Audio dead, no sound card: "samsung-i2s: Failed to add route Secondary Playback(*) ->
+    Playback Mixer", card -ENODEV. ACK 6.18 lacks 4fc945d8fdfc (no secondary DAI on i2sv7)
+    and 752925401476 (op_clk vs runtime PM): added to kernel-prereqs.txt (both cherry-pick
+    cleanly on the 6.18 base); needs a backport-kernel regeneration.
+  - Browser gray: the page loads, the WebView renderer never draws. Renderer log: "ashmem:
+    readlink(/proc/self/fd/N) failed: Operation not permitted" + "Unable to stat ashmem device":
+    libcutils identifies memfds by readlink, Chromium's renderer sandbox denies it, and the
+    fallback needs /dev/ashmem. sys.use_memfd alone is not enough: Android still expects
+    /dev/ashmem. ACK 6.18 has only the Rust ashmem (ASHMEM depends on RUST; android16-6.12
+    too, the C driver ends at android15-6.6). Options: CONFIG_RUST in our kernel build (needs
+    rustc + bindgen + rust-src for the arm64 build host in LOS kernel.mk) or carry the
+    android15-6.6 C ashmem as an ANDROID: patch (port to the 6.18 shrinker API). With
+    /dev/ashmem present, sys.use_memfd may be droppable again.
   Open for the first boot: HAL sources are only syntax-checked here; drm_hwcomposer with the
   command-mode panel; HIDDEN/CACHE/USERDATA are formatted by the first boot (formattable).
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from

@@ -70,3 +70,9 @@ b990db9a0176  exclude=drivers/gpu/drm/panel/panel-samsung-s6e3fc2x01.c,drivers/g
 # Fixes the series relies on
 5a759b120e31  phy: exynos5-usbdrd: fix USB 2.0 HS PHY tuning values for Exynos7870
 f4b830a53719  leds: expresswire: Fix chip state breakage
+
+# Samsung I2S on Exynos7870 (v7 variant without a secondary DAI): without 4fc945d8fdfc the card
+# fails with "Failed to add route Secondary Playback(*) -> Playback Mixer" (-ENODEV, no sound
+# card on Android 2026-11-15). 752925401476 balances op_clk with runtime PM.
+4fc945d8fdfc  ASoC: samsung: i2s: drop secondary DAI for i2sv7 hardware variant
+752925401476  ASoC: samsung: i2s: enable op_clk in probe to balance runtime PM

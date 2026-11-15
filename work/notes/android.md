@@ -297,9 +297,16 @@ hand, `backport-kernel continue`.
     cfg80211 disables the channels outside it in orig_flags at registration: 100-144 stay
     "disabled" whatever the country. 36-64 and 149-165 are no-IR (passive scan, usable once
     a beacon is heard). The user's own 5 GHz network was not in the scan: probably on 100+.
-    Stock (qcacld) ignores the board domain when the host sets a country. Options, undecided:
-    change the regdomain in board.bin, or a kernel-side override. Android's country code is
-    null (no telephony).
+    CORRECTION (same day): that was an artefact of loading the database after the wiphy had
+    registered. The board data's regdomain is 0 (kprobe on the service-ready event: rd=0x0),
+    which ath maps to its default country US: it registers with the no-midband default world
+    domain and sends a driver hint "US" (REGULATORY_STRICT_REG), whose rules then REPLACE
+    orig_flags. Without regulatory.db that hint failed at registration and was never retried.
+    With the database present before the driver binds (tested by rebinding ath10k_sdio): phy
+    US/DFS-FCC as base, global CZ from the AP's country IE, channels 100-140 enabled (no-IR +
+    radar detection = passive scan), and the user's Malumalu_5G on 5640 MHz (ch 128) is in the
+    scan. No regulatory override needed: device 78e0986 + vendor 146e764 are the whole fix.
+    Android's country code is still null (no telephony): the AP's country IE sets it.
   - Wi-Fi link speed "1 Mbps": cosmetic. ath10k fills the tx bitrate only with
     WMI_SERVICE_PEER_STATS (not in TLV firmware) or PEER_STATS_INFO (service 116: not set in
     the stock firmware, bitmap 0xd 7 9 2 f 9 b f b b 4 c 0 0 0 2 0 0 1 0...). Only the rx

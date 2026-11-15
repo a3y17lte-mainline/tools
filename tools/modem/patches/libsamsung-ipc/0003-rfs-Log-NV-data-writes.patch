@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sun, 15 Nov 2026 15:03:42 +0100
+Subject: [PATCH] rfs: Log NV data writes
+
+The modem's NV data holds its calibration and identity. Log where the
+modem changes it.
+---
+ samsung-ipc/rfs.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/samsung-ipc/rfs.c b/samsung-ipc/rfs.c
+index 1616f89..965252e 100644
+--- a/samsung-ipc/rfs.c
++++ b/samsung-ipc/rfs.c
+@@ -653,6 +653,9 @@ int ipc_nv_data_write(struct ipc_client *client, const void *data, size_t size,
+ 		return -1;
+ 	}
+ 
++	ipc_client_log(client, "Writing nv_data: offset 0x%x, size 0x%zx",
++		       offset, size);
++
+ 	rc = ipc_nv_data_path_check(client);
+ 	if (rc < 0) {
+ 		ipc_client_log(client, "Checking nv_data path failed");
+-- 
+2.56.0
+

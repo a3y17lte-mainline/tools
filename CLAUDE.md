@@ -107,7 +107,20 @@ Not done, roughly in planned order:
   revisit with the modem, after checking SCO over HCI.
 - GPU follow-ups: sending the Mesa/GTK patches (see GPU section); build + shader-db the Mesa
   branches on main before the MR. Per-chip GPU voltages done and installed 2026-11-12 (group X).
-- Android 17 (phase 4). Stretch goals: modem (Shannon 315; remoteproc + mailbox + WWAN) and cameras.
+- Modem (Shannon 315, 2026-11-15): code written, nothing run on the phone yet. Kernel: 10 commits
+  on branch `modem` in the worktree src/linux-modem (mailbox variant, drivers/net/wwan/exynos_modem,
+  Samsung's /dev/umts_* + rmnet interface as a local-only front end). Builds, KUnit, series-lint and
+  dtbs_check are clean. Not on a3y17lte and not in the tracker: rebase with
+  `git rebase --onto a3y17lte 929b94890e8d modem`, then add the groups from out/tracker/ledger.md.
+  Userspace: tools/modem/ (libsamsung-ipc a3y17lte profile, samsungipcd NV service) builds into
+  out/modem-userspace. U-Boot must be updated BEFORE a kernel with the modem DT is installed: it
+  loads kernel and ramdisk into the modem's memory (fix: branch `modem` in the worktree
+  src/u-boot-modem, built but not flashed). Next steps need Alpine: read-only probes, the U-Boot
+  flash, then the first modem start (needs the user's go). EFS stays never-touch: the modem's NV files run on a working copy
+  (tools/modem/modem-nv-setup, EFS mounted ro,noload). Never run libsamsung-ipc's herolte profile
+  on the real EFS (wrong NV size: it overwrites nv_data.bin from the 2019 backup file).
+  Start with work/notes/modem.md (status header, sections 8 and 10).
+- Android 17 (phase 4). Stretch goal: cameras.
 - Upstreaming: wave 1 is ready to prepare once the user wants to send.
 
 Working style (user preferences, also in memory): short single-step phone commands, no chained wait
@@ -180,7 +193,8 @@ Keep series small: one commit per logical change, follow-ups folded in.
 - `firmware/twrp/` TWRP 3.7.0_9-0 a3y17lte (GPG-verified, TeamWin key 95707D42…891A43DF)
 - `tools/` a3-flash, a3-install-kernel, a3-backup, guard-phone-writes (+ .tests), build-uboot, build-kernel-img, build-rootfs, a3-sync-modules,
   mkconfig-a3y17lte, mkbootimg-samsung, phone-sh, peek/, ect-parse, initramfs/ (init, showoff.sh), probes/
-  (bare-metal S-Boot payloads, asv-fuse module)
+  (bare-metal S-Boot payloads, asv-fuse module), modem/ (build-userspace, test-nv, modem-nv-setup, patches for
+  libsamsung-ipc and samsungipcd)
 - `work/` stock DTs (ground truth, rev02 DTB = this unit), kernel config copy, initramfs tree (Alpine 3.24;
   add packages with its own apk: `cd work/initramfs && qemu-aarch64-static -L . ./sbin/apk --root . --usermode
   --arch aarch64 add PKG`; the busybox trigger error is harmless), `work/ssh/` dropbear host key

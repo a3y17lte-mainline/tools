@@ -1,0 +1,42 @@
+#!/bin/sh
+# modem-nv-setup: runs ON THE PHONE (Alpine), before the modem software starts.
+#
+# - makes /dev/disk/by-partlabel/{RADIO,EFS} if the device manager did not (symlinks in /dev)
+# - mounts EFS strictly read-only at /efs: "noload" keeps ext4 from replaying its journal,
+#   so not a single block of the partition is written
+# - on the first run copies the modem's four NV data files to the working copy in
+#   /var/lib/modem/nv, which is what libsamsung-ipc (a3y17lte profile) reads and writes
+#
+# The working copy holds the IMEI and the radio calibration: root only, never copy it off the
+# phone. Delete /var/lib/modem/nv to start again from the files on EFS.
+set -eu
+NV=/var/lib/modem/nv
+
+part() {
+	for u in /sys/class/block/*/uevent; do
+		if grep -qx "PARTNAME=$1" "$u"; then
+			echo "/dev/$(basename "$(dirname "$u")")"
+			return 0
+		fi
+	done
+	echo "modem-nv-setup: no partition named $1" >&2
+	return 1
+}
+
+mkdir -p /dev/disk/by-partlabel
+for p in RADIO EFS; do
+	[ -e "/dev/disk/by-partlabel/$p" ] || ln -s "$(part "$p")" "/dev/disk/by-partlabel/$p"
+done
+
+mkdir -p /efs
+mountpoint -q /efs ||
+	mount -t ext4 -o ro,noload,nosuid,nodev,noexec /dev/disk/by-partlabel/EFS /efs
+
+if [ ! -e "$NV/nv_data.bin" ]; then
+	mkdir -p "$NV"
+	chmod 700 /var/lib/modem "$NV"
+	for f in nv_data.bin nv_data.bin.md5 .nv_data.bak .nv_data.bak.md5; do
+		cp -p "/efs/$f" "$NV/"
+	done
+	echo "modem-nv-setup: NV working copy created in $NV"
+fi

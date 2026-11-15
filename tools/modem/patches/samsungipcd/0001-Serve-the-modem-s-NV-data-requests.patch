@@ -1,0 +1,157 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sun, 15 Nov 2026 15:04:07 +0100
+Subject: [PATCH] Serve the modem's NV data requests
+
+The daemon opened the RFS channel, because the kernel driver wants it
+open, but did not read from it. The modem's requests to read and write
+parts of its NV data file went unanswered, so nothing it changed
+survived a restart, and the kernel's receive queue for the channel ran
+full.
+
+Answer NV item reads and writes from the library's NV data file in a
+thread of its own, and report every other RFS command.
+
+While at it, let the Makefile take CC and CFLAGS, for cross builds.
+---
+ Makefile      | 10 +++---
+ samsung-ipc.c | 88 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 94 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index ff669b8..6b1859a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2,17 +2,19 @@ PREFIX ?= /usr
+ 
+ all: samsungipcd ppp-hook.so
+ 
++CC ?= gcc
++
+ ppp_crc.o: ppp_crc.c
+-	gcc ppp_crc.c -O3 -c -o ppp_crc.o
++	$(CC) ppp_crc.c -O3 -c -o ppp_crc.o
+ 
+ samsungipcd: server.c ppp_crc.o samsung-ipc.c modem.h buffers.h
+-	gcc -DPREFIX='"$(PREFIX)"' server.c ppp_crc.o samsung-ipc.c $(shell pkg-config --cflags --libs samsung-ipc) -o $@
++	$(CC) $(CFLAGS) -DPREFIX='"$(PREFIX)"' server.c ppp_crc.o samsung-ipc.c $(shell pkg-config --cflags --libs samsung-ipc) -o $@
+ 
+ samsungipcd-sim: server.c ppp_crc.o phonesim.c modem.h buffers.h
+-	gcc -DPREFIX='"$(PREFIX)"' server.c ppp_crc.o phonesim.c -o $@
++	$(CC) $(CFLAGS) -DPREFIX='"$(PREFIX)"' server.c ppp_crc.o phonesim.c -o $@
+ 
+ ppp-hook.so: ppp_hook.c ppp_crc.o
+-	gcc -DPREFIX='"$(PREFIX)"' ppp_hook.c ppp_crc.o -fPIE -fPIC -shared -pthread -o ppp-hook.so
++	$(CC) $(CFLAGS) -DPREFIX='"$(PREFIX)"' ppp_hook.c ppp_crc.o -fPIE -fPIC -shared -pthread -o ppp-hook.so
+ 
+ clean:
+ 	rm -f samsungipcd samsungipcd-sim ppp_crc.o
+diff --git a/samsung-ipc.c b/samsung-ipc.c
+index bc63e5e..35d1978 100644
+--- a/samsung-ipc.c
++++ b/samsung-ipc.c
+@@ -339,6 +339,88 @@ static void net_setup(struct ipc_client* fmt, const char* when)
+     }
+ }
+ 
++/*
++ * The modem keeps its settings and calibration in a file that the host stores
++ * for it. It reads and writes parts of that file through the RFS channel while
++ * it runs.
++ */
++static void rfs_nv_read_item(struct ipc_client* rfs, struct ipc_message* msg)
++{
++    struct ipc_rfs_nv_read_item_request_data* req = msg->data;
++    struct ipc_rfs_nv_read_item_response_header hdr = {0};
++    void* nv_data = NULL;
++    void* resp = NULL;
++    size_t resp_size = 0;
++    if(msg->size >= sizeof(*req))
++        nv_data = ipc_nv_data_read(rfs, req->length, req->offset);
++    if(nv_data)
++    {
++        hdr.confirm = 1;
++        hdr.offset = req->offset;
++        hdr.length = req->length;
++        resp_size = ipc_rfs_nv_data_item_size_setup(&hdr, nv_data, req->length);
++        resp = ipc_rfs_nv_read_item_setup(&hdr, nv_data, req->length);
++    }
++    if(resp)
++        ipc_client_send(rfs, msg->mseq, IPC_RFS_NV_READ_ITEM, 0, resp, resp_size);
++    else
++    {
++        printf("RFS: NV read failed (%zu bytes)\n", msg->size);
++        hdr.confirm = 0;
++        ipc_client_send(rfs, msg->mseq, IPC_RFS_NV_READ_ITEM, 0, &hdr, sizeof(hdr));
++    }
++    free(resp);
++    free(nv_data);
++}
++
++static void rfs_nv_write_item(struct ipc_client* rfs, struct ipc_message* msg)
++{
++    struct ipc_rfs_nv_write_item_request_header* req = msg->data;
++    struct ipc_rfs_nv_write_item_response_data resp = {0};
++    size_t size = ipc_rfs_nv_write_item_size_extract(msg->data, msg->size);
++    void* nv_data = ipc_rfs_nv_write_item_extract(msg->data, msg->size);
++    if(size && nv_data && !ipc_nv_data_write(rfs, nv_data, size, req->offset))
++    {
++        resp.confirm = 1;
++        resp.offset = req->offset;
++        resp.length = req->length;
++    }
++    else
++        printf("RFS: NV write failed (%zu bytes)\n", msg->size);
++    ipc_client_send(rfs, msg->mseq, IPC_RFS_NV_WRITE_ITEM, 0, &resp, sizeof(resp));
++}
++
++static void* rfs_thread(void* arg)
++{
++    struct ipc_client* rfs = arg;
++    for(;;)
++    {
++        struct ipc_message msg = {0};
++        if(ipc_client_poll(rfs, NULL, NULL) < 0)
++        {
++            //the modem is gone, the other thread ends the daemon
++            sleep(1);
++            continue;
++        }
++        if(ipc_client_recv(rfs, &msg) < 0)
++            continue;
++        switch(msg.command)
++        {
++        case IPC_RFS_NV_READ_ITEM:
++            rfs_nv_read_item(rfs, &msg);
++            break;
++        case IPC_RFS_NV_WRITE_ITEM:
++            rfs_nv_write_item(rfs, &msg);
++            break;
++        default:
++            printf("RFS: unhandled command 0x%04x (%zu bytes)\n", msg.command, msg.size);
++            break;
++        }
++        free(msg.data);
++    }
++    return NULL;
++}
++
+ static void* sipc_thread(void* arg)
+ {
+     fcntl(thread_comm[1], F_SETFL, fcntl(thread_comm[1], F_GETFL) | O_NONBLOCK);
+@@ -355,6 +437,12 @@ static void* sipc_thread(void* arg)
+     || ipc_client_open(fmt)
+     || ipc_client_open(rfs))
+         ans = -1;
++    else
++    {
++        pthread_t rt;
++        pthread_create(&rt, NULL, rfs_thread, rfs);
++        pthread_detach(rt);
++    }
+     write(thread_comm[1], &ans, sizeof(ans));
+     char* smsc_addr = NULL;
+     size_t smsc_addr_len = 0;
+-- 
+2.56.0
+

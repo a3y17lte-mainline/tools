@@ -1,0 +1,93 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sun, 15 Nov 2026 15:03:42 +0100
+Subject: [PATCH] devices: Add the Galaxy A3 2017 (a3y17lte)
+
+The Galaxy A3 2017 (Exynos 7870, Shannon 315 modem) uses the modem
+interface of herolte. Its NV data file has 1 MiB instead of 2 MiB: with
+the herolte specs the size check fails and the library replaces the file
+with its backup.
+
+Add a device that reuses the herolte code with NV data specs of its own.
+The directory of the NV data files can be chosen at build time with
+A3Y17LTE_NV_DATA_DIR and defaults to /efs.
+---
+ samsung-ipc/devices/herolte/herolte.c | 21 +++++++++++++++++++++
+ samsung-ipc/devices/herolte/herolte.h |  1 +
+ samsung-ipc/devices/ipc_devices.c     | 10 ++++++++++
+ 3 files changed, 32 insertions(+)
+
+diff --git a/samsung-ipc/devices/herolte/herolte.c b/samsung-ipc/devices/herolte/herolte.c
+index 37d334f..bb2c078 100644
+--- a/samsung-ipc/devices/herolte/herolte.c
++++ b/samsung-ipc/devices/herolte/herolte.c
+@@ -187,6 +187,8 @@ static int select_secure_mode(struct ipc_client *client,
+ static char const * const modem_image_devices[] = {
+ 	"/dev/disk/by-partlabel/RADIO",                   /* PostmarketOS */
+ 	"/dev/block/platform/155a0000.ufs/by-name/RADIO", /* LineageOS */
++	"/dev/block/by-name/RADIO",                       /* Android */
++	"/dev/block/platform/13540000.mmc/by-name/RADIO", /* a3y17lte */
+ 	NULL
+ };
+ 
+@@ -599,6 +601,25 @@ struct ipc_client_gprs_specs herolte_gprs_specs = {
+ 	.gprs_get_capabilities = xmm626_kernel_smdk4412_gprs_get_capabilities,
+ };
+ 
++/*
++ * Galaxy A3 2017: the same modem interface as herolte with a smaller NV data
++ * file. The directory can be set at build time, for example to keep the
++ * modem away from the EFS partition.
++ */
++#ifndef A3Y17LTE_NV_DATA_DIR
++#define A3Y17LTE_NV_DATA_DIR "/efs"
++#endif
++
++struct ipc_client_nv_data_specs a3y17lte_nv_data_specs = {
++	.nv_data_path = A3Y17LTE_NV_DATA_DIR "/nv_data.bin",
++	.nv_data_md5_path = A3Y17LTE_NV_DATA_DIR "/nv_data.bin.md5",
++	.nv_data_backup_path = A3Y17LTE_NV_DATA_DIR "/.nv_data.bak",
++	.nv_data_backup_md5_path = A3Y17LTE_NV_DATA_DIR "/.nv_data.bak.md5",
++	.nv_data_secret = XMM626_NV_DATA_SECRET,
++	.nv_data_size = 0x100000,
++	.nv_data_chunk_size = XMM626_NV_DATA_CHUNK_SIZE,
++};
++
+ struct ipc_client_nv_data_specs herolte_nv_data_specs = {
+ 	.nv_data_path = XMM626_NV_DATA_PATH,
+ 	.nv_data_md5_path = XMM626_NV_DATA_MD5_PATH,
+diff --git a/samsung-ipc/devices/herolte/herolte.h b/samsung-ipc/devices/herolte/herolte.h
+index 32d1638..9294a86 100644
+--- a/samsung-ipc/devices/herolte/herolte.h
++++ b/samsung-ipc/devices/herolte/herolte.h
+@@ -31,5 +31,6 @@ extern struct ipc_client_ops herolte_rfs_ops;
+ extern struct ipc_client_handlers herolte_handlers;
+ extern struct ipc_client_gprs_specs herolte_gprs_specs;
+ extern struct ipc_client_nv_data_specs herolte_nv_data_specs;
++extern struct ipc_client_nv_data_specs a3y17lte_nv_data_specs;
+ 
+ #endif /* __HEROLTE_H__ */
+diff --git a/samsung-ipc/devices/ipc_devices.c b/samsung-ipc/devices/ipc_devices.c
+index a0fe955..ca65b43 100644
+--- a/samsung-ipc/devices/ipc_devices.c
++++ b/samsung-ipc/devices/ipc_devices.c
+@@ -164,6 +164,16 @@ struct ipc_device_desc ipc_devices[] = {
+ 		.gprs_specs = &herolte_gprs_specs,
+ 		.nv_data_specs = &herolte_nv_data_specs,
+ 	},
++	{
++		.name = "a3y17lte",
++		.board_name = NULL,
++		.kernel_version = NULL,
++		.fmt_ops = &herolte_fmt_ops,
++		.rfs_ops = &herolte_rfs_ops,
++		.handlers = &herolte_handlers,
++		.gprs_specs = &herolte_gprs_specs,
++		.nv_data_specs = &a3y17lte_nv_data_specs,
++	},
+ };
+ 
+ unsigned int ipc_devices_count = sizeof(ipc_devices) /
+-- 
+2.56.0
+

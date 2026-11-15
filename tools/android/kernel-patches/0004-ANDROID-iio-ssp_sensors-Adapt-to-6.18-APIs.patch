@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sat, 14 Nov 2026 21:42:22 +0100
-Subject: [PATCH 4/5] ANDROID: iio: ssp_sensors: Adapt to 6.18 APIs
+Subject: [PATCH 04/11] ANDROID: iio: ssp_sensors: Adapt to 6.18 APIs
 
 - include <linux/mod_devicetable.h> for the platform_device_id tables:
   in 6.18 <linux/platform_device.h> does not pull it in

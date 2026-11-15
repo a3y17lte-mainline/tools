@@ -87,6 +87,17 @@ hand, `backport-kernel continue`.
   always worked. Values U-Boot leaves: CTRL1 0xc7 = 0x12 (bit4 set, bit2 clear), SWCTRL 0xca =
   0x24. ANDROID: patch 0009 does the same in extcon-s2m's S2MU004 init. TODO: fold into the
   mainline S2MU004 extcon commit (group with the MUIC), it is needed without U-Boot.
+- Sanity check before the first full build (2026-11-15), fixed: nonsecure KeyMint binary had
+  no SELinux label outside its APEX (init starts no service without a domain: no FBE, no
+  boot); CONFIG_UNICODE was off (f2fs casefold, which emulated_storage.mk makes vold format
+  /data with). Checked and fine: HAL versions against compatibility_matrix.202604 (all in
+  range), FBE speed (CPU has aes/pmull/sha2, CRYPTO_AES_ARM64_CE_BLK=y: keep encryption),
+  module names (the recovery build's kati + soong pass covered them).
+  Open for the first boot: HAL sources are only syntax-checked here; drm_hwcomposer with the
+  command-mode panel; HIDDEN/CACHE/USERDATA are formatted by the first boot (formattable).
+- Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from
+  the thermistor IIO channel ("batt-temp"), TECHNOLOGY + design values through
+  monitored-battery (power supply core). Not run on the phone yet.
 - Debug technique that worked: a second cpio (xz) appended to the ramdisk with a replacement
   init.recovery rc + script, writing to /dev/pmsg0 (pstore pmsg, read on Alpine as
   /sys/fs/pstore/pmsg-ramoops-0): one "STEP name" line before each read. The console buffer

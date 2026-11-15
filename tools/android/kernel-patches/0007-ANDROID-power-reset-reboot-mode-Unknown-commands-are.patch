@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sun, 15 Nov 2026 00:56:26 +0100
-Subject: [PATCH] ANDROID: power: reset: reboot-mode: Unknown commands are a
- normal reboot
+Subject: [PATCH 07/11] ANDROID: power: reset: reboot-mode: Unknown commands
+ are a normal reboot
 
 Android's init passes the reboot reason as the restart command:
 "userrequested", "shell", or "userrequested,recovery,ui" for "Reboot

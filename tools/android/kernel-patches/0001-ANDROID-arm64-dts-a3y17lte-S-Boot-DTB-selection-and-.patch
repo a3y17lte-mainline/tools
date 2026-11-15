@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sat, 14 Nov 2026 21:20:40 +0100
-Subject: [PATCH 1/5] ANDROID: arm64: dts: a3y17lte: S-Boot DTB selection and
+Subject: [PATCH 01/11] ANDROID: arm64: dts: a3y17lte: S-Boot DTB selection and
  Wi-Fi/BT addresses
 
 S-Boot loads boot.img directly and picks the DTB from its DTBH table by

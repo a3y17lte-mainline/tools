@@ -1,7 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sun, 15 Nov 2026 00:47:44 +0100
-Subject: [PATCH] ANDROID: arm64: dts: exynos7870: Add the normal reboot mode
+Subject: [PATCH 06/11] ANDROID: arm64: dts: exynos7870: Add the normal reboot
+ mode
 
 S-Boot keeps booting what INFORM3 says: after a boot into recovery, a
 plain reboot went to recovery again, because nothing rewrote the

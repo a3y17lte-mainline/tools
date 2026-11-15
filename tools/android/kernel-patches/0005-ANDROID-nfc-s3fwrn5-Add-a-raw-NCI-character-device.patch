@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sat, 14 Nov 2026 23:51:21 +0100
-Subject: [PATCH 5/5] ANDROID: nfc: s3fwrn5: Add a raw NCI character device
+Subject: [PATCH 05/11] ANDROID: nfc: s3fwrn5: Add a raw NCI character device
 
 Android's NFC stack (libnfc-nci) is an NCI host in userspace: its HAL
 needs the NCI packets of the chip, and features like host card emulation
@@ -29,7 +29,7 @@ Enable it in a3y17lte_defconfig for the NFC HAL of the Galaxy A3 (2017).
  create mode 100644 include/uapi/linux/s3fwrn5-raw.h
 
 diff --git a/arch/arm64/configs/a3y17lte_defconfig b/arch/arm64/configs/a3y17lte_defconfig
-index f2a41d3b4d48..fdeae9381088 100644
+index e6f1460190d6..2128ec9488dd 100644
 --- a/arch/arm64/configs/a3y17lte_defconfig
 +++ b/arch/arm64/configs/a3y17lte_defconfig
 @@ -242,6 +242,7 @@ CONFIG_RFKILL_INPUT=y

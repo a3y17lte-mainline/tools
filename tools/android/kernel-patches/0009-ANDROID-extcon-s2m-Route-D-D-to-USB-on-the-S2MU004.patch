@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sun, 15 Nov 2026 01:24:51 +0100
-Subject: [PATCH] ANDROID: extcon: s2m: Route D+/D- to USB on the S2MU004
+Subject: [PATCH 09/11] ANDROID: extcon: s2m: Route D+/D- to USB on the S2MU004
 
 On the Galaxy A3 (2017) the USB data lines pass through the analog
 switches of the S2MU004 MUIC. S-Boot leaves them open on a normal boot:

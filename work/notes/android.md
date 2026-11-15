@@ -97,6 +97,8 @@ hand, `backport-kernel continue`.
   ab_partitions.txt is required for ab_update"): Android 17's board_config.mk turns an unset
   AB_OTA_UPDATER into true. BoardConfig now sets it false (device 9102785); the images of that
   build were A/B-flavoured (ro.build.ab_update, update_engine, super metadata): rebuild.
+  Android may rewrite RECOVERY from boot (install-recovery): fine by the user (2026-11-15),
+  RECOVERY holds Lineage recovery anyway.
   Open for the first boot: HAL sources are only syntax-checked here; drm_hwcomposer with the
   command-mode panel; HIDDEN/CACHE/USERDATA are formatted by the first boot (formattable).
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from

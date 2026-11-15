@@ -13,16 +13,16 @@ Not set although required by the 6.12 list: ASHMEM (Rust-only in this
 tree; Android uses memfd), SCHED_DEBUG and NF_CT_PROTO_DCCP (removed
 upstream). CFI_CLANG is CFI here.
 ---
- arch/arm64/configs/a3y17lte_defconfig | 654 ++++++++++++++++++++++++++
- 1 file changed, 654 insertions(+)
+ arch/arm64/configs/a3y17lte_defconfig | 651 ++++++++++++++++++++++++++
+ 1 file changed, 651 insertions(+)
  create mode 100644 arch/arm64/configs/a3y17lte_defconfig
 
 diff --git a/arch/arm64/configs/a3y17lte_defconfig b/arch/arm64/configs/a3y17lte_defconfig
 new file mode 100644
-index 000000000000..e6f1460190d6
+index 000000000000..22db326a9bea
 --- /dev/null
 +++ b/arch/arm64/configs/a3y17lte_defconfig
-@@ -0,0 +1,654 @@
+@@ -0,0 +1,651 @@
 +# CONFIG_WERROR is not set
 +CONFIG_LOCALVERSION="-a3y17lte-android"
 +# CONFIG_LOCALVERSION_AUTO is not set
@@ -104,9 +104,6 @@ index 000000000000..e6f1460190d6
 +CONFIG_MODULES=y
 +CONFIG_MODULE_UNLOAD=y
 +CONFIG_MODVERSIONS=y
-+CONFIG_MODULE_COMPRESS=y
-+CONFIG_MODULE_COMPRESS_ZSTD=y
-+CONFIG_MODULE_DECOMPRESS=y
 +CONFIG_BLK_INLINE_ENCRYPTION=y
 +# CONFIG_IOSCHED_BFQ is not set
 +# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set

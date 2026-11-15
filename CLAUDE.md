@@ -114,7 +114,7 @@ Not done, roughly in planned order:
   A RAM image without USB now reboots itself into U-Boot after ~70 s. With samsungipcd (NV service)
   the modem REGISTERS ON LTE with the user's own SIM (PIN off, slot 1, O2 CZ, unlimited plan) and
   MOBILE DATA works (APN internet, rmnet0 by hand, ~16 Mbit/s), SMS receive + send work, incoming and outgoing calls with audio (mixer modem path +
-  samsungipcd hook tools/modem/voicecall.sh; earpiece routing just fixed, uplink untested). Never try a PIN or send
+  samsungipcd hook tools/modem/voicecall.sh; earpiece + main mic, both ways user-confirmed). Never try a PIN or send
   anything (SMS, data, calls) on that SIM without asking. Details in work/notes/modem.md section 0. Kernel: 10 commits
   (now 13 + fixups) on branch `modem` in the worktree src/linux-modem (mailbox variant, drivers/net/wwan/exynos_modem,
   Samsung's /dev/umts_* + rmnet interface as a local-only front end). Builds, KUnit, series-lint and

@@ -3,8 +3,7 @@
 Status 2026-11-15 night: **LTE registration and mobile data work** with the user's SIM (O2 CZ),
 from a RAM boot (section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by
 hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive and send work. Incoming and outgoing
-calls work; call audio works (first test played on the speaker, fixed in the hook, not re-tested;
-uplink not checked). Not tried yet: IPv6, suspend with the modem up, ModemManager, Android. The SIM is the user's own: no PIN tries, nothing sent without
+calls work, with audio both ways on earpiece + main mic. Not tried yet: IPv6, suspend with the modem up, ModemManager, Android. The SIM is the user's own: no PIN tries, nothing sent without
 asking. Earlier the same day:
 Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
@@ -193,8 +192,9 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
   codec DAC/earpiece/ADC powered; the user heard the line. `AT+CHUP` ended it, hook off.
 - It played on the loudspeaker: the TFA9896 amp is on the same codec bus (multi-codec link) and
   its "Speaker" pin switch is on by default. The hook now turns `Speaker Switch` off for the
-  call and restores it. Not re-tested yet; uplink (does the other side hear the A3's mic?) not
-  checked yet either.
+  call and restores it.
+- Second outgoing call (to a number the user chose; not recorded): speaker off, earpiece on,
+  uplink from the codec; **the user confirmed audio both ways** (earpiece and the main mic).
 - The RAM image (`build-ram-img`) now carries all modules (modprobe; load the sound card by
   modalias: `for a in $(cat /sys/bus/platform/devices/*/modalias /sys/bus/i2c/devices/*/modalias
   | sort -u); do modprobe -q $a; done`), amixer/aplay/arecord from Alpine, and the hook.

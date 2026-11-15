@@ -118,8 +118,13 @@ Not done, roughly in planned order:
   anything (SMS, data, calls) on that SIM without asking. Details in work/notes/modem.md section 0. Kernel: 10 commits
   (now 13 + fixups) on branch `modem` in the worktree src/linux-modem (mailbox variant, drivers/net/wwan/exynos_modem,
   Samsung's /dev/umts_* + rmnet interface as a local-only front end). Builds, KUnit, series-lint and
-  dtbs_check are clean. Not on a3y17lte and not in the tracker: rebase with
-  `git rebase --onto a3y17lte 929b94890e8d modem`, then add the groups from out/tracker/ledger.md.
+  dtbs_check are clean. Since 2026-11-15 the series is ON a3y17lte (fixups folded,
+  old tip tagged a3y17lte-pre-modem) and in the Android config fragment (built in); tracker groups
+  still pending in out/tracker/ledger.md, series-lint not re-run. Continue on Android (stock
+  cbd/libsec-ril, EFS read-write there). Alpine trap: the RAM image's NV working copy is recreated
+  from EFS every boot, so the modem's network state never persists; after many reboots the network
+  rejected the CS part of the attach (cause 10) and incoming calls stopped. Mailbox = wake source
+  (IRQ 84 wakes s2idle, but immediately: the CP keeps messaging; not solved).
   Userspace: tools/modem/ (libsamsung-ipc a3y17lte profile, samsungipcd NV service) builds into
   out/modem-userspace. U-Boot must be updated BEFORE a kernel with the modem DT is installed: it
   loads kernel and ramdisk into the modem's memory (fix: branch `modem` in the worktree

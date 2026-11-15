@@ -1,0 +1,25 @@
+From 0a277f193bc18b757a170b6ed33cd70e2827db11 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sun, 15 Nov 2026 22:22:39 +0100
+Subject: [PATCH] Line-buffer the log
+
+---
+ server.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/server.c b/server.c
+index 66c13f2..c3c3951 100644
+--- a/server.c
++++ b/server.c
+@@ -1870,6 +1870,8 @@ int main(int argc, const char** argv)
+ {
+     job_queue_cap = MIN_JOB_QUEUE_CAP;
+     job_queue = calloc(MIN_JOB_QUEUE_CAP, sizeof(*job_queue));
++    //the log usually goes to a file: line-buffer it so it is current while the modem runs
++    setvbuf(stdout, NULL, _IOLBF, 0);
+     signal(SIGPIPE, SIG_IGN);
+     if(argc == 1)
+     {
+-- 
+2.56.0
+

@@ -31,6 +31,8 @@ CARRIED = {"extcon: add support for Samsung S2M series PMIC extcon devices",
 REVIEWED_FOLLOWUPS = {
     "arm64: dts: exynos7870: Add GPU cooling",                       # group T, not CPU cooling
     "arm64: dts: exynos7870-a3y17lte: Keep BUCK2 at 750 mV or more",  # group X, own rationale
+    # modem group (rfc): next to the CMU_MIF memory clock IDs, but sent with the modem
+    "dt-bindings: clock: samsung,exynos7870-cmu: Add the modem mailbox clock",
 }
 # checkpatch spelling false positives (names)
 KNOWN_WORDS = {"ABOV", "abov"}

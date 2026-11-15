@@ -2,8 +2,8 @@
 
 Status 2026-11-15 night: **LTE registration and mobile data work** with the user's SIM (O2 CZ),
 from a RAM boot (section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by
-hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive works. Not tried yet: SMS
-send, calls, IPv6, suspend, ModemManager. The SIM is the user's own: no PIN tries, nothing sent without
+hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive and send work. Not tried yet:
+calls (need the audio route), IPv6, suspend with the modem up, ModemManager, Android. The SIM is the user's own: no PIN tries, nothing sent without
 asking. Earlier the same day:
 Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
@@ -150,6 +150,14 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
 - The user sent an SMS to the A3: `IPC_SMS_INCOMING_MSG` in samsungipcd's log, `+CMTI: "ME",0`
   queued on the AT port, `AT+CMGF=0` + `AT+CMGR=0` returned the PDU (GSM 7-bit, text arrived
   intact). Decoding the PDU was done on the PC (no PDU tool on the phone).
+- samsungipcd erases a stored SMS when `AT+CMGR` reads it (`deque_get_erase`): read it once and
+  keep the PDU.
+
+### SMS send (2026-11-15 night)
+
+- Reply to the sender of a received SMS: SMS-SUBMIT PDU built on the PC (first byte 00 = the
+  daemon fills in the SMSC it read from the modem; TP-MTI submit, no validity period, GSM 7-bit),
+  `AT+CMGS=<TPDU length>`, the hex PDU, Ctrl-Z. The user's phone received it.
 
 ## 1. Decisions (user, 2026-11-15)
 

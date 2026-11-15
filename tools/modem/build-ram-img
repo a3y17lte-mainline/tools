@@ -40,6 +40,8 @@ cp "$O/drivers/mailbox/exynos-mailbox.ko" "$O/drivers/net/wwan/exynos_modem/exyn
 cp -a "$US/usr" "$T/"
 rm -rf "$T/usr/include"
 install -m755 "$ROOT/tools/modem/modem-nv-setup" "$T/usr/local/bin/modem-nv-setup"
+# The current init (the base cpio may be older): reboots into U-Boot if USB never comes up
+install -m755 "$ROOT/tools/initramfs/init" "$T/init"
 # Optional probes: the modem control register reader and the I2C register reader
 [ -e "$ROOT/tools/probes/cp-ctrl/cp_ctrl.ko" ] && cp "$ROOT/tools/probes/cp-ctrl/cp_ctrl.ko" "$T/lib/modem/"
 [ -e "$ROOT/out/i2c-rd" ] && install -m755 "$ROOT/out/i2c-rd" "$T/usr/local/bin/i2c-rd"

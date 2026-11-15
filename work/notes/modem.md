@@ -1,8 +1,8 @@
 # Modem: Shannon 315 (SS315AP) on the Exynos 7870
 
-Status 2026-11-15 evening: first modem starts done (section 0): loader handshake passes, the
-main firmware never reports in; suspect the shared PMIC bus, batcher mode written, its write
-path waits for the user's yes. Earlier the same day:
+Status 2026-11-15 night: **the modem boots** (section 0): with hsi2c0 in batcher mode the
+firmware sends PHONE_START 1.1 s after power-on and the link is in IPC mode. Next: open the FMT
+and RFS channels (INIT_END, NV service) = the first step with radio activity. Earlier the same day:
 Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
 not pushed, not installed, not in the tracker yet: section 8). U-Boot needs one commit first
@@ -89,6 +89,31 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
   as built at 18:01) writes the PMIC through the same path, so it was not booted either. Both
   need the user's yes. Worst case of a wrong write: a crash (watchdog -> Android, `adb reboot
   recovery` -> U-Boot) or, unlikely, a PMIC power-off that needs the power key.
+
+### Batcher mode: the fix (2026-11-15 night, user's go)
+
+- Write path checked with `tools/probes/batcher-test wreg=5`: INT2M 0xfb -> 0xff -> 0xfb
+  through the batcher, batcher and normal reads agree at every step, original restored.
+- First boot of the batcher kernel: `sec-pmic-i2c 5-0066: Failed to set masks in 0x4: -6`, so no
+  PMIC driver, no regulators, everything deferred, no UDC: the system ran but was unreachable,
+  and `poweroff` failed (no PMIC). The user had to reset it. pstore log:
+  `out/pstore-batcher-crash-20261115.txt`.
+- Cause: in batcher mode the probe skipped what the vendor probe does in every mode: clear the
+  controller's pending interrupt status, reset, init. The bootloader's last batcher transfer
+  leaves a controller interrupt pending, and the batcher reports it as an unexpected interrupt
+  (state bit 1 -> -ENXIO). In the probe tests the normal driver had already cleared it. (A
+  bare software reset is enough for the batcher: checked with `batcher-test rawrst=1`.)
+  Fixed (fixup on "i2c: exynos5: Add batcher mode").
+- Safety net: `tools/initramfs/init` reboots into recovery (our U-Boot -> fastboot) when no UDC
+  appears within ~70 s; `build-ram-img` puts the current init into the image.
+- Then: PMIC probes, 32 regulators, cpufreq steps BUCK1 600-975 mV through the batcher with no
+  error, charger fine. `ipc-modem boot`: security 2 -> 11 (first after cold boot), 0 -> 0,
+  state 3 at 31.46 s, **state 4 (online) at 32.56 s**, CP->AP word 0xc8 (PHONE_START), IPC
+  magic 0xaa / access 1. No hsi2c timeouts, no CP fail/watchdog interrupts. The CP repeats
+  PHONE_START (~300 mailbox interrupts in a minute) until FMT and RFS are open.
+- So the PMIC bus is shared with the CP and must be used through the batcher on every board
+  with a running modem. The CP mailbox block's 0x10500180 range (stock second reg of hsi2c0)
+  was never needed.
 
 ## 1. Decisions (user, 2026-11-15)
 

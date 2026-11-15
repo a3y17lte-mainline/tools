@@ -4,7 +4,9 @@
  * the normal driver owns the controller: holds the adapter lock and masks the controller IRQ,
  * reads PMIC registers through the batcher with the driver's own code (copied verbatim by
  * tools/probes/batcher-test/gen), restores the controller registers, prints, fails to load.
- * Only reads: the batcher's write path is never used here.
+ * With wreg=R (0x05, S2MPU05 INT2M only), also checks the write path: sets R to 0xff through
+ * the batcher, reads it back both ways, writes the original back through the batcher, and in
+ * any case restores the original through the normal path at the end.
  */
 #include <linux/delay.h>
 #include <linux/i2c.h>
@@ -26,6 +28,11 @@ static int count = 16;
 module_param(count, int, 0);
 static int len = 1;
 module_param(len, int, 0);
+static int wreg = -1;
+module_param(wreg, int, 0);
+/* 1: software-reset the controller and skip the driver's init before the reads */
+static int rawrst;
+module_param(rawrst, int, 0);
 
 /* Register Map */
 #define HSI2C_CTL		0x00
@@ -328,6 +335,52 @@ static void exynos5_i2c_batcher_load(void __iomem *regs,
 }
 
 
+static int batcher_write(void __iomem *regs, u8 reg, u8 val)
+{
+	struct exynos5_i2c_batcher_op ops[HSI2C_BATCHER_MAX_OPS];
+	u8 buf[2] = { reg, val };
+	unsigned int rx_op = 0, cnt;
+	u32 state;
+	int ret;
+
+	cnt = exynos5_i2c_batcher_build(ops, addr, 0, buf, 2, false, &rx_op);
+	writel(0, regs + HSI2C_BATCHER_CON);
+	writel(HSI2C_BATCHER_ENABLE | HSI2C_BATCHER_DEDICATE, regs + HSI2C_BATCHER_CON);
+	writel(readl(regs + HSI2C_BATCHER_INT_STATUS), regs + HSI2C_BATCHER_INT_STATUS);
+	exynos5_i2c_batcher_load(regs, ops, cnt);
+	writel(HSI2C_BATCHER_INT_ENABLE, regs + HSI2C_BATCHER_INT_EN);
+	writel(HSI2C_BATCHER_ENABLE | HSI2C_BATCHER_DEDICATE | HSI2C_BATCHER_START,
+	       regs + HSI2C_BATCHER_CON);
+	ret = readl_poll_timeout(regs + HSI2C_BATCHER_STATE, state,
+				 state & (HSI2C_BATCHER_OPERATION_COMPLETE |
+					  HSI2C_BATCHER_UNEXPECTED_INTR), 20, 1000000);
+	writel(0, regs + HSI2C_BATCHER_INT_EN);
+	if (ret || (state & HSI2C_BATCHER_UNEXPECTED_INTR)) {
+		pr_info("batcher_test: write %#x: state %#x (%s)\n", reg, state,
+			ret ? "timeout" : "error");
+		ret = ret ?: -ENXIO;
+	}
+	writel(state | HSI2C_BATCHER_OPERATION_COMPLETE, regs + HSI2C_BATCHER_STATE);
+	writel(readl(regs + HSI2C_BATCHER_INT_STATUS), regs + HSI2C_BATCHER_INT_STATUS);
+	writel(0, regs + HSI2C_BATCHER_CON);
+	return ret;
+}
+
+/* The normal driver's path; the caller holds the adapter lock */
+static int normal_rw(struct i2c_adapter *adap, u8 reg, u8 *val, bool write)
+{
+	u8 wbuf[2] = { reg, *val };
+	struct i2c_msg msgs[2] = {
+		{ .addr = addr, .flags = 0, .len = write ? 2 : 1, .buf = wbuf },
+		{ .addr = addr, .flags = I2C_M_RD, .len = 1, .buf = val },
+	};
+	int ret = __i2c_transfer(adap, msgs, write ? 1 : 2);
+
+	return ret == (write ? 1 : 2) ? 0 : -EIO;
+}
+
+static void controller_restore(void __iomem *regs, const u32 *saved);
+
 static const u32 saved_regs[] = {
 	HSI2C_CTL, HSI2C_FIFO_CTL, HSI2C_TRAILIG_CTL, HSI2C_CLK_CTL, HSI2C_CLK_SLOT,
 	HSI2C_INT_ENABLE, HSI2C_CONF, HSI2C_AUTO_CONF, HSI2C_TIMEOUT, HSI2C_TIMING_HS1,
@@ -369,6 +422,17 @@ static int batcher_read(void __iomem *regs, u8 reg, u8 *buf, unsigned int n)
 	return ret;
 }
 
+static void controller_restore(void __iomem *regs, const u32 *saved)
+{
+	int i;
+
+	writel(readl(regs + HSI2C_CTL) | HSI2C_SW_RST, regs + HSI2C_CTL);
+	writel(readl(regs + HSI2C_CTL) & ~HSI2C_SW_RST, regs + HSI2C_CTL);
+	for (i = 0; i < ARRAY_SIZE(saved_regs); i++)
+		writel(saved[i], regs + saved_regs[i]);
+	writel(readl(regs + HSI2C_INT_STATUS), regs + HSI2C_INT_STATUS);
+}
+
 static int __init batcher_test_init(void)
 {
 	u32 saved[ARRAY_SIZE(saved_regs)];
@@ -405,6 +469,14 @@ static int __init batcher_test_init(void)
 		readl(regs + HSI2C_BATCHER_STATE), readl(regs + HSI2C_BATCHER_CON),
 		readl(regs + HSI2C_TRANS_STATUS));
 
+	if (rawrst) {
+		writel(readl(regs + HSI2C_CTL) | HSI2C_SW_RST, regs + HSI2C_CTL);
+		writel(readl(regs + HSI2C_CTL) & ~HSI2C_SW_RST, regs + HSI2C_CTL);
+		pr_info("batcher_test: raw reset: ctl %#x conf %#x clk_ctl %#x timeout %#x\n",
+			readl(regs + HSI2C_CTL), readl(regs + HSI2C_CONF),
+			readl(regs + HSI2C_CLK_CTL), readl(regs + HSI2C_TIMEOUT));
+	}
+
 	for (r = first; r < first + count; r += len) {
 		unsigned int n = min(len, first + count - r);
 
@@ -419,11 +491,45 @@ static int __init batcher_test_init(void)
 	}
 
 	/* Hand the controller back the way the driver set it up */
-	writel(readl(regs + HSI2C_CTL) | HSI2C_SW_RST, regs + HSI2C_CTL);
-	writel(readl(regs + HSI2C_CTL) & ~HSI2C_SW_RST, regs + HSI2C_CTL);
-	for (i = 0; i < ARRAY_SIZE(saved_regs); i++)
-		writel(saved[i], regs + saved_regs[i]);
-	writel(readl(regs + HSI2C_INT_STATUS), regs + HSI2C_INT_STATUS);
+	controller_restore(regs, saved);
+
+	if (wreg == 0x05 && addr == 0x66) {
+		u8 orig = 0, v = 0, nb = 0;
+
+		enable_irq(irq);
+		ret = normal_rw(adap, wreg, &orig, false);
+		pr_info("batcher_test: write test: %#x normal read %#x (%d)\n", wreg, orig, ret);
+		if (!ret) {
+			disable_irq(irq);
+			ret = batcher_write(regs, wreg, 0xff);
+			if (!ret)
+				ret = batcher_read(regs, wreg, &v, 1);
+			controller_restore(regs, saved);
+			enable_irq(irq);
+			normal_rw(adap, wreg, &nb, false);
+			pr_info("batcher_test: write test: after batcher write 0xff: batcher read %#x (%d), normal read %#x\n",
+				v, ret, nb);
+
+			disable_irq(irq);
+			ret = batcher_write(regs, wreg, orig);
+			if (!ret)
+				ret = batcher_read(regs, wreg, &v, 1);
+			controller_restore(regs, saved);
+			enable_irq(irq);
+			normal_rw(adap, wreg, &nb, false);
+			pr_info("batcher_test: write test: after batcher write %#x: batcher read %#x (%d), normal read %#x\n",
+				orig, v, ret, nb);
+
+			/* Whatever happened: the original value, the proven way */
+			v = orig;
+			ret = normal_rw(adap, wreg, &v, true);
+			nb = 0;
+			normal_rw(adap, wreg, &nb, false);
+			pr_info("batcher_test: write test: restored %#x through the normal path (%d), reads %#x\n",
+				orig, ret, nb);
+		}
+		disable_irq(irq);
+	}
 	pr_info("batcher_test: after: batcher state %#x con %#x trans %#x, %d failed\n",
 		readl(regs + HSI2C_BATCHER_STATE), readl(regs + HSI2C_BATCHER_CON),
 		readl(regs + HSI2C_TRANS_STATUS), fails);

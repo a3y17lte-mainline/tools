@@ -44,6 +44,19 @@ if [ -n "$UDC" ]; then
 	echo "$UDC" > $G/UDC && log "USB gadget bound to $UDC"
 else
 	log "ERROR: no UDC found"
+	# Without USB this system cannot be reached (a test kernel whose PMIC or USB supplies did
+	# not come up). Give late probes a minute, then reboot into recovery: on this phone that
+	# is our U-Boot, which ends in fastboot. INFORM3 + PMU software reset need no PMIC driver.
+	(
+		for i in $(seq 1 60); do
+			sleep 1
+			[ -n "$(ls /sys/class/udc 2>/dev/null)" ] && exit 0
+		done
+		log "still no UDC after 60 s: rebooting into recovery"
+		sync
+		/usr/local/bin/poke 0x1048080c 0x12345674
+		/usr/local/bin/poke 0x10480400 1
+	) &
 fi
 
 for i in $(seq 1 50); do

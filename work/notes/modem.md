@@ -1,6 +1,9 @@
 # Modem: Shannon 315 (SS315AP) on the Exynos 7870
 
-Status 2026-11-15: Part A done, nothing run on the phone yet. Kernel: 10 commits on branch
+Status 2026-11-15 evening: first modem starts done (section 0): loader handshake passes, the
+main firmware never reports in; suspect the shared PMIC bus, batcher mode written, its write
+path waits for the user's yes. Earlier the same day:
+Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
 not pushed, not installed, not in the tracker yet: section 8). U-Boot needs one commit first
 (branch `modem`, worktree `src/u-boot-modem`): it loads files into the modem's memory. Userspace: libsamsung-ipc with an
@@ -49,6 +52,43 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
   `multipdp`, `rmnet0-7`, the fail and watchdog IRQs).
 - `modem-nv-setup`: EFS mounted "ro without journal" (norecovery), NV working copy in
   /var/lib/modem/nv (RAM in this boot).
+
+### First modem starts (2026-11-15 evening, `ipc-modem boot`, boot only, no SIM/network)
+
+- Unlock request 2 returns 11 on the first start after a cold boot and 0 on later ones; the
+  verify request 0 returns 0 every time. After verify, the AP gets a bus error on the firmware
+  region (the monitor locks it): never touch `fw_base` after `SEC_VERIFY`.
+- The loader runs: both handshake stages pass, the loader's answers arrive in the RAW ring.
+- Then nothing: no PHONE_START. Mailbox: CP->AP message word stays 0x83 (from the loader),
+  status (ISSR5) 1, active (ISSR9) 1, no performance requests, INTMR0 = 0x73e20000 (the CP
+  masked its side), CP_STAT stays 0x110, the IPC magic stays "BOOT". BOOT_OFF times out after
+  15 s. The CP fail and watchdog interrupts never fire.
+- Not the cause (each tried, same result): stale IPC header (now cleared at probe), clock
+  tables written only at INIT_END (now also before power-on), MIF/INT at their lowest level
+  (held at 902/200 MHz for a run), MIF frequency word 0 (written by hand).
+- A second start without a reboot does not get past BOOT_ON (status never set): the restart
+  path is not right yet. Stock resets the CP through the PMU sequencer path every time; ours
+  only resets a powered CP. Use a fresh boot per attempt for now.
+- **Leading suspect: the PMIC bus.** The S2MPU05 on hsi2c0 is shared with the CP, which sets
+  its own RF regulators through the PMIC. The stock DT runs hsi2c0 in "batcher" mode
+  (`samsung,hsi2c-batcher`, second reg range 0x10500180 inside the CP mailbox block, second
+  IRQ SPI 372): every transfer is handed to a batcher that takes a hardware semaphore. Mainline
+  drives the controller directly, which collides with the CP: in every run our side logged
+  "exynos5-hsi2c 10510000.i2c: tx timeout" some seconds after the CP started (never otherwise),
+  and our IRQ handler would also acknowledge the CP's controller interrupts.
+- Batcher mode for i2c-exynos5 is written (kernel branch `modem`: binding, driver, DT commits,
+  register sequence identical to the vendor's for a 2.5 MHz HS bus, checked on the host against
+  a transcription of the vendor code). Hardware check so far, read path only:
+  `tools/probes/batcher-test` (adapter lock, controller IRQ masked, the driver's own functions,
+  controller restored afterwards) read PMIC 0x00-0x0f through the batcher, 1- and 7-byte reads:
+  identical to the normal path (0x01/0x02 are clear-on-read), 0 failures, normal driver fine
+  afterwards.
+- NOT done: the write path. The probe's `wreg=5` mode (INT2M 0xfb -> 0xff -> 0xfb through the
+  batcher, original restored through the normal path) was refused by the session's safety
+  check (a PMIC write), and booting the batcher kernel (`out/images/linux-a3y17lte-modem.img`
+  as built at 18:01) writes the PMIC through the same path, so it was not booted either. Both
+  need the user's yes. Worst case of a wrong write: a crash (watchdog -> Android, `adb reboot
+  recovery` -> U-Boot) or, unlikely, a PMIC power-off that needs the power key.
 
 ## 1. Decisions (user, 2026-11-15)
 

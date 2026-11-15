@@ -1,8 +1,9 @@
 # Modem: Shannon 315 (SS315AP) on the Exynos 7870
 
-Status 2026-11-15 night: **the modem registers on LTE** with the user's SIM, from a RAM boot
-(section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by hand. Not tried
-yet: SMS, data, calls, suspend. The SIM is the user's own: no PIN tries, nothing sent without
+Status 2026-11-15 night: **LTE registration and mobile data work** with the user's SIM (O2 CZ),
+from a RAM boot (section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by
+hand, rmnet0 configured by hand. ~16 Mbit/s download. Not tried yet: SMS, calls, IPv6,
+suspend, ModemManager. The SIM is the user's own: no PIN tries, nothing sent without
 asking. Earlier the same day:
 Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
@@ -131,6 +132,18 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
   0,99 on LTE (the proxy's CSQ only covers 2G/3G).
 - The AT port queues unsolicited +CREG/+CGREG/+CEREG reports: the first command after a while
   returns a long backlog before its own answer.
+
+### Mobile data (2026-11-15 night, user's go: unlimited plan, O2 CZ, APN "internet")
+
+- `AT+CGDCONT=1,"IP","internet"`, then `AT+CGACT=1,1`: first try ERROR (the attach profile
+  makes the modem re-register, as samsungipcd's README says), second OK. `AT+CGPADDR` and
+  `AT+CGCONTRDP` give the address and two DNS servers; no gateway (point to point).
+- `ip link set rmnet0 up; ip addr add <ip>/32 dev rmnet0`, host routes over rmnet0 only (USB
+  networking untouched), `/etc/resolv.conf` with the operator DNS (RAM only).
+- ping 1.1.1.1 4/4 (28-129 ms), DNS through the operator server, HTTP fetch, and a 100 MiB
+  download (proof.ovh.net/files/100Mb.dat; it is 100 MiB, not 100 Mbit) in 54 s = ~16 Mbit/s,
+  rx/tx errors and drops 0, no CP fail/watchdog interrupt, no hsi2c timeout. So the RAW ring,
+  multi-frame-free SIPC5 path, flow control and the legacy rmnet netdev hold up under load.
 
 ## 1. Decisions (user, 2026-11-15)
 

@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
+Date: Sun, 15 Nov 2026 01:20:30 +0100
+Subject: [PATCH] ANDROID: power: reset: reboot-mode: Write the normal mode at
+ boot
+
+Samsung's S-Boot remembers the last boot mode until the reboot mode
+register tells it another one. A reset that bypasses the reboot notifier
+(watchdog, hang, forced reset) leaves the register alone, so after a boot
+into recovery every such reset started the recovery again: a recovery
+that hangs was all the phone would boot.
+
+Write the "normal" mode when the driver registers. A reboot with a mode
+still overwrites it, and a reset without one now leads to a normal boot.
+---
+ drivers/power/reset/reboot-mode.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/power/reset/reboot-mode.c b/drivers/power/reset/reboot-mode.c
+index 485fe928e5d8..4707a22ec64e 100644
+--- a/drivers/power/reset/reboot-mode.c
++++ b/drivers/power/reset/reboot-mode.c
+@@ -119,6 +119,17 @@ int reboot_mode_register(struct reboot_mode_driver *reboot)
+ 		list_add_tail(&info->list, &reboot->head);
+ 	}
+ 
++	/*
++	 * A reset that does not come through the reboot notifier (watchdog,
++	 * a hang, a forced reset) leaves the mode register as it is, and a
++	 * bootloader that remembers the last mode starts the same thing
++	 * again: a recovery that hangs is then all the phone boots. Ask for a
++	 * normal boot from the start; a reboot with a mode overwrites it.
++	 */
++	list_for_each_entry(info, &reboot->head, list)
++		if (!strcmp(info->mode, "normal"))
++			reboot->write(reboot, info->magic);
++
+ 	reboot->reboot_notifier.notifier_call = reboot_mode_notify;
+ 	register_reboot_notifier(&reboot->reboot_notifier);
+ 

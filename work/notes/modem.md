@@ -2,8 +2,9 @@
 
 Status 2026-11-15 night: **LTE registration and mobile data work** with the user's SIM (O2 CZ),
 from a RAM boot (section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by
-hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive and send work. Not tried yet:
-calls (need the audio route), IPv6, suspend with the modem up, ModemManager, Android. The SIM is the user's own: no PIN tries, nothing sent without
+hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive and send work. Incoming call rings and
+can be answered and hung up (no audio yet). Not tried yet: outgoing calls, call audio, IPv6,
+suspend with the modem up, ModemManager, Android. The SIM is the user's own: no PIN tries, nothing sent without
 asking. Earlier the same day:
 Part A done. Kernel: 10 commits on branch
 `modem` (worktree `src/linux-modem`, based on the a3y17lte tip of that morning, 929b94890e8d;
@@ -158,6 +159,19 @@ userspace). Undo: `a3-flash RECOVERY out/android/new-20261115-1548/recovery.img`
 - Reply to the sender of a received SMS: SMS-SUBMIT PDU built on the PC (first byte 00 = the
   daemon fills in the SMSC it read from the modem; TP-MTI submit, no validity period, GSM 7-bit),
   `AT+CMGS=<TPDU length>`, the hex PDU, Ctrl-Z. The user's phone received it.
+
+### Incoming call (2026-11-15 night)
+
+- The user called the A3: `IPC_CALL_INCOMING`, `+CLCC: 1,1,4` (MT, incoming). `ATA` ->
+  `IPC_CALL_ANSWER`, `+CLCC: 1,1,0` (active). The CP then sent `IPC_SND_WB_AMR_STATUS`,
+  `IPC_SND_CLOCK_CTRL` and `IPC_SND_SPKR_VOLUME_CTRL`: the hooks for the voice route. No audio
+  either way (the mixer's CP port / the CP<->AP audio path is not implemented).
+- In samsungipcd `ATH` is an alias of `AT+CLCC` and does NOT hang up; `AT+CHUP` does
+  (`IPC_CALL_RELEASE`, `NO CARRIER`).
+- Not tried: outgoing calls (`ATD<number>;`).
+- Next for calls: the voice path. Stock routes call audio through the S1402X mixer's CP port
+  (AIF2, see audio.md) driven by the CP's own I2S, and the AP sets the route and volumes when
+  the CP's IPC_SND_* messages arrive.
 
 ## 1. Decisions (user, 2026-11-15)
 

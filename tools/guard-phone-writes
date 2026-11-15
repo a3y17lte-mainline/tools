@@ -21,7 +21,9 @@ RULES = [
     (r"\bfastboot\b[^|;&\n]*(\b(flash|erase|format|oem|flashing|update|wipe)\b|\s-w\b)", "fastboot write"),
     (r"\badb\b[^|;&\n]*\bsideload\b", "adb sideload"),
     (r"\bof=\s*['\"]?/dev/(block/)?(mmcblk|sd[a-z]|by-name|platform|loop)", "dd to a block device"),
-    (r"/dev/block/[^\s'\"]*by-name/[A-Za-z0-9_]+[^|;&\n]*(>|\btee\b)", "write to a by-name partition"),
+    # only a redirect or tee INTO a by-name node: reads (dd if=, pull, cat, 2>&1) stay allowed
+    # (the user's rule, 2026-11-15: read-backs are fine, writes need consent)
+    (r"(>|\btee\b(\s+-\S+)*)\s*['\"]?/dev/block/[^\s'\"]*by-name/", "write to a by-name partition"),
     (r">\s*['\"]?/dev/(block/)?(mmcblk|sd[a-z])", "redirect into a block device"),
     (r"\bblockdev\b[^|;&\n]*--setrw\b", "making a block device writable"),
     (r"force_ro", "touching eMMC boot-area force_ro"),

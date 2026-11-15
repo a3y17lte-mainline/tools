@@ -44,3 +44,8 @@
 2	tools/phone-sh 'i2ctransfer -y 0 w1@0x3b 0x0c'
 2	ssh -T a3 "i2cdetect -y 0"
 0	ssh -T a3 i2cget -y 0 0x3b 0x04 w
+2	adb shell "cat x > /dev/block/by-name/BOOT"
+2	adb shell "cat x | tee -a /dev/block/platform/13540000.dwmmc0/by-name/EFS"
+0	adb exec-out "dd if=/dev/block/by-name/BOOT bs=1M 2>/dev/null" > boot.img
+0	adb pull /dev/block/by-name/BOOT boot.img 2>&1 | tail -1
+0	adb shell readlink /dev/block/platform/x/by-name/BOOT 2>&1 | head -2

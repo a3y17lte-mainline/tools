@@ -133,7 +133,11 @@ Keep series small: one commit per logical change, follow-ups folded in.
 - Raw `heimdall flash`, fastboot writes, adb sideload, and dd/redirects/mkfs to phone block
   devices are blocked by `tools/guard-phone-writes` (a PreToolUse hook in ~/.claude/settings.json).
   If it blocks you, stop and ask the user. Do not rephrase the command to get past it.
-- Read-only is fine: `heimdall detect|print-pit|download-pit`, `adb exec-out dd if=...`, `a3-backup`.
+- Read-only is fine: `heimdall detect|print-pit|download-pit`, `adb exec-out dd if=...`, `adb pull`
+  of a partition, `a3-backup`. Read-backs are always allowed; writes never without the user's
+  consent (2026-11-15). If the guard blocks a pure read, that is a guard bug: narrow the rule
+  and add a test line to tools/guard-phone-writes.tests (edit both files with the editor, since
+  the old rule also blocks shell commands that contain the test strings).
 - After a heimdall action with `--no-reboot`, the next heimdall action needs `--resume`.
 
 ## USB networking

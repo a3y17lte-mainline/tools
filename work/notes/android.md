@@ -243,6 +243,30 @@ hand, `backport-kernel continue`.
     ("alsa_device_proxy: available frames(1026) > buffer size(1024), clamped", load 4) and
     audio is dead until the HAL is killed. (3) Do not read /sys/kernel/debug/clk/clk_summary on
     this kernel: the phone died during that read (mechanism unconfirmed, log lost).
+  - Audio pitch, root cause (2026-11-15, kernel #7): audio-graph-card2/simple-card-utils calls
+    snd_soc_dai_set_sysclk(cpu, 0, rate of the DAI node's first clock) at init. Clock ID 0 is
+    SAMSUNG_I2S_RCLKSRC_0. With the DT now assigning source 1, i2s_set_sysclk() took its
+    "source differs" branch: switched MOD bit 10 back to 0 (pitch unchanged, MOD 0x1000 at rest)
+    and clk_put() the op_clk it got from clk_get_parent() (upstream 752925401476): a clock
+    freed while linked in the tree. That was the crash on reading clk_summary and on unbinding
+    samsung-i2s (oops in clk_core_evict_parent_cache_subtree <- clk_unregister <-
+    samsung_i2s_remove; out/android/pstore-rebind.txt). Fix: i2s_set_sysclk() keeps the source
+    when the mux is exposed as a clock, like i2s_set_fmt() (mainline tip b1c9eda430ea, Android
+    lineage-24.0 94af655f2047). Not built/run yet. Until then: no clk_summary, no unbind.
+  - Audio HAL stall, fixed in source (device 8ae0063, not built yet): StreamA3::transfer()
+    returned 0 frames with OK after every setConnectedDevices() until a restart that never
+    came -> PCM XRUN, worker spinning, audio dead. Routing is only a mixer change here: the
+    override is gone.
+  - Sleep, measured on kernel #7 with /data/local/tmp/sleeptest.sh (RTC wakealarm, detached,
+    log /data/local/tmp/sleep-STATE.log): s2idle and deep both suspend and wake (IRQ 55
+    s2mpu05), USB gadget back "configured" 8 s after the wake, adb reconnects. Resume takes
+    ~5 s, 4.7-5.2 s of it wiphy_resume: without WoWLAN mac80211 stops ath10k on suspend and
+    restarts it (firmware boot over SDIO, as at boot: 4.2 s) in the resume path; the DPM
+    watchdog warns at 5 s and panics at 20 s. Firmware features are only "ignore-otp" (no
+    wowlan-support), ath10k debugfs is off. tm2-touchkey resume 215-245 ms. The user's "USB
+    dead after locking" did not reproduce in 20 s cycles on #7 (seen on the build-4 kernel;
+    host log then: descriptor read -110). LineageResA3y17lte now applies (wake keys 1, keys
+    19): Home wake to be confirmed by the user.
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

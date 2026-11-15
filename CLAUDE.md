@@ -15,7 +15,7 @@ Read these first:
    tab output is ~55 KB of XML and gets saved to a file: strip the tags with a short python script.
    Its "Phase" status lines lag behind this file; this file wins.
 3. Upstream tracker, an HTML artifact with a db: https://claude.ai/artifact/RQq4vqHXBeHm8Kuqsrye3r.
-   56 groups (A..BC, Dp; U/V/W are Mesa/GTK) covering all 134 local kernel commits; none sent yet.
+   66 groups (A..BM, Dp; U/V/W are Mesa/GTK) covering all 160 local kernel commits; none sent yet.
    Waves: 1 = standalone, 2 = needs nothing unsent, 3 = board DT/drivers that depend on others, rfc.
    Don't summarise the groups here (that copy went stale): export and print them instead,
    `ArtifactData list groups out_dir=DIR`, then `tools/tracker-check DIR --show`.
@@ -85,7 +85,7 @@ Not done, roughly in planned order:
   NULL deref (group AI), and the CPUCL0 watchdog resuming from its reset values (s3c2410_wdt
   resume order vs the PMU automatic disable, fixed 2026-11-14; the old CPU0 hold is gone, so
   every tick freezes now). Wake sources: RTC/charger alarm, power key, USB plug (S2MU004 PMIC,
-  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-14, 134 commits). If
+  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-15, 160 commits). If
   ArtifactData is not offered in a session, record tracker changes in out/tracker/ledger.md. Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
   Details, tools and traps: work/notes/suspend.md.
@@ -196,7 +196,7 @@ Keep series small: one commit per logical change, follow-ups folded in.
   with ArtifactData (read first, pin if_version) whenever patches change, are regrouped, sent or reviewed,
   following "Series and tracker hygiene" below.
 - Kernel: branch `a3y17lte` in src/linux, local commits = `git log master..a3y17lte` (local master =
-  v7.4-rc2; 134 as of 2026-11-14, including the carried mainline fix d00ba321499c
+  v7.4-rc2; 160 as of 2026-11-15, including the carried mainline fix d00ba321499c
   (group AX, ASoC cards had no PCM): drop it when rebasing onto rc3)
 
 ## Display (command-mode panel, working 2026-11-09)

@@ -352,6 +352,19 @@ hand, `backport-kernel continue`.
     Alpine rootfs on microSD would need build-kernel-img's root option pointed at the card.
     The modem work is in the worktree src/linux-modem (branch modem, build dir
     out/linux-modem); it forks from c7f1ab15e265, before today's I2S0 fold and fixes.
+  - OPEN, next task when the phone is back from the modem work (handed over 2026-11-15
+    ~17:30): deep sleep + wake-on-WLAN. Build of 16:55 (device with stock firmware + supplicant
+    overlay, kernel still #7 without the I2S fix) enabled WoWLAN (magic packet) from boot; the
+    first deep sleep after locking never woke: pstore ends at "PM: suspend entry (deep)" ...
+    "Suspending console(s)", no key wake, no watchdog reset, manual Power+VolDown
+    (out/android/pstore-nowake.txt). Never tested before: WoW was measured in s2idle only,
+    deep only without WoW. By design it cannot wake either: the QCA9377 signals in-band over
+    SDIO and the SoC is powered down; the host-wake pin is not in our DT (stock DT has it).
+    User's decisions: NO s2idle (a commit making it the default was reset and force-pushed
+    away, device tip 5dd6339); do it properly = host-wake GPIO as a wakeup source + find why the
+    wake hung. Until then deep + WoW hangs on every lock: iw phy phy0 wowlan disable at runtime
+    (lost at boot), or drop wowlan_triggers from configs/wifi/wpa_supplicant_overlay.conf.
+    Also open from it: a hang in deep-sleep wake is not rescued by the watchdog.
   - Open, reported on build 4: after locking, USB is dead after the wake (host sees the device,
     descriptor reads time out), the screen is slow to come back, Home does not wake. mem_sleep
     defaults to deep; deep sleep was only tested with RTC wake + display on mainline. Home wake

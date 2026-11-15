@@ -61,6 +61,19 @@ hand, `backport-kernel continue`.
 - tools/android/build-kernel = compile check only. The ROM builds the kernel from source
   (never a prebuilt). Open: LineageOS kernel.mk hard-codes linux-x86 host paths (sysroot,
   kernel-build-tools): needs a patch in android-host-arm64 for the arm64 build host.
+- Regenerated 2026-11-15 (219 steps, tip 3fcf1690d804): series of 160 incl. bus DVFS; prereqs
+  + 4fc945d8fdfc/752925401476 (I2S, sound card). The reboot mode (dtsi + PMU binding), MUIC
+  D+/D- routing (folded into "extcon: s2m: Add S2MU004 support") and fuel gauge presence/temp
+  (binding + driver, DTS folded into "Add MUIC, battery and thermistor") are mainline commits
+  now (tracker groups BL, BM, Z); the ANDROID: set is 0001-0008. Manual steps a regeneration
+  will hit again: "clk: samsung: exynos7870: Support CMUs in a power domain" (git am cannot
+  build its 3-way base: apply with --reject, add #include <linux/pm_runtime.h> by hand) and
+  "dt-bindings: soc: samsung: exynos-pmu: Allow the normal reboot mode" (empty on 6.18, which
+  lacks the mode restriction: checkout --ours, git am --skip, continue). exynos-bus conflict is
+  in rr-cache.
+- ANDROID: 0008 C ashmem (android15-6.6 driver ported: shrinker_alloc, mm_get_unmapped_area,
+  ashmem_area_*() and ashmem_memfd_ioctl() like the Rust driver); CONFIG_ASHMEM=y builds it
+  when RUST is off. W=1 clean. Not run on the phone yet.
 - Optional later: 65c132fa8c93 (dw_mmc DMA threshold, needs adapting to the pre-refactor struct).
 
 ## S-Boot direct boot (facts from TWRP's image + sboot.bin strings; not yet tested with our kernel)

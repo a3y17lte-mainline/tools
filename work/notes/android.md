@@ -179,6 +179,10 @@ hand, `backport-kernel continue`.
   i.e. RCLKSRC = PCLK, at 66.625 MHz since bus DVFS. A DT fix in the mainline series (group AW; see
   audio.md status), folded into the Android kernel too (lineage-24.0 0bc47ba9803e, force-pushed).
   Android has no /dev/mem: kprobes with register-held values replace peek for driver state.
+  Media volume could not be changed: STREAM_MUSIC had Min 0 / Max 0 (dumpsys audio). No
+  audio_policy_engine_configuration.xml, and our policy XML had no <volumes>, so the HAL's Config
+  returned no volume groups. Fixed by including audio_policy_volumes.xml + default_volume_tables.xml
+  (frameworks/av, as cuttlefish does), device 7b57f8b. Needs a rebuild (vendor files).
   Next, planned (stashed plan): our own light HAL for the touch-key LED (the LineageOS HAL
   only matches button-backlight*, so dumpsys lights is empty and the keys stay lit), and 3
   DECON windows with blending (composition efficiency 0.0025: everything goes through the

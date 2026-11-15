@@ -162,6 +162,22 @@ hand, `backport-kernel continue`.
     /dev/ashmem present, sys.use_memfd may be droppable again.
   Open for the first boot: HAL sources are only syntax-checked here; drm_hwcomposer with the
   command-mode panel; HIDDEN/CACHE/USERDATA are formatted by the first boot (formattable).
+- Fourth build (2026-11-15, regenerated kernel + C ashmem): Bluetooth scans, the browser
+  draws (ashmem), no boot cursor, sound card registered. Bus DVFS works: MIF follows the
+  fastest cluster (275-902 MHz, many transitions); INT/DISP stay at 133 MHz (powersave, as
+  stock); the power HAL boost ends correctly (min back to 343 MHz).
+  Sound was still dead, but not in the audio path: Codec2 picked HIDL (media.c2.hal.selection
+  defaults to hidl below ro.vendor.api_level 202404). Without hwservicemanager that finds no
+  store, and media.swcodec registered its AIDL store with no components. Only
+  c2.android.inproc.aac.decoder (ApexCodecs) was left, so "Failed to create audio/vorbis
+  decoder" and AudioFlinger "Frames written: 0". Fixed with media.c2.hal.selection=aidl in
+  vendor.prop (device 66c9790); tested live (setprop as root, restart media.swcodec,
+  mediaserver and zygote; the codec list is built by the lazy media.codeclist.generator).
+  Sound confirmed by the user.
+  Next, planned (stashed plan): our own light HAL for the touch-key LED (the LineageOS HAL
+  only matches button-backlight*, so dumpsys lights is empty and the keys stay lit), and 3
+  DECON windows with blending (composition efficiency 0.0025: everything goes through the
+  GPU, even status bar + app).
 - Fuel gauge (ANDROID: patches 0010/0011, for the mainline series too): PRESENT = 1, TEMP from
   the thermistor IIO channel ("batt-temp"), TECHNOLOGY + design values through
   monitored-battery (power supply core). Not run on the phone yet.

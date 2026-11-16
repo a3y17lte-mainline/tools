@@ -521,6 +521,21 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
   the vendor interface), `include/shannon.h` + `samsung-ipc/shannon.c` with the decoded
   Shannon/IMS layouts (work/notes/ril/), 11 layout tests (host, ASan/UBSan clean).
   `LIBSAMSUNG_IPC_FRAME_LOG=/path` appends every frame as hex: for the recording run.
+  Since 2026-11-16 a hard fork (GitHub `external_libsamsung-ipc`): every device and modem
+  older than Shannon is removed (herolte = Galaxy S7 and a3y17lte remain; no Android.mk, no
+  nv_data-imei), so it no longer tracks Replicant. Memory bugs fixed the same day, each with a
+  test that fails on the old code under ASan: frame length trusted on receive (heap overflow),
+  16 bit length wrap on send, call list / IMSI / SMS helpers reading past short messages,
+  data_read/data_write (restart at the buffer start, endless loop at EOF), the NV md5
+  calculation leaking the whole file per NV write, NV reads/writes outside the file (a write
+  past the end made the next check fail -> restore from backup), md5 replaced by rename,
+  firmware upload errors taken for success, select() -> poll(). `tools/modem/test-libsamsung-ipc
+  [fuzz S]` builds it with ASan/UBSan and runs the 22 tests and the libFuzzer harness
+  (samsung-ipc/tests/fuzz.c: framing + every helper that reads modem data).
+  Still to do (the generalization): framing and the vendor kernel interface still live under
+  modems/xmm626 names; device = compile-time IPC_DEVICE_NAME; NV size per device; restore from
+  backup is automatic in ipc_nv_data_load(). tools/modem/patches/libsamsung-ipc is the old
+  patch export and no longer matches the repo.
 - `src/shannond` (own repo, branch main): C++20 daemon. Core (`Modem` request tracker, NV/RFS
   service, Sim, Network, Data with P-CSCF and WWAN links rmnet<cid-1>, Sms, Calls with the
   audio hook tools/modem/voicecall.sh), a synthetic modem on SOCK_SEQPACKET pairs, 21 tests

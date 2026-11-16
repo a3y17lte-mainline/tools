@@ -1,0 +1,49 @@
+#!/bin/sh
+# test-libsamsung-ipc: build src/libsamsung-ipc on the host with ASan/UBSan (leak check
+# included) and full warnings, and run its tests. The repo's own build is autotools, which
+# this machine does not have.
+#
+#   test-libsamsung-ipc            library + tests + tools, run every test
+#   test-libsamsung-ipc fuzz [S]   also build the libFuzzer harness and run it for S seconds
+#                                  (default 60; corpus and crashes in out/libsamsung-ipc-host/fuzz)
+set -eu
+ROOT=$HOME/Projects/exynos7870
+SRC=$ROOT/src/libsamsung-ipc
+B=$ROOT/out/libsamsung-ipc-host
+CF="-g -O1 -fsanitize=address,undefined -fno-sanitize-recover=undefined -Wall -Wextra -Wformat=2
+	-Wno-unused-parameter -Wno-deprecated-declarations -I$SRC/include -I$SRC/samsung-ipc
+	-DIPC_DEVICE_NAME=\"a3y17lte\""
+SRCS=$(find "$SRC/samsung-ipc" -name '*.c' -not -path '*/tests/*')
+
+mkdir -p "$B/fuzz/corpus"
+cd "$B"
+# shellcheck disable=SC2086
+clang $CF -o libsamsung-ipc-test $SRCS $(ls "$SRC"/samsung-ipc/tests/*.c | grep -v /fuzz.c) \
+	"$SRC"/samsung-ipc/tests/partitions/*.c -lcrypto
+# shellcheck disable=SC2086
+clang $CF -o ipc-modem $SRCS "$SRC"/tools/ipc-modem/*.c -lcrypto -lpthread 2>&1 |
+	grep -v 'ipc-modem-log\|vsnprintf\|ipc_modem_log\|\^\|warning generated' || true
+# shellcheck disable=SC2086
+clang $CF -o nv_data-md5 $SRCS "$SRC"/tools/nv_data-md5.c -lcrypto
+
+fail=0 n=0
+for t in $(./libsamsung-ipc-test list-tests | tail -n +2); do
+	n=$((n + 1))
+	if ! ./libsamsung-ipc-test test "$t" > "test-$t.log" 2>&1; then
+		echo "FAIL $t (see $B/test-$t.log)"
+		fail=$((fail + 1))
+	fi
+done
+echo "$n tests, $fail failed"
+
+if [ "${1:-}" = fuzz ]; then
+	# shellcheck disable=SC2086
+	clang -g -O1 -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined \
+		-Wno-deprecated-declarations -I"$SRC/include" -I"$SRC/samsung-ipc" \
+		-DIPC_DEVICE_NAME='"a3y17lte"' -o fuzz/fuzz "$SRC"/samsung-ipc/tests/fuzz.c $SRCS -lcrypto
+	cd fuzz
+	./fuzz -max_len=8192 -max_total_time="${2:-60}" -print_final_stats=1 corpus/ > fuzz.log 2>&1 ||
+		{ echo "fuzz: FAILED, see $B/fuzz/fuzz.log"; exit 1; }
+	grep 'number_of_executed_units' fuzz.log
+fi
+[ "$fail" = 0 ]

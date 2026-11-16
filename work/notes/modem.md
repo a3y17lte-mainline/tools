@@ -542,7 +542,7 @@ Behaviour:
 - Closing the ports leaves the modem running. A crash (fail IRQ, watchdog, CRASH_EXIT)
   removes and re-adds both ports from a work item: readers get an error, the next open boots
   again. No crash dump on this path (legacy only).
-- Packet data: `ip link add wwan0pdp0 parentdev-name wwan0 type wwan linkid 0` (link id N =
+- Packet data: `ip link add wwan0pdp0 parentdev wwan0 type wwan linkid 0` (link id N =
   PDP channel 10+N, 0-14); no default link. Raw IP, MTU 1500, IPv4/IPv6 by version nibble.
 - Phone side: `tools/modem/modem-nv-setup` copies the first 37 MiB of RADIO to
   `/lib/firmware/samsung/a3y17lte/modem.bin` and links `modem-nv.bin` to the NV working copy.

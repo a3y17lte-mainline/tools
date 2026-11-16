@@ -85,7 +85,7 @@ Not done, roughly in planned order:
   NULL deref (group AI), and the CPUCL0 watchdog resuming from its reset values (s3c2410_wdt
   resume order vs the PMU automatic disable, fixed 2026-11-14; the old CPU0 hold is gone, so
   every tick freezes now). Wake sources: RTC/charger alarm, power key, USB plug (S2MU004 PMIC,
-  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-15, 160 commits). If
+  2026-11-14); sensor hub, touch keys and BT verified after resume. The tracker db is in sync with the branch (2026-11-16, 182 commits, 75 groups). If
   ArtifactData is not offered in a session, record tracker changes in out/tracker/ledger.md. Charging continues across suspend (the
   charger watchdog is cleared from a 30 s wakeup alarm while a charger is attached, group K).
   Details, tools and traps: work/notes/suspend.md.
@@ -120,8 +120,8 @@ Not done, roughly in planned order:
   Samsung's /dev/umts_* + rmnet interface as a local-only front end). Builds, KUnit, series-lint and
   dtbs_check are clean. Since 2026-11-15 the series is ON a3y17lte (fixups folded,
   old tip tagged a3y17lte-pre-modem) and in the Android config fragment (built in); tracker groups
-  still pending in out/tracker/ledger.md, series-lint not re-run. Continue on Android (stock
-  cbd/libsec-ril, EFS read-write there). Alpine trap: the RAM image's NV working copy is recreated
+  BN-BQ, series-lint clean for the modem commits. Continue on Android (stock
+  cbd/libsec-ril need exynos_modem.legacy_abi=1 on the cmdline since 2026-11-16; EFS read-write there). Alpine trap: the RAM image's NV working copy is recreated
   from EFS every boot, so the modem's network state never persists; after many reboots the network
   rejected the CS part of the attach (cause 10) and incoming calls stopped. Mailbox = wake source
   (IRQ 84 wakes s2idle, but immediately: the CP keeps messaging; not solved).

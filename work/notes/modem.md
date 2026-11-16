@@ -1,5 +1,13 @@
 # Modem: Shannon 315 (SS315AP) on the Exynos 7870
 
+Status 2026-11-16: **the kernel has a WWAN interface** (on a3y17lte, section 8a): two WWAN
+ports (Samsung IPC, RFS), packet data as WWAN links, and the kernel loads and starts the modem
+itself (firmware-name: the RADIO image and the NV working copy). Built, KUnit and checks clean,
+NOT run on the phone yet. The vendor interface (`/dev/umts_*`, `rmnetN`) stays as a local
+commit, now opt-in: `exynos_modem.legacy_abi=1`. Everything below up to section 8 was done
+with the vendor interface. Plan for the open stack: `~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md`;
+stock RIL/IMS reference: work/notes/ril/.
+
 Status 2026-11-15 night: **LTE registration and mobile data work** with the user's SIM (O2 CZ),
 from a RAM boot (section 0): hsi2c0 in batcher mode, samsungipcd with the NV service, AT port by
 hand, rmnet0 configured by hand. ~16 Mbit/s download. SMS receive and send work. Incoming and outgoing
@@ -505,6 +513,41 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
   a write rewrites the md5 file. Stock libsec-ril additionally handles generic file requests
   (open/read/write/close/lseek/unlink/rename/mkdir/opendir/..., `RFS_NV_RESTORE`,
   `RFS_NV_WRITE_ALL_ITEM`) under `/efs` and `/cpefs`.
+
+## 8a. WWAN interface (2026-11-16, on a3y17lte)
+
+Commits, in series order (old tip tagged `a3y17lte-pre-wwan`):
+
+| Commit | What |
+|---|---|
+| dt-bindings: net: Add the Samsung Exynos integrated modem | + `firmware-name` (image, NV data), required |
+| net: wwan: core: Add the Samsung IPC port types | `WWAN_PORT_SIPC` ("sipc"), `WWAN_PORT_SIPC_RFS` ("sipcrfs") |
+| net: wwan: Add the Samsung Exynos integrated modem interface | unchanged core |
+| net: wwan: exynos_modem: Add KUnit tests for the link helpers | unchanged |
+| net: wwan: exynos_modem: Load and start the firmware | `boot.c`, `fw.h` (TOC parser + 3 KUnit cases) |
+| net: wwan: exynos_modem: Add the WWAN ports and links | `wwan.c`, `net.c` (raw IP netdev shared with legacy) |
+| arm64: dts: exynos7870-a3y17lte: Enable the modem | + `firmware-name = "samsung/a3y17lte/modem.bin", "samsung/a3y17lte/modem-nv.bin"` |
+| net: wwan: exynos_modem: Add the vendor kernel's userspace interface | local; now uses `net.c`, `legacy_abi` parameter |
+
+Behaviour:
+- Ports `/dev/wwan0sipc0` (FMT channel 235) and `/dev/wwan0sipc1` (RFS 245). One message per
+  read/write, no SIPC header (the link adds it). INIT_END goes out once both are open.
+- The first open of the IPC port boots the modem (`exmodem_boot`): reset, read the TOC (partial
+  firmware load, 512 bytes), SMC unlock (answer 11 on the first start after cold boot is
+  normal), BOOT/MAIN/NV loaded directly into the firmware region with partial firmware
+  requests (no 36 MiB buffer, no firmware cache), 0MEM size check, SMC verify (must be 0),
+  power on, boot on, DL start, handshake 0x900d/0xa00d and 0x9f00/0xaf00 on channel 215 (2 s
+  per answer), boot off (PHONE_START within 15 s). On failure: `exmodem_stop` (IRQs off,
+  power off, state offline). The open fails with the error.
+- Closing the ports leaves the modem running. A crash (fail IRQ, watchdog, CRASH_EXIT)
+  removes and re-adds both ports from a work item: readers get an error, the next open boots
+  again. No crash dump on this path (legacy only).
+- Packet data: `ip link add wwan0pdp0 parentdev-name wwan0 type wwan linkid 0` (link id N =
+  PDP channel 10+N, 0-14); no default link. Raw IP, MTU 1500, IPv4/IPv6 by version nibble.
+- Phone side: `tools/modem/modem-nv-setup` copies the first 37 MiB of RADIO to
+  `/lib/firmware/samsung/a3y17lte/modem.bin` and links `modem-nv.bin` to the NV working copy.
+- Untested on hardware: the in-kernel boot (timing, the restart path, which was unreliable
+  with the vendor interface too: section 0), port and link traffic.
 
 ## 8. Kernel code (branch `modem`, 2026-11-15)
 

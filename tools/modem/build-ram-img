@@ -3,19 +3,22 @@
 #
 #   build-ram-img [output.img]
 #
-# Kernel from the `modem` branch (worktree src/linux-modem, build directory out/linux-modem,
-# config = out/linux/.config + the modem options), the usual debug initramfs, and an extra
-# initramfs layer with the modem modules and the userspace from out/modem-userspace
-# (run tools/modem/build-userspace first). Nothing is written to the phone.
+# Kernel from src/linux (branch a3y17lte, build directory out/linux, config from
+# tools/mkconfig-a3y17lte), the usual debug initramfs, and an extra initramfs layer with the
+# modem modules and the userspace from out/modem-userspace (run tools/modem/build-userspace
+# first). Nothing is written to the phone.
 #
-# On the phone afterwards:  insmod /lib/modem/exynos-mailbox.ko; insmod /lib/modem/exynos_modem.ko
+# On the phone afterwards:  modem-nv-setup (NV working copy + the firmware files), then
+#   insmod /lib/modem/exynos-mailbox.ko; insmod /lib/modem/exynos_modem.ko
+# for the WWAN ports (/dev/wwan0sipc0, /dev/wwan0sipc1), or ... exynos_modem.ko legacy_abi=1
+# for the vendor interface (/dev/umts_*) that libsamsung-ipc and samsungipcd use.
 # All other modules of the build are in /lib/modules (modprobe works); amixer/aplay/arecord
 # come from Alpine's alsa-utils (fetched once into out/apk-alsa); the call audio hook
 # tools/modem/voicecall.sh is installed where samsungipcd runs it.
 set -euo pipefail
 ROOT=~/Projects/exynos7870
-SRC=$ROOT/src/linux-modem
-O=$ROOT/out/linux-modem
+SRC=$ROOT/src/linux
+O=$ROOT/out/linux
 US=$ROOT/out/modem-userspace
 BASE_CPIO=$ROOT/out/images/initramfs-debug.cpio.gz
 OUT=${1:-$ROOT/out/images/linux-a3y17lte-modem.img}
@@ -24,13 +27,9 @@ K=(make -s -C "$SRC" O="$O" ARCH=arm64 LLVM=1)
 [ -e "$US/usr/sbin/samsungipcd" ] || { echo "run tools/modem/build-userspace first" >&2; exit 1; }
 [ -e "$BASE_CPIO" ] || { echo "no $BASE_CPIO: run tools/build-kernel-img once" >&2; exit 1; }
 
-mkdir -p "$O"
-cp "$ROOT/out/linux/.config" "$O/.config"
-"$SRC/scripts/config" --file "$O/.config" -e MAILBOX -m EXYNOS_MBOX -m WWAN -m EXYNOS_MODEM \
-	-e EXYNOS_MODEM_LEGACY_ABI
-"${K[@]}" olddefconfig
+# The modem options are in tools/mkconfig-a3y17lte; run it if one is missing
 for c in EXYNOS_MBOX EXYNOS_MODEM EXYNOS_MODEM_LEGACY_ABI; do
-	grep -q "^CONFIG_$c=" "$O/.config" || { echo "CONFIG_$c did not stick" >&2; exit 1; }
+	grep -q "^CONFIG_$c=" "$O/.config" || { echo "CONFIG_$c not set: run mkconfig-a3y17lte" >&2; exit 1; }
 done
 
 nice "${K[@]}" CC="ccache clang" -j"$(nproc)" Image dtbs modules \

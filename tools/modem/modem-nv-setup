@@ -6,6 +6,10 @@
 #   so not a single block of the partition is written
 # - on the first run copies the modem's four NV data files to the working copy in
 #   /var/lib/modem/nv, which is what libsamsung-ipc (a3y17lte profile) reads and writes
+# - for the kernel's own modem start (WWAN interface): copies the firmware image from RADIO
+#   to /lib/firmware/samsung/a3y17lte/modem.bin (37 MiB, a read of RADIO; RAM on a RAM boot)
+#   and links modem-nv.bin there to the NV working copy, so the kernel loads the current NV
+#   data on every start. Both names are the board DT's firmware-name.
 #
 # The working copy holds the IMEI and the radio calibration: root only, never copy it off the
 # phone. Delete /var/lib/modem/nv to start again from the files on EFS.
@@ -40,3 +44,12 @@ if [ ! -e "$NV/nv_data.bin" ]; then
 	done
 	echo "modem-nv-setup: NV working copy created in $NV"
 fi
+FW=/lib/firmware/samsung/a3y17lte
+mkdir -p "$FW"
+if [ ! -s "$FW/modem.bin" ]; then
+	# The table of contents, the loader and the firmware end at 0x247ae28 on A320FLXXS9CTK1
+	dd if=/dev/disk/by-partlabel/RADIO of="$FW/modem.bin.tmp" bs=1M count=37 2>/dev/null
+	mv "$FW/modem.bin.tmp" "$FW/modem.bin"
+	echo "modem-nv-setup: firmware image copied to $FW/modem.bin"
+fi
+ln -sf "$NV/nv_data.bin" "$FW/modem-nv.bin"

@@ -125,13 +125,14 @@ Not done, roughly in planned order:
   from EFS every boot, so the modem's network state never persists; after many reboots the network
   rejected the CS part of the attach (cause 10) and incoming calls stopped. Mailbox = wake source
   (IRQ 84 wakes s2idle, but immediately: the CP keeps messaging; not solved).
-  Userspace: tools/modem/ (libsamsung-ipc a3y17lte profile, samsungipcd NV service) builds into
+  Userspace: tools/modem/build-userspace (src/libsamsung-ipc, samsungipcd NV service) builds into
   out/modem-userspace. U-Boot must be updated BEFORE a kernel with the modem DT is installed: it
   loads kernel and ramdisk into the modem's memory (fix: branch `modem` in the worktree
   src/u-boot-modem, built but not flashed). Next steps need Alpine: read-only probes, the U-Boot
   flash, then the first modem start (needs the user's go). EFS stays never-touch: the modem's NV files run on a working copy
-  (tools/modem/modem-nv-setup, EFS mounted ro,noload). Never run libsamsung-ipc's herolte profile
-  on the real EFS (wrong NV size: it overwrites nv_data.bin from the 2019 backup file).
+  (tools/modem/modem-nv-setup, EFS mounted ro,noload). Never point libsamsung-ipc at the real
+  EFS. (Its old herolte profile, wrong NV size, overwrote nv_data.bin from the 2019 backup; since
+  2026-11-16 the library refuses a size mismatch and restores only from a checked backup.)
   Start with work/notes/modem.md (status header, sections 8 and 10).
 - Modem WWAN interface (2026-11-16, on a3y17lte, untested on the phone): WWAN ports
   wwan0sipc0 + wwan0sipcrfs0, packet data as WWAN links, in-kernel modem start from firmware-name files
@@ -142,9 +143,12 @@ Not done, roughly in planned order:
 - Android radio HAL (2026-11-16, written, not compiled here, never run): shannond's AIDL V5 front
   end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to
   /data/vendor/modem, kernel.firmware_class.path). Android kernel lineage-24.0 regenerated with
-  the modem series (old tip tag lineage-24.0-pre-modem; new mailbox/PMU prereqs). shannond and
-  libsamsung-ipc repos are local only: they need pushing + local manifest entries before the
-  Spark can build. work/notes/modem.md section 8c.
+  the modem series (old tip tag lineage-24.0-pre-modem; new mailbox/PMU prereqs). shannond
+  (hardware_samsung_shannond) and libsamsung-ipc (external_libsamsung-ipc) are org repos, in the
+  local manifest and lineage.dependencies. work/notes/modem.md section 8c.
+- libsamsung-ipc (2026-11-16): hard fork, Shannon only (herolte + a3y17lte as table entries,
+  device from the DT compatible at run time), memory bugs fixed, NV restore policy. Host tests:
+  tools/modem/test-libsamsung-ipc [fuzz S]; real NV data: tools/modem/test-nv. modem.md 8b.
 - Open RIL + IMS (2026-11-16, decided: no Samsung userspace blobs; VoLTE yes, Wi-Fi calling not now
   but keep it possible). Reference from the stock image: work/notes/ril/README.md (RIL message
   maps, IMS stack, the modem's voice engine = IPC group 0x16: VoLTE media runs in the modem).
@@ -223,8 +227,8 @@ Keep series small: one commit per logical change, follow-ups folded in.
 - `firmware/twrp/` TWRP 3.7.0_9-0 a3y17lte (GPG-verified, TeamWin key 95707D42…891A43DF)
 - `tools/` a3-flash, a3-install-kernel, a3-backup, guard-phone-writes (+ .tests), build-uboot, build-kernel-img, build-rootfs, a3-sync-modules,
   mkconfig-a3y17lte, mkbootimg-samsung, phone-sh, peek/, ect-parse, initramfs/ (init, showoff.sh), probes/
-  (bare-metal S-Boot payloads, asv-fuse module), modem/ (build-userspace, test-nv, modem-nv-setup, patches for
-  libsamsung-ipc and samsungipcd)
+  (bare-metal S-Boot payloads, asv-fuse module), modem/ (build-userspace, test-nv, test-libsamsung-ipc,
+  modem-nv-setup, patches for samsungipcd)
 - `work/` stock DTs (ground truth, rev02 DTB = this unit), kernel config copy, initramfs tree (Alpine 3.24;
   add packages with its own apk: `cd work/initramfs && qemu-aarch64-static -L . ./sbin/apk --root . --usermode
   --arch aarch64 add PKG`; the busybox trigger error is harmless), `work/ssh/` dropbear host key

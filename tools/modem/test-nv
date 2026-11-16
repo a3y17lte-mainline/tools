@@ -82,7 +82,9 @@ clang --target=aarch64-alpine-linux-musl --sysroot="$SYSROOT" -fuse-ld=lld -O1 -
 	-I"$T/out/usr/include/samsung-ipc" -L"$T/out/usr/lib" -lsamsung-ipc
 
 rc=0
-qemu-aarch64-static -L "$SYSROOT" -E LD_LIBRARY_PATH="$T/out/usr/lib" "$T/test" || rc=$?
+# No device tree on the host: name the device
+qemu-aarch64-static -L "$SYSROOT" -E LD_LIBRARY_PATH="$T/out/usr/lib" \
+	-E LIBSAMSUNG_IPC_DEVICE=a3y17lte "$T/test" || rc=$?
 (cd "$NV" && sha256sum nv_data.bin nv_data.bin.md5 .nv_data.bak .nv_data.bak.md5) > "$T/after"
 
 if ! cmp -s "$T/before" "$T/after"; then

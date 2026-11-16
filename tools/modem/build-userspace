@@ -1,13 +1,13 @@
 #!/bin/bash
 # build-userspace: cross-build the open modem userspace for the phone's Alpine (aarch64, musl):
-# libsamsung-ipc (manoedinata's Shannon LTE fork + the a3y17lte profile), its ipc-modem test
-# tool, and samsungipcd (AT command proxy for ModemManager/oFono, + an NV request service).
+# libsamsung-ipc (our Shannon fork, src/libsamsung-ipc), its ipc-modem test tool, and
+# samsungipcd (AT command proxy for ModemManager/oFono, + an NV request service).
 #
 #   build-userspace [--nv-dir DIR] [--out DIR]
 #
-# Sources: src/libsamsung-ipc (own repo, branch a3y17lte) or, without it, work/ref/libsamsung-ipc;
-# work/ref/samsungipcd. The work/ref clones are made at the pinned commits with tools/modem/patches/
-# applied on a branch "a3y17lte" if they are missing.
+# Sources: src/libsamsung-ipc (own repo, branch a3y17lte; the device is found at run time from
+# the device tree) and work/ref/samsungipcd, cloned at the pinned commit with
+# tools/modem/patches/samsungipcd applied on a branch "a3y17lte" if it is missing.
 # Output: out/modem-userspace/ (a tree to copy onto the rootfs; nothing is installed here).
 # With src/shannond present it also cross-builds shannond (usr/sbin/shannond; the sysroot needs g++ and
 # libstdc++-dev, added with the same apk call as below).
@@ -25,8 +25,6 @@ SYSROOT=$ROOT/out/modem-sysroot
 OUT=$ROOT/out/modem-userspace
 PATCHES=$ROOT/tools/modem/patches
 NV_DIR=/var/lib/modem/nv
-LIB_URL=https://github.com/manoedinata/libsamsung-ipc
-LIB_COMMIT=bba6a0d5004e777242e27d6cf2287c7ccda2c982
 DAEMON_URL=https://github.com/manoedinata/samsungipcd
 DAEMON_COMMIT=7165a7481ac1a943f73e32f39e3e2d50e5507d5c
 
@@ -53,15 +51,12 @@ if [ ! -e "$SYSROOT/usr/lib/crt1.o" ]; then
 		--arch aarch64 --initdb --no-scripts add musl-dev openssl-dev gcc g++ libstdc++-dev linux-headers)
 fi
 
-fetch libsamsung-ipc $LIB_URL $LIB_COMMIT
 fetch samsungipcd $DAEMON_URL $DAEMON_COMMIT
 
 CC=(clang --target=aarch64-alpine-linux-musl --sysroot="$SYSROOT" -fuse-ld=lld -O2 -g0 -Wall
 	-Wno-unused-parameter)
-# libsamsung-ipc lives in its own repo (src/libsamsung-ipc, branch a3y17lte) since 2026-11-16;
-# work/ref/libsamsung-ipc + tools/modem/patches/libsamsung-ipc remain as the fallback
-LIB=$REF/libsamsung-ipc
-[ -d "$ROOT/src/libsamsung-ipc" ] && LIB=$ROOT/src/libsamsung-ipc
+LIB=$ROOT/src/libsamsung-ipc
+[ -d "$LIB" ] || { echo "build-userspace: $LIB is missing" >&2; exit 1; }
 DAEMON=$REF/samsungipcd
 
 rm -rf "$OUT"
@@ -70,7 +65,7 @@ mkdir -p "$OUT/usr/lib" "$OUT/usr/bin" "$OUT/usr/sbin" "$OUT/usr/include/samsung
 mapfile -t SRCS < <(find "$LIB/samsung-ipc" -name '*.c' -not -path '*/tests/*' | sort)
 "${CC[@]}" -shared -fPIC -Wl,-soname,libsamsung-ipc.so.0 -o "$OUT/usr/lib/libsamsung-ipc.so.0" \
 	-I"$LIB/include" -I"$LIB/samsung-ipc" \
-	-DIPC_DEVICE_NAME='"a3y17lte"' -DA3Y17LTE_NV_DATA_DIR="\"$NV_DIR\"" \
+	-DIPC_NV_DATA_DIR="\"$NV_DIR\"" \
 	"${SRCS[@]}" -lcrypto
 ln -s libsamsung-ipc.so.0 "$OUT/usr/lib/libsamsung-ipc.so"
 cp "$LIB"/include/*.h "$OUT/usr/include/samsung-ipc/"
@@ -94,7 +89,7 @@ if [ -d "$SHANNOND" ]; then
 fi
 
 {
-	echo "libsamsung-ipc $(git -C "$LIB" rev-parse --short HEAD) (base ${LIB_COMMIT:0:7})"
+	echo "libsamsung-ipc $(git -C "$LIB" rev-parse --short HEAD)"
 	echo "samsungipcd $(git -C "$DAEMON" rev-parse --short HEAD) (base ${DAEMON_COMMIT:0:7})"
 	[ -d "$SHANNOND" ] && echo "shannond $(git -C "$SHANNOND" rev-parse --short HEAD 2>/dev/null || echo uncommitted)"
 	echo "NV data directory: $NV_DIR"

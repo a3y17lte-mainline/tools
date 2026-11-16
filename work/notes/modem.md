@@ -482,13 +482,12 @@ Character device behaviour (the compat ABI):
 
 Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/modem-userspace`
 (a tree for the rootfs, not installed; needs libcrypto3 and musl on the phone):
-- Patches in `tools/modem/patches/` on the pinned upstream commits (clones in `work/ref/`, branch
-  `a3y17lte`): libsamsung-ipc gets the NV read fix, the NV path taken from the client, a log
-  line per NV write, and the `a3y17lte` device (herolte code, NV size 1 MiB, NV directory from
-  `A3Y17LTE_NV_DATA_DIR`); samsungipcd gets an RFS thread that answers NV item reads and writes
-  and logs every other RFS command.
-- Built for `IPC_DEVICE_NAME` a3y17lte with the NV files in `/var/lib/modem/nv` (the working
-  copy). `usr/bin/ipc-modem` is the library's test tool (boots the modem, prints IPC).
+- libsamsung-ipc is our own repo now (src/libsamsung-ipc, see 8b; the old patch export is gone).
+  samsungipcd: patches in `tools/modem/patches/samsungipcd` on the pinned upstream commit (clone
+  in `work/ref/`, branch `a3y17lte`): an RFS thread that answers NV item reads and writes and
+  logs every other RFS command.
+- Built with the NV files in `/var/lib/modem/nv` (the working copy, `IPC_NV_DATA_DIR`); the
+  device comes from the device tree at run time. `usr/bin/ipc-modem` is the library's test tool (boots the modem, prints IPC).
 - `tools/modem/test-nv` (host, qemu-user): the profile accepts the NV files of the EFS backup as
   they are, and an NV write leaves all four files byte-identical when the data is the same.
   Passed.
@@ -516,9 +515,7 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
 
 ## 8b. Open userspace (2026-11-16, not run on the phone yet)
 
-- `src/libsamsung-ipc` (own repo, branch a3y17lte; patch export in tools/modem/patches): the
-  a3y17lte device finds the WWAN ports by type in sysfs (falls back to the herolte code on
-  the vendor interface), `include/shannon.h` + `samsung-ipc/shannon.c` with the decoded
+- `src/libsamsung-ipc` (own repo, branch a3y17lte): `include/shannon.h` + `samsung-ipc/shannon.c` with the decoded
   Shannon/IMS layouts (work/notes/ril/), 11 layout tests (host, ASan/UBSan clean).
   `LIBSAMSUNG_IPC_FRAME_LOG=/path` appends every frame as hex: for the recording run.
   Since 2026-11-16 a hard fork (GitHub `external_libsamsung-ipc`): every device and modem
@@ -530,12 +527,21 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
   calculation leaking the whole file per NV write, NV reads/writes outside the file (a write
   past the end made the next check fail -> restore from backup), md5 replaced by rename,
   firmware upload errors taken for success, select() -> poll(). `tools/modem/test-libsamsung-ipc
-  [fuzz S]` builds it with ASan/UBSan and runs the 22 tests and the libFuzzer harness
+  [fuzz S]` builds it with ASan/UBSan and runs the 26 tests and the libFuzzer harness
   (samsung-ipc/tests/fuzz.c: framing + every helper that reads modem data).
-  Still to do (the generalization): framing and the vendor kernel interface still live under
-  modems/xmm626 names; device = compile-time IPC_DEVICE_NAME; NV size per device; restore from
-  backup is automatic in ipc_nv_data_load(). tools/modem/patches/libsamsung-ipc is the old
-  patch export and no longer matches the repo.
+  Layout since the restructure: `framing.c` (FMT/RFS frames), `transports/wwan.c` (mainline
+  ports, the kernel boots) and `transports/vendor.c` (/dev/umts_*, userspace boot; the
+  IOCTL_MODEM_XMIT_BOOT struct now has the kernel's fixed layout, so 32-bit builds work too),
+  `devices/shannon_devices.c` (one set of handlers, transport chosen at open: WWAN if there,
+  else vendor), `devices/ipc_devices.c` (phones as data: name, DT compatibles, RADIO paths,
+  rmnet count, NV specs). Device = `LIBSAMSUNG_IPC_DEVICE`, else build-time `IPC_DEVICE_NAME`,
+  else the DT compatible (a3y17lte: "samsung,a3y17lte"; herolte by name only). NV directory =
+  build-time `IPC_NV_DATA_DIR` (default /efs). NV policy: the size must match the firmware TOC's
+  NV entry when RADIO is readable (A3: 0x100000; herolte's 0x200000 would be refused); NV data
+  of the wrong size is never restored over (wrong device, not damage); restore only from a
+  backup that passes size + md5, the replaced file kept as nv_data.bin.bad, all writes via
+  temp file + fsync + rename, re-checked after; a backup is only made from NV data that passes,
+  and checked after writing. The vendor boot loads (and if needed restores) NV before upload.
 - `src/shannond` (own repo, branch main): C++20 daemon. Core (`Modem` request tracker, NV/RFS
   service, Sim, Network, Data with P-CSCF and WWAN links rmnet<cid-1>, Sms, Calls with the
   audio hook tools/modem/voicecall.sh), a synthetic modem on SOCK_SEQPACKET pairs, 21 tests

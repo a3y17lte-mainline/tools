@@ -76,3 +76,14 @@ f4b830a53719  leds: expresswire: Fix chip state breakage
 # card on Android 2026-11-15). 752925401476 balances op_clk with runtime PM.
 4fc945d8fdfc  ASoC: samsung: i2s: drop secondary DAI for i2sv7 hardware variant
 752925401476  ASoC: samsung: i2s: enable op_clk in probe to balance runtime PM
+
+# Exynos mailbox (the modem mailbox builds on the Exynos850 rework)
+6b0eadf69bd1  mailbox: exynos: drop unneeded runtime pointer (pclk)
+8a19c5aa2f04  mailbox: exynos: drop superfluous mbox setting per channel
+7caa16023b14  mailbox: exynos: Drop unused register definitions
+fd8dc36a12b2  dt-bindings: mailbox: google,gs101-mbox: Add samsung,exynos850-mbox
+4ff8c9df5e3d  mailbox: exynos: Add support for Exynos850 mailbox
+
+# exynos-pmu reboot modes (our "normal" mode binding edits these blocks)
+3527091de0fe  dt-bindings: samsung: exynos-pmu: Restrict children with unevaluatedProperties
+e131ca83dabc  dt-bindings: samsung: exynos-pmu: Narrow allowed reboot modes

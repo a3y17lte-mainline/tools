@@ -137,7 +137,14 @@ Not done, roughly in planned order:
   wwan0sipc0 + wwan0sipcrfs0, packet data as WWAN links, in-kernel modem start from firmware-name files
   (modem-nv-setup stages them). The vendor /dev/umts_* interface now needs
   exynos_modem.legacy_abi=1. work/notes/modem.md section 8a; plan
-  ~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md (next: libsamsung-ipc, daemon).
+  ~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md. Open userspace (8b): src/modemd
+  (C++ daemon core + Linux CLI, 29 host tests) on src/libsamsung-ipc (a3y17lte branch).
+- Android radio HAL (2026-11-16, written, not compiled here, never run): modemd's AIDL V5 front
+  end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to
+  /data/vendor/modem, kernel.firmware_class.path). Android kernel lineage-24.0 regenerated with
+  the modem series (old tip tag lineage-24.0-pre-modem; new mailbox/PMU prereqs). modemd and
+  libsamsung-ipc repos are local only: they need pushing + local manifest entries before the
+  Spark can build. work/notes/modem.md section 8c.
 - Open RIL + IMS (2026-11-16, decided: no Samsung userspace blobs; VoLTE yes, Wi-Fi calling not now
   but keep it possible). Reference from the stock image: work/notes/ril/README.md (RIL message
   maps, IMS stack, the modem's voice engine = IPC group 0x16: VoLTE media runs in the modem).

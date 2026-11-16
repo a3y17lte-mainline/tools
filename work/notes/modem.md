@@ -524,12 +524,47 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
 - `src/modemd` (own repo, branch main): C++20 daemon. Core (`Modem` request tracker, NV/RFS
   service, Sim, Network, Data with P-CSCF and WWAN links rmnet<cid-1>, Sms, Calls with the
   audio hook tools/modem/voicecall.sh), a synthetic modem on SOCK_SEQPACKET pairs, 21 tests
-  (host and qemu-aarch64), Linux front end `modemd` (socket /run/modemd.sock, `help`).
+  (host and qemu-aarch64; 29 with the HAL's codec tests), Linux front end `modemd` (socket
+  /run/modemd.sock, `help`).
   tools/modem/build-userspace cross-builds it into out/modem-userspace/usr/sbin/modemd.
 - Untested assumptions to check first on the phone: radio on = PWR_UP exec + PHONE_STATE
   NORMAL (samsungipcd's), radio off = PHONE_STATE LPM (stock's, never sent by us), the IP
   configuration flags (DNS under bit 0 per stock vs bits 1/2 per samsungipcd: the parser takes
   any non-zero field), SMS send result arriving as a separate IPC_SMS_SEND_MSG message.
+
+### 8c. Android radio HAL (2026-11-16, written, never compiled: needs the LOS tree)
+
+- `src/modemd/frontends/aidl`: `android.hardware.radio-service.a3y17lte`, AIDL V5 (config
+  `default`, modem/SIM/network/data/messaging/voice `slot1`), one process with the core on its
+  own thread (`Stack`: binder calls are posted to the core's loop; nullptr core = modem not up
+  yet -> RADIO_NOT_AVAILABLE). Generated "not supported" bases (`gen_stubs.py` from the frozen
+  V5 API in src/los-ref); `Codec` (hex, base64, FCP->SIM GET RESPONSE, CLA channels, AKA
+  DB/DC answers) host-tested (29 tests total). `Android.bp` + `.rc` (user radio, NET_ADMIN)
+  + VINTF fragment in the repo; libsamsung-ipc has an `Android.bp` (`libsamsung-ipc-shannon`).
+- Device tree (src/android/device/samsung/a3y17lte, commit "Radio HAL (off until tested)"):
+  `A3_ENABLE_RADIO=true` builds it (default off: then the NoTelephony overlay keeps voice/SMS
+  off). `init.a3y17lte.modem.rc` mounts EFS ro,noload (context a3_efs_file) and runs
+  `modem-setup.sh` in post-fs-data: first boot copies the NV files to /data/vendor/modem/nv
+  and RADIO (37 MiB) to /data/vendor/modem/firmware/samsung/a3y17lte/modem.bin, links
+  modem-nv.bin to the working copy (it persists, unlike Alpine's RAM image).
+  bootconfig `kernel.firmware_class.path=/data/vendor/modem/firmware`: partial firmware reads
+  (request_partial_firmware_into_buf) never fall back to ueventd, so the kernel must find the
+  files itself. ueventd: /dev/wwan0sipc* radio:radio. Sepolicy is written for permissive; for
+  enforcing, the kernel's open of a vendor data file may hit the core-domain neverallow
+  (commented rule in hal_radio_default.te).
+- Android kernel (lineage-24.0, regenerated 2026-11-16 with backport-kernel, old tip tagged
+  `lineage-24.0-pre-modem`): modem series + new prerequisites (mailbox 6b0eadf69bd1,
+  8a19c5aa2f04, 7caa16023b14, fd8dc36a12b2, 4ff8c9df5e3d; exynos-pmu 3527091de0fe, e131ca83dabc).
+  WWAN core: the ACK enum has no NMEA, so the SIPC types follow MIPC (names, not numbers,
+  matter). Defconfig: WWAN, EXYNOS_MODEM(+LEGACY_ABI), EXYNOS_MBOX built in.
+- Behaviour choices to revisit on the phone: SMS are acknowledged by the core at once (the
+  framework's ack is a no-op); emergencyDial = a normal dial (stock's emergency call type in
+  IpcTxCallOriginate @7 not decoded); one call at a time (hangup/reject/background = release);
+  signal = RSSI only (LTE level from RSSI, no RSRP yet); operator name = the PLMN digits (the
+  framework prefers SPN/EONS); only the serving cell in getCellInfoList; no VoPS (IMS later);
+  setInitialAttachApn sends the attach profile (the modem re-registers).
+- To build: modemd -> e.g. hardware/a3y17lte/modemd, libsamsung-ipc -> external/libsamsung-ipc
+  in the local manifest once the repos are pushed (user's word), then `A3_ENABLE_RADIO=true`.
 
 ## 8a. WWAN interface (2026-11-16, on a3y17lte)
 

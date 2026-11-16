@@ -1,7 +1,7 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From f0016f473d5b6ec5d62551790fca107387170e16 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sun, 15 Nov 2026 15:03:42 +0100
-Subject: [PATCH] devices: Add the Galaxy A3 2017 (a3y17lte)
+Subject: [PATCH 4/7] devices: Add the Galaxy A3 2017 (a3y17lte)
 
 The Galaxy A3 2017 (Exynos 7870, Shannon 315 modem) uses the modem
 interface of herolte. Its NV data file has 1 MiB instead of 2 MiB: with

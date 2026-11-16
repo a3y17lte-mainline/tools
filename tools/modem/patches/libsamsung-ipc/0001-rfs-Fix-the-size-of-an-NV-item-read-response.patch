@@ -1,7 +1,7 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 7cffd7e22adfa3ee47bd28b108776e22eccf0db8 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Sun, 15 Nov 2026 15:03:24 +0100
-Subject: [PATCH] rfs: Fix the size of an NV item read response
+Subject: [PATCH 1/7] rfs: Fix the size of an NV item read response
 
 ipc_rfs_nv_data_item_size_setup() returned the size of the response
 header alone, so ipc_rfs_nv_read_item_setup() allocated a buffer without

@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""Resolve PIC string references in a 32-bit ARM ELF.
+
+Usage: picstr LIB 'DAT_002eff4c + 0x2efc5c' ...   (as Ghidra prints them)
+Prints the string at (word at DAT address) + constant.
+"""
+import re
+import subprocess
+import sys
+
+lib = sys.argv[1]
+data = open(lib, "rb").read()
+segs = []
+for line in subprocess.run(["readelf", "-lW", lib], capture_output=True, text=True,
+                           check=True).stdout.splitlines():
+    f = line.split()
+    if f and f[0] == "LOAD":
+        segs.append((int(f[2], 16), int(f[1], 16), int(f[4], 16)))
+
+
+def off(va):
+    for vaddr, o, size in segs:
+        if vaddr <= va < vaddr + size:
+            return va - vaddr + o
+    raise ValueError(hex(va))
+
+
+for expr in sys.argv[2:]:
+    m = re.search(r"DAT_([0-9a-f]+) \+ (0x[0-9a-f]+)", expr)
+    lit = int.from_bytes(data[off(int(m.group(1), 16)):][:4], "little", signed=True)
+    va = (lit + int(m.group(2), 16)) & 0xffffffff
+    s = data[off(va):off(va) + 600].split(b"\0")[0].decode(errors="replace")
+    print(f"{va:#x}: {s}")

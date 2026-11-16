@@ -57,8 +57,12 @@ Flow, with the component that does each step:
    (`NotifyRegiAuth`); Java asks the SIM (`SimManager.requestIsimAuthentication`) and answers
    with `RequestUpdateAkaResp`. Digest algorithms known to the library: `AKAv1-MD5`,
    `AKAv2-MD5`.
-5. Native `CreateIPSec` hands the keys, SPIs and ports to `imsd` (`IPSecInterface`), which
-   installs the four security associations with PF_KEY.
+5. Native `RegistrationSession::CreateIPSec` fills `IPSecInterface::SetIPSecInformation` with
+   four SPIs (UE client -> P-CSCF server, UE server -> P-CSCF client and the two reverse
+   directions), four ports (UE client/server, P-CSCF client/server), the two algorithms, the
+   IP version and local address, then installs the associations (`IPSecApplySAAssoc`) and
+   the policies (`IPSecApplySAPolicy`) over PF_KEY. `imsd` exists because the app cannot
+   open that socket itself. In the open stack this is Android's `IpSecManager`.
 6. Second REGISTER on the protected ports with `Security-Verify`; 200 OK. Native subscribes
    to the registration event package (`TrySubscribe`); Java goes to `RegisteredState`.
 7. Refresh before expiry (`ReRegisteringState`); old security associations are deleted after
@@ -98,10 +102,34 @@ Read: class inventory, state names, token strings. Not read line by line: `CallU
   registration (`ResipVolteHandler`, per-operator list). We route emergency calls to the
   circuit-switched side instead.
 
+## 4. What the Java app passes down
+
+From `StackIF` (the builders of `RequestUACreation`, `RequestRegistration`, `RequestMakeCall`).
+This is the full set of knobs Samsung's SIP layer takes, and so the list of profile settings
+that matter:
+
+- Identity and network: IMPI, IMPU list, domain, realm, password, interface, network id, PDN,
+  P-CSCF address list and port, RAT, current PANI, phone id, operator id.
+- Transport and security: transport type, IPsec on/off with encryption and authentication
+  algorithm, register algorithm, self port, keep-alive, compact headers, MSS size, TCP reset
+  error codes, hostname.
+- Registration: service list, feature tag list, instance id and UUID, GRUU, outbound, session
+  id, subscribe-to-reg, subscriber timer, reg expiry, user agent string.
+- SIP timers: T1, T2, T4, A-K, ringback and ringing timers, dedicated-bearer timer
+  (`DbrTimer`), early-media RTP timeout.
+- Call behaviour: preconditions (enabled, initial sendrecv, 183 for IR.92 v9, upgrade
+  support), 100rel, 183 on progress, session expires, Min-SE, session refresher, privacy
+  restrictions, P-Early-Media, history-info, explicit call transfer, remote URI type.
+- Media: audio engine type, audio codec list and port, AMR/AMR-WB payload types (octet
+  aligned and bandwidth efficient), DTMF payload types, mode sets, max-red, AS/RS/RR
+  bandwidths, ptime/maxptime, RTP and RTCP timeouts, RTCP on active call, RTCP-XR, SRTP, EVS
+  settings. (Video and RCS settings exist and are not needed.)
+- Per call: peer URI, call type, codec, direction, CLI mode, dialled number, additional SIP
+  headers, "LTE EPS-only attached" flag.
+
 ## Open
 
 - Line-by-line reads of `TryRegister`, `CreateIPSec`, `CallUacSession::*`, `SdpCreator::*`
   for exact header values and the order of UPDATE/PRACK against the bearer event.
-- The byte meanings in 0x1601, 0x1602 and 0x1605 (options), from `Channel` and the `SAE_Set*`
-  functions that fill it.
-- `UaProfile`: which profile settings reach the native stack.
+- The mapping from the JSON profile keys to these builder settings (`RegisterTask`,
+  `ResipRegistrationManager`): names mostly match, not checked one by one.

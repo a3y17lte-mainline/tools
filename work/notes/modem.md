@@ -583,7 +583,20 @@ in the IRadioConfig stub.
   it on the cmdline and wins (first phone boot, 2026-11-16).
   Same boot: the modem probe failed with -ENODEV from devfreq_get_devfreq_by_phandle (the
   built-in exynos7870-dmc probes later on Android, and the phandle makes no device link);
-  fixed to defer (fixup! on the modem commit, Android branch regenerated). ueventd: /dev/wwan0sipc* radio:radio. Sepolicy is written for permissive; for
+  fixed to defer (fixup! on the modem commit, Android branch regenerated).
+  Second boot (2026-11-16, no SIM inserted): modem online, IMEI and baseband shown, "No
+  service". Fixed: (1) the kernel handed out the 2 KiB frames of multi-frame RFS messages
+  one by one ("bad RFS frame (2048 bytes)"): link_rx_dispatch now joins them (fixup!, cap
+  512 KiB / 512 fragments), shannond reads RFS into 512 KiB; (2) mappings audited against
+  libsec-ril (decomp + REA on GetReleaseCause's jump tables): registration status per
+  ConvertIpcToRegState (4/9 = denied, 1/8 = not registered, 5/7/10 = unknown) and the _EM
+  variants for searching/denied/unknown like NetRegState::SetEmergencyState ("Emergency
+  calls only"); call end = cause type + cause through GetReleaseCause's tables; data fail
+  causes = the modem's own codes via ConvertDataFailCauseFromIpc; SIM card blocked = PUK +
+  PIN1 perm blocked, perso substate per lock. Matched stock already: access technology
+  table (0x01 GSM, 0x02 GPRS, 0x03 EDGE, 0x04/0x05 UMTS, 0x21 LTE, 0x30 IWLAN), call list
+  states, RSSI to ASU ((113 - rssi) / 2). Not used yet: the LTE fields of
+  IPC_DISP_RSSI_INFO (@9..@0xf, stock fills RSRP/RSRQ-like values from them). ueventd: /dev/wwan0sipc* radio:radio. Sepolicy is written for permissive; for
   enforcing, the kernel's open of a vendor data file may hit the core-domain neverallow
   (commented rule in hal_radio_default.te).
 - Android kernel (lineage-24.0, regenerated 2026-11-16 with backport-kernel, old tip tagged

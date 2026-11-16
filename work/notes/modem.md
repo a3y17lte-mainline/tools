@@ -521,12 +521,12 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
   the vendor interface), `include/shannon.h` + `samsung-ipc/shannon.c` with the decoded
   Shannon/IMS layouts (work/notes/ril/), 11 layout tests (host, ASan/UBSan clean).
   `LIBSAMSUNG_IPC_FRAME_LOG=/path` appends every frame as hex: for the recording run.
-- `src/modemd` (own repo, branch main): C++20 daemon. Core (`Modem` request tracker, NV/RFS
+- `src/shannond` (own repo, branch main): C++20 daemon. Core (`Modem` request tracker, NV/RFS
   service, Sim, Network, Data with P-CSCF and WWAN links rmnet<cid-1>, Sms, Calls with the
   audio hook tools/modem/voicecall.sh), a synthetic modem on SOCK_SEQPACKET pairs, 21 tests
-  (host and qemu-aarch64; 29 with the HAL's codec tests), Linux front end `modemd` (socket
-  /run/modemd.sock, `help`).
-  tools/modem/build-userspace cross-builds it into out/modem-userspace/usr/sbin/modemd.
+  (host and qemu-aarch64; 29 with the HAL's codec tests), Linux front end `shannond` (socket
+  /run/shannond.sock, `help`).
+  tools/modem/build-userspace cross-builds it into out/modem-userspace/usr/sbin/shannond.
 - Untested assumptions to check first on the phone: radio on = PWR_UP exec + PHONE_STATE
   NORMAL (samsungipcd's), radio off = PHONE_STATE LPM (stock's, never sent by us), the IP
   configuration flags (DNS under bit 0 per stock vs bits 1/2 per samsungipcd: the parser takes
@@ -534,7 +534,7 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
 
 ### 8c. Android radio HAL (2026-11-16, written, never compiled: needs the LOS tree)
 
-- `src/modemd/frontends/aidl`: `android.hardware.radio-service.a3y17lte`, AIDL V5 (config
+- `src/shannond/frontends/aidl`: `android.hardware.radio-service.a3y17lte`, AIDL V5 (config
   `default`, modem/SIM/network/data/messaging/voice `slot1`), one process with the core on its
   own thread (`Stack`: binder calls are posted to the core's loop; nullptr core = modem not up
   yet -> RADIO_NOT_AVAILABLE). Generated "not supported" bases (`gen_stubs.py` from the frozen
@@ -563,7 +563,7 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
   signal = RSSI only (LTE level from RSSI, no RSRP yet); operator name = the PLMN digits (the
   framework prefers SPN/EONS); only the serving cell in getCellInfoList; no VoPS (IMS later);
   setInitialAttachApn sends the attach profile (the modem re-registers).
-- To build: modemd -> e.g. hardware/a3y17lte/modemd, libsamsung-ipc -> external/libsamsung-ipc
+- To build: shannond -> e.g. hardware/a3y17lte/shannond, libsamsung-ipc -> external/libsamsung-ipc
   in the local manifest once the repos are pushed (user's word), then `A3_ENABLE_RADIO=true`.
 
 ## 8a. WWAN interface (2026-11-16, on a3y17lte)

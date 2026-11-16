@@ -9,7 +9,7 @@
 # work/ref/samsungipcd. The work/ref clones are made at the pinned commits with tools/modem/patches/
 # applied on a branch "a3y17lte" if they are missing.
 # Output: out/modem-userspace/ (a tree to copy onto the rootfs; nothing is installed here).
-# With src/modemd present it also cross-builds modemd (usr/sbin/modemd; the sysroot needs g++ and
+# With src/shannond present it also cross-builds shannond (usr/sbin/shannond; the sysroot needs g++ and
 # libstdc++-dev, added with the same apk call as below).
 #
 # --nv-dir: where the modem's NV data files live on the phone (default /var/lib/modem/nv, a
@@ -82,21 +82,21 @@ LINK=(-I"$OUT/usr/include/samsung-ipc" -L"$OUT/usr/lib" -lsamsung-ipc -lpthread)
 "${CC[@]}" -DPREFIX='"/usr"' -o "$OUT/usr/sbin/samsungipcd" "$DAEMON"/server.c "$DAEMON"/ppp_crc.c \
 	"$DAEMON"/samsung-ipc.c "${LINK[@]}"
 
-# modemd (src/modemd, own repo): the open modem daemon, if it is there
-MODEMD=$ROOT/src/modemd
-if [ -d "$MODEMD" ]; then
-	MB=$ROOT/out/modemd-aarch64
-	cmake -S "$MODEMD" -B "$MB" -G Ninja -DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_TOOLCHAIN_FILE="$MODEMD/cmake/alpine-aarch64.cmake" -DALPINE_SYSROOT="$SYSROOT" \
+# shannond (src/shannond, own repo): the open modem daemon, if it is there
+SHANNOND=$ROOT/src/shannond
+if [ -d "$SHANNOND" ]; then
+	MB=$ROOT/out/shannond-aarch64
+	cmake -S "$SHANNOND" -B "$MB" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_TOOLCHAIN_FILE="$SHANNOND/cmake/alpine-aarch64.cmake" -DALPINE_SYSROOT="$SYSROOT" \
 		-DLIBSAMSUNG_IPC_DIR="$LIB" > /dev/null
-	ninja -C "$MB" modemd > /dev/null
-	install -m755 "$MB/modemd" "$OUT/usr/sbin/modemd"
+	ninja -C "$MB" shannond > /dev/null
+	install -m755 "$MB/shannond" "$OUT/usr/sbin/shannond"
 fi
 
 {
 	echo "libsamsung-ipc $(git -C "$LIB" rev-parse --short HEAD) (base ${LIB_COMMIT:0:7})"
 	echo "samsungipcd $(git -C "$DAEMON" rev-parse --short HEAD) (base ${DAEMON_COMMIT:0:7})"
-	[ -d "$MODEMD" ] && echo "modemd $(git -C "$MODEMD" rev-parse --short HEAD 2>/dev/null || echo uncommitted)"
+	[ -d "$SHANNOND" ] && echo "shannond $(git -C "$SHANNOND" rev-parse --short HEAD 2>/dev/null || echo uncommitted)"
 	echo "NV data directory: $NV_DIR"
 } > "$OUT/BUILD-INFO"
 find "$OUT" -type f | sort | sed "s|$OUT/||"

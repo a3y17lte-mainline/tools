@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""Resolve C++ virtual calls in a 32-bit ARM ELF with exported symbols.
+
+Usage: vtslot LIB CLASS OFFSET...   (OFFSET = the 0x... in "*(int *)this + 0x...")
+       vtslot LIB CLASS --all       (print every slot)
+Slots of exported virtual functions are R_ARM_ABS32 relocations against the
+symbol (the file holds 0); local ones are R_ARM_RELATIVE (the file holds the address).
+"""
+import subprocess
+import sys
+
+lib, cls, args = sys.argv[1], sys.argv[2], sys.argv[3:]
+syms = {}
+vt = None
+for line in subprocess.run(["nm", "-DC", "--defined-only", lib], capture_output=True,
+                           text=True, check=True).stdout.splitlines():
+    addr, _, name = line.split(" ", 2)
+    syms.setdefault(int(addr, 16) & ~1, name)
+    if name == f"vtable for {cls}":
+        vt = int(addr, 16)
+if vt is None:
+    sys.exit(f"no vtable for {cls}")
+
+# Map the virtual address to a file offset through the program headers.
+segs = []
+for line in subprocess.run(["readelf", "-lW", lib], capture_output=True, text=True,
+                           check=True).stdout.splitlines():
+    f = line.split()
+    if f and f[0] == "LOAD":
+        segs.append((int(f[2], 16), int(f[1], 16), int(f[4], 16)))
+data = open(lib, "rb").read()
+
+
+def aps2_relocs():
+    """Decode Android's packed relocations (.rel.dyn, "APS2"): offset -> symbol value."""
+    sec = None
+    for line in subprocess.run(["readelf", "-SW", lib], capture_output=True, text=True,
+                               check=True).stdout.splitlines():
+        m = line.split("]", 1)[-1].split()
+        if len(m) > 5 and m[1] == "ANDROID_REL":
+            sec = (int(m[3], 16), int(m[4], 16))
+        if len(m) > 5 and m[0] == ".dynsym":
+            dynsym = int(m[3], 16)
+    out = {}
+    if not sec:
+        return out
+    buf = data[sec[0]:sec[0] + sec[1]]
+    assert buf[:4] == b"APS2"
+    pos = 4
+
+    def sleb():
+        nonlocal pos
+        result = shift = 0
+        while True:
+            b = buf[pos]
+            pos += 1
+            result |= (b & 0x7f) << shift
+            shift += 7
+            if not b & 0x80:
+                if b & 0x40:
+                    result -= 1 << shift
+                return result
+
+    total, offset = sleb(), sleb()
+    done = 0
+    while done < total:
+        size, flags = sleb(), sleb()
+        delta = sleb() if flags & 2 else None
+        info = sleb() if flags & 1 else None
+        if flags & 8 and flags & 4:
+            sleb()
+        for _ in range(size):
+            offset += delta if delta is not None else sleb()
+            i = info if info is not None else sleb()
+            if flags & 8 and not flags & 4:
+                sleb()
+            sym = i >> 8
+            if sym:
+                o = dynsym + sym * 16
+                out[offset] = int.from_bytes(data[o + 4:o + 8], "little")
+        done += size
+    return out
+
+
+relocs = {}
+
+
+def word(va):
+    if va in relocs:
+        return relocs[va]
+    for vaddr, off, size in segs:
+        if vaddr <= va < vaddr + size:
+            o = va - vaddr + off
+            return int.from_bytes(data[o:o + 4], "little")
+    raise ValueError(hex(va))
+
+
+relocs = aps2_relocs()
+
+
+def slot(off):
+    target = word(vt + 8 + off)
+    return f"{off:#06x}  {target & ~1:#08x}  {syms.get(target & ~1, '?')}"
+
+
+if args == ["--all"]:
+    off = 0
+    while True:
+        target = word(vt + 8 + off)
+        if (target & ~1) not in syms:
+            break
+        print(slot(off))
+        off += 4
+else:
+    for a in args:
+        print(slot(int(a, 16)))

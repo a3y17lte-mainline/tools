@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Guess main/sub/type of every IpcTx* builder of libsec-ril from a decompile dump.
+
+Usage: txmap DECOMP_DIR [CLASS]
+Ghidra names stack variables by their offset, so with the frame buffer at
+local_B (the pointer handed to the send call), main/sub/type are the variables
+at B-4, B-5 and B-6. Functions the heuristic cannot read print "?".
+"""
+import re
+import sys
+
+cls = sys.argv[2] if len(sys.argv) > 2 else "IpcProtocol41"
+src = open(f"{sys.argv[1]}/{cls}.c", errors="replace").read()
+SEND = re.compile(r"\+ 0x18\)\)\s*\(\*\(int \*\*\)\((?:this|param_1) \+ 8\),\s*&?\(?(?:\w+ \*\))?_?(?:local|auStack|uStack|acStack)_([0-9a-f]+)")
+ASSIGN = re.compile(r"^\s*_?(?:local|uStack|auStack|acStack|cStack|bStack)_([0-9a-f]+)(?:\[(\d+)\])?(?:\._(\d+)_(\d+)_)? = (.+);")
+CONCAT = re.compile(r"CONCAT(\d)(\d)\((.+),(0x[0-9a-f]+|\d+)\)$")
+
+
+def const_bytes(expr):
+    """Return {byte index: value} for the constant low part of an expression."""
+    expr = expr.strip()
+    expr = re.sub(r"^\([a-z0-9_ ]+\)", "", expr)
+    if re.fullmatch(r"0x[0-9a-f]+|\d+", expr):
+        v = int(expr, 0)
+        return {i: (v >> (8 * i)) & 0xff for i in range(4)}, True
+    if expr.startswith("'"):
+        return {}, False
+    m = CONCAT.match(expr)
+    if m:
+        low = int(m.group(2))
+        v = int(m.group(4), 0)
+        return {i: (v >> (8 * i)) & 0xff for i in range(low)}, False
+    return {}, False
+
+
+for f in re.split(r"^// ==== ", src, flags=re.M)[1:]:
+    head, body = f.split("\n", 1)
+    name = head.split("::")[-1].strip()
+    if not name.startswith("IpcTx"):
+        continue
+    s = SEND.search(body)
+    if not s:
+        print(f"????    {name}")
+        continue
+    base = int(s.group(1), 16)
+    mem = {}
+    for line in body.splitlines():
+        a = ASSIGN.match(line)
+        if not a:
+            continue
+        off = int(a.group(1), 16) - (int(a.group(2)) if a.group(2) else 0)
+        if a.group(3):
+            off -= int(a.group(3))
+        vals, whole = const_bytes(a.group(5))
+        width = 4
+        decl = re.search(rf"undefined(\d)\s+_?\w+_{a.group(1)}\b", body)
+        if decl and whole:
+            width = int(decl.group(1))
+        elif re.search(rf"(char|byte|undefined1)\s+\w+_{a.group(1)}\b", body) and whole:
+            width = 1
+        elif re.search(rf"(u?short|undefined2)\s+\w+_{a.group(1)}\b", body) and whole:
+            width = 2
+        for i, v in vals.items():
+            if i < width:
+                mem[off - i] = v
+    got = [mem.get(base - 4), mem.get(base - 5), mem.get(base - 6)]
+    txt = "".join("??" if g is None else f"{g:02x}" for g in got[:2])
+    typ = "?" if got[2] is None else str(got[2])
+    print(f"{txt} t{typ}  {name}")

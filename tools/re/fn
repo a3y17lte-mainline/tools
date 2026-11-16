@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""Print functions from a DumpDecomp.java dump. Usage: fn DIR REGEX [-l]
+REGEX matches the "Class::Method" header; -l lists names only."""
+import glob
+import re
+import sys
+
+d, pat = sys.argv[1], re.compile(sys.argv[2])
+only_names = "-l" in sys.argv
+for path in sorted(glob.glob(d + "/*.c")):
+    show = False
+    for line in open(path, errors="replace"):
+        if line.startswith("// ==== "):
+            show = bool(pat.search(line))
+            if show and only_names:
+                print(line[8:].rstrip())
+                show = False
+        if show:
+            sys.stdout.write(line)

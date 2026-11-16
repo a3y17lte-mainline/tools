@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Per-message field offsets of libsec-ril, from a DumpDecomp.java dump.
+
+Usage: layouts DECOMP_DIR RXMAP TXMAP [CLASS]
+Receive side: every offset a parser reads from the frame, with its width.
+Transmit side: every stack slot a builder writes, as frame offset, width and
+source expression (constant or parameter). Offsets count from the frame start
+(7-byte header). Output is a skeleton: meanings come from reading the function.
+"""
+import re
+import sys
+
+d, rxmap, txmap = sys.argv[1:4]
+cls = sys.argv[4] if len(sys.argv) > 4 else "IpcProtocol41"
+funcs = {}
+for f in re.split(r"^// ==== ", open(f"{d}/{cls}.c", errors="replace").read(), flags=re.M)[1:]:
+    head, body = f.split("\n", 1)
+    funcs.setdefault(head.split("::")[-1].strip(), body)
+
+WIDTH = {"char": 1, "byte": 1, "undefined1": 1, "uchar": 1, "bool": 1, "short": 2,
+         "ushort": 2, "undefined2": 2, "int": 4, "uint": 4, "undefined4": 4,
+         "undefined8": 8, "longlong": 8, "ulonglong": 8}
+
+
+def rx_fields(body):
+    sig = body.split("{", 1)[0]
+    # The frame is the first char* parameter (param_1, or param_2 without "this").
+    frame = "param_2" if "__thiscall" not in sig and "param_2" in sig and \
+        re.search(r"\(param_2 \+ |param_2\[", body) and not re.search(r"param_1\[\d", body) \
+        else "param_1"
+    out = {}
+    for m in re.finditer(rf"{frame}\[(0x[0-9a-f]+|\d+)\]", body):
+        out.setdefault(int(m.group(1), 0), 1)
+    for m in re.finditer(rf"\*\((\w+) \*\)\({frame} \+ (0x[0-9a-f]+|\d+)\)", body):
+        out[int(m.group(2), 0)] = WIDTH.get(m.group(1), 1)
+    for m in re.finditer(rf"\(\w+ \*\)\({frame} \+ (0x[0-9a-f]+|\d+)\)|{frame} \+ (0x[0-9a-f]+|\d+)[,)]", body):
+        off = int(m.group(1) or m.group(2), 0)
+        out.setdefault(off, 0)  # 0 = start of a buffer or string
+    return {o: w for o, w in out.items() if o >= 7}
+
+
+SEND = re.compile(r"\+ 0x18\)\)\s*\(\*\(int \*\*\)\((?:this|param_1) \+ 8\),\s*&?\(?(?:\w+ \*\))?_?(?:local|auStack|uStack|acStack)_([0-9a-f]+),\s*([^)]+)\)")
+ASSIGN = re.compile(r"^\s*_?(\w+?)_([0-9a-f]+)(?:\[(\d+)\])? = (.+);")
+COPY = re.compile(r"(?:memcpy\w*|strncpy|strcpy)\((?:\(\w+ \*\))?&?_?\w+?_([0-9a-f]+)(?: \+ (\d+|0x[0-9a-f]+))?,\s*([^,]+)")
+
+
+def tx_fields(body):
+    s = SEND.search(body)
+    if not s:
+        return None, None
+    base = int(s.group(1), 16)
+    decl = {}
+    for m in re.finditer(r"^\s*(\w+) \*?_?\w+?_([0-9a-f]+)(?: \[(\d+)\])?;", body, flags=re.M):
+        decl[int(m.group(2), 16)] = (WIDTH.get(m.group(1), 1), m.group(3))
+    out = {}
+    for line in body.splitlines():
+        a = ASSIGN.match(line)
+        if a and a.group(1) in ("local", "uStack", "auStack", "acStack", "cStack", "bStack"):
+            var = int(a.group(2), 16)
+            off = base - var + (int(a.group(3)) if a.group(3) else 0)
+            if off >= 7 and "**(int **)(DAT_" not in a.group(4) and "__stack_chk" not in a.group(4):
+                width = 1 if a.group(3) else decl.get(var, (1, None))[0]
+                out[off] = (width, a.group(4).strip())
+        for c in COPY.finditer(line):
+            off = base - int(c.group(1), 16) + (int(c.group(2), 0) if c.group(2) else 0)
+            if off >= 7:
+                out[off] = (0, c.group(3).strip())
+    return out, s.group(2).strip()
+
+
+def fmt_rx(fields):
+    return " ".join(f"@{o:#x}:{'buf' if w == 0 else 'u' + str(w * 8)}" for o, w in sorted(fields.items()))
+
+
+def fmt_tx(fields):
+    parts = []
+    for o, (w, src) in sorted(fields.items()):
+        src = re.sub(r"\(\w+\)", "", src)
+        if len(src) > 28:
+            src = src[:25] + "..."
+        parts.append(f"@{o:#x}:{'buf' if w == 0 else 'u' + str(w * 8)}={src}")
+    return " ".join(parts)
+
+
+rows = []
+for line in open(rxmap):
+    m = re.match(r"([0-9a-f]{4})  (\w+)", line)
+    if m and m.group(2) in funcs:
+        rows.append((m.group(1), "rx", "", m.group(2), fmt_rx(rx_fields(funcs[m.group(2)]))))
+for line in open(txmap):
+    m = re.match(r"([0-9a-f?]{4})(?: t(\S+))?\s+(\w+)", line)
+    if m and m.group(3) in funcs:
+        fields, length = tx_fields(funcs[m.group(3)])
+        desc = "(not parsed)" if fields is None else f"len={length} " + fmt_tx(fields)
+        rows.append((m.group(1), "tx", m.group(2) or "?", m.group(3), desc))
+TYPES = {"1": "exec", "2": "get", "3": "set", "4": "cfrm", "5": "event"}
+for cmd, way, typ, name, desc in sorted(rows):
+    print(f"{cmd} {way}{' ' + TYPES.get(typ, 't' + typ) if way == 'tx' else ''} {name}: {desc}")

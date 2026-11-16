@@ -133,6 +133,11 @@ Not done, roughly in planned order:
   (tools/modem/modem-nv-setup, EFS mounted ro,noload). Never run libsamsung-ipc's herolte profile
   on the real EFS (wrong NV size: it overwrites nv_data.bin from the 2019 backup file).
   Start with work/notes/modem.md (status header, sections 8 and 10).
+- Open RIL + IMS (2026-11-16, decided: no Samsung userspace blobs; VoLTE yes, Wi-Fi calling not now
+  but keep it possible). Reference from the stock image: work/notes/ril/README.md (RIL message
+  maps, IMS stack, the modem's voice engine = IPC group 0x16: VoLTE media runs in the modem).
+  RE tools: tools/re/ (Ghidra dump script, vtslot, rxmap, txmap, layouts); extracted blobs and
+  decompile dumps in work/system/extract/ (untracked).
 - Android 17 (phase 4). Stretch goal: cameras.
 - Upstreaming: wave 1 is ready to prepare once the user wants to send.
 

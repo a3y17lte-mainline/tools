@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""Build the receive command map of libsec-ril from a DumpDecomp.java dump.
+
+Usage: rxmap DECOMP_DIR VTABLE_TXT   (VTABLE_TXT = `vtslot LIB IpcProtocol41 --all`)
+Each group dispatcher switches on the sub command and calls a virtual handler;
+the top dispatcher switches on the main command the same way.
+"""
+import re
+import sys
+
+src = open(sys.argv[1] + "/IpcProtocol41.c", errors="replace").read()
+vt = {}
+for line in open(sys.argv[2]):
+    off, addr, name = line.split(None, 2)
+    vt[int(off, 16)] = re.sub(r"\(.*", "", name.strip()).split("::")[-1]
+slot_of = {name: off for off, name in vt.items()}
+
+CASE = re.compile(r"case (?:'(\\?.[0-9a-fx]*)'|(0x[0-9a-f]+|\d+)):")
+IFEQ = re.compile(r"== (?:'(\\?.[0-9a-fx]*)'|(0x[0-9a-f]+|\d+))\)")
+CALL = re.compile(r"\(\*\*\(code \*\*\)\(\*(?:\(int \*\))?(?:param_1|this) \+ (0x[0-9a-f]+)\)\)")
+ESC = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, "0": 0}
+
+
+def num(ch, lit):
+    if lit:
+        return int(lit, 0)
+    if ch.startswith("\\x"):
+        return int(ch[2:], 16)
+    if ch.startswith("\\"):
+        return ESC.get(ch[1], ord(ch[1]))
+    return ord(ch)
+
+
+def cases(body):
+    out, pending = {}, []
+    for line in body.splitlines():
+        m = CASE.search(line) or IFEQ.search(line)
+        if m:
+            pending.append(num(m.group(1), m.group(2)))
+            continue
+        c = CALL.search(line)
+        if c and pending:
+            for p in pending:
+                out[p] = vt.get(int(c.group(1), 16), c.group(1))
+            pending = []
+        elif "break;" in line or "return" in line:
+            pending = []
+    return out
+
+
+funcs = {}
+for f in re.split(r"^// ==== ", src, flags=re.M)[1:]:
+    head, body = f.split("\n", 1)
+    funcs[head.split("::")[-1].strip()] = body
+
+groups = {name: cases(body) for name, body in funcs.items()}
+groups = {n: c for n, c in groups.items() if len(c) >= 2}
+
+top = "GetRxData"
+print(f"# top dispatcher: {top}")
+for main, handler in sorted(groups[top].items()):
+    print(f"\n## main {main:#04x}: {handler}")
+    subs = groups.get(handler, {})
+    for sub, h in sorted(subs.items()):
+        print(f"{main:02x}{sub:02x}  {h}")
+    if not subs and handler in funcs:
+        m = re.search(r"\+ 5\) == '?(\\?x?[0-9a-f]+)'?", funcs[handler])
+        print(f"(single or unparsed dispatcher{': sub ' + m.group(1) if m else ''})")

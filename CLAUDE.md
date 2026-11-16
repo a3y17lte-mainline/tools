@@ -140,7 +140,7 @@ Not done, roughly in planned order:
   exynos_modem.legacy_abi=1. work/notes/modem.md section 8a; plan
   ~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md. Open userspace (8b): src/shannond
   (C++ daemon core + Linux CLI, 29 host tests) on src/libsamsung-ipc (a3y17lte branch).
-- Android radio HAL (2026-11-16, written, not compiled here, never run): shannond's AIDL V5 front
+- Android radio HAL (2026-11-16; the LOS build passes on the Spark, never run on the phone): shannond's AIDL V5 front
   end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to
   /data/vendor/modem, kernel.firmware_class.path). Android kernel lineage-24.0 regenerated with
   the modem series (old tip tag lineage-24.0-pre-modem; new mailbox/PMU prereqs). shannond

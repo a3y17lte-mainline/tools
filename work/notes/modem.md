@@ -553,7 +553,15 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
   configuration flags (DNS under bit 0 per stock vs bits 1/2 per samsungipcd: the parser takes
   any non-zero field), SMS send result arriving as a separate IPC_SMS_SEND_MSG message.
 
-### 8c. Android radio HAL (2026-11-16, written, never compiled: needs the LOS tree)
+### 8c. Android radio HAL (2026-11-16; builds in the LOS tree on the Spark, not run yet)
+
+First run (needs the user's go: the modem starts with the SIM and registers): flash the
+A3_ENABLE_RADIO=true build, then check dmesg for the in-kernel modem start (TOC, NV, handshake),
+/data/vendor/modem/{nv,firmware} (modem-setup.sh, logcat tag modem-setup), logcat of
+android.hardware.radio-service.a3y17lte (port open, SIM, registration), then SIM status,
+registration and data in Settings. Build fixes so far: sepolicy neverallows (a3_efs_file as
+contextmount_type, setup split nv/firmware without DAC overrides), no responseAcknowledgement
+in the IRadioConfig stub.
 
 - `src/shannond/frontends/aidl`: `android.hardware.radio-service.a3y17lte`, AIDL V5 (config
   `default`, modem/SIM/network/data/messaging/voice `slot1`), one process with the core on its

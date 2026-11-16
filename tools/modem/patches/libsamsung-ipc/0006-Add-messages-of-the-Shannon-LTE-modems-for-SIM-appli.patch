@@ -1,4 +1,4 @@
-From 7c2c28684ea51bd1f179c2054b6ae3206551f0fe Mon Sep 17 00:00:00 2001
+From fefdc3b73e9fc826aec8e7b717f7f31adcd9e69c Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Mon, 16 Nov 2026 10:19:58 +0100
 Subject: [PATCH 6/7] Add messages of the Shannon (LTE) modems for SIM
@@ -25,15 +25,15 @@ byte offsets taken from the modem's frames.
  Android.mk                        |   1 +
  include/Makefile.am               |   1 +
  include/samsung-ipc.h             |   1 +
- include/shannon.h                 | 392 +++++++++++++++++++++++++++
+ include/shannon.h                 | 393 ++++++++++++++++++++++++++
  samsung-ipc/Makefile.am           |   1 +
  samsung-ipc/ipc_strings.c         |  54 ++++
- samsung-ipc/shannon.c             | 437 ++++++++++++++++++++++++++++++
+ samsung-ipc/shannon.c             | 440 ++++++++++++++++++++++++++++++
  samsung-ipc/tests/Makefile.am     |   2 +
  samsung-ipc/tests/a3y17lte_data.c | 355 ++++++++++++++++++++++++
  samsung-ipc/tests/a3y17lte_data.h |  37 +++
  samsung-ipc/tests/main.c          |  45 +++
- 11 files changed, 1326 insertions(+)
+ 11 files changed, 1330 insertions(+)
  create mode 100644 include/shannon.h
  create mode 100644 samsung-ipc/shannon.c
  create mode 100644 samsung-ipc/tests/a3y17lte_data.c
@@ -74,10 +74,10 @@ index d9aa7c7..eaa116a 100644
  #endif /*  __SAMSUNG_IPC_H__ */
 diff --git a/include/shannon.h b/include/shannon.h
 new file mode 100644
-index 0000000..654cdfc
+index 0000000..cf90e30
 --- /dev/null
 +++ b/include/shannon.h
-@@ -0,0 +1,392 @@
+@@ -0,0 +1,393 @@
 +/*
 + * This file is part of libsamsung-ipc.
 + *
@@ -117,6 +117,7 @@ index 0000000..654cdfc
 + * Commands
 + */
 +
++#define IPC_SEC_SIM_ICCID					0x050C
 +#define IPC_SEC_SIM_APPS_INFO					0x050F
 +#define IPC_CALL_SRVCC						0x0214
 +#define IPC_NET_SSAC_INFO					0x0819
@@ -256,7 +257,7 @@ index 0000000..654cdfc
 +	unsigned short flags;
 +	unsigned char ipv4[4];
 +	unsigned char ipv4_dns[2][4];
-+	unsigned char ipv6[16];
++	unsigned char ipv6[16];		/* fe80:: + interface id */
 +	unsigned char ipv6_dns[2][16];
 +	unsigned int pcscf_ipv4_count;
 +	unsigned char pcscf_ipv4[IPC_GPRS_PCSCF_MAX][4];
@@ -549,10 +550,10 @@ index e11d00c..f0f5f84 100644
  	case IPC_SAT_ENVELOPE_CMD:
 diff --git a/samsung-ipc/shannon.c b/samsung-ipc/shannon.c
 new file mode 100644
-index 0000000..01ddd4c
+index 0000000..0e91a0c
 --- /dev/null
 +++ b/samsung-ipc/shannon.c
-@@ -0,0 +1,437 @@
+@@ -0,0 +1,440 @@
 +/*
 + * This file is part of libsamsung-ipc.
 + *
@@ -791,15 +792,18 @@ index 0000000..01ddd4c
 +	config->cid = p[0];
 +	config->flags = p[1] | (p[2] << 8);
 +
-+	if (config->flags & IPC_GPRS_IP_CONFIGURATION_FLAG_IPV4) {
++	/*
++	 * The stock RIL takes the IPv4 DNS servers with the IPv4 flag, other
++	 * clients read bits 1 and 2 as "DNS present". Take every address
++	 * field as it is: all zeroes means absent either way.
++	 */
++	if (config->flags & IPC_GPRS_IP_CONFIGURATION_FLAG_IPV4)
 +		memcpy(config->ipv4, p + IPC_GPRS_IP_CONFIG_IPV4, 4);
-+		memcpy(config->ipv4_dns, p + IPC_GPRS_IP_CONFIG_IPV4_DNS, 8);
-+	}
++	memcpy(config->ipv4_dns, p + IPC_GPRS_IP_CONFIG_IPV4_DNS, 8);
 +
-+	if (config->flags & IPC_GPRS_IP_CONFIGURATION_FLAG_IPV6) {
-+		memcpy(config->ipv6, p + IPC_GPRS_IP_CONFIG_IPV6, 16);
-+		memcpy(config->ipv6_dns, p + IPC_GPRS_IP_CONFIG_IPV6_DNS, 32);
-+	}
++	/* The IPv6 field holds the interface identifier for SLAAC (fe80::id) */
++	memcpy(config->ipv6, p + IPC_GPRS_IP_CONFIG_IPV6, 16);
++	memcpy(config->ipv6_dns, p + IPC_GPRS_IP_CONFIG_IPV6_DNS, 32);
 +
 +	if ((config->flags & IPC_GPRS_IP_CONFIGURATION_FLAG_MTU) &&
 +	    size >= IPC_GPRS_IP_CONFIG_MTU + 4)

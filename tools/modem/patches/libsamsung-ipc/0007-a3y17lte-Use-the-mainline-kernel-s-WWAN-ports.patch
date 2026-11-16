@@ -1,4 +1,4 @@
-From 3503833b7322bceaec003849e6f46f81e45d28fa Mon Sep 17 00:00:00 2001
+From 1eb68c869cd6802f644184851a34d5e237c62869 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Martin=20=C5=A0trobl?= <recordyletsplays@gmail.com>
 Date: Mon, 16 Nov 2026 10:19:58 +0100
 Subject: [PATCH 7/7] a3y17lte: Use the mainline kernel's WWAN ports

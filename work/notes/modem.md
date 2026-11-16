@@ -514,6 +514,23 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
   (open/read/write/close/lseek/unlink/rename/mkdir/opendir/..., `RFS_NV_RESTORE`,
   `RFS_NV_WRITE_ALL_ITEM`) under `/efs` and `/cpefs`.
 
+## 8b. Open userspace (2026-11-16, not run on the phone yet)
+
+- `src/libsamsung-ipc` (own repo, branch a3y17lte; patch export in tools/modem/patches): the
+  a3y17lte device finds the WWAN ports by type in sysfs (falls back to the herolte code on
+  the vendor interface), `include/shannon.h` + `samsung-ipc/shannon.c` with the decoded
+  Shannon/IMS layouts (work/notes/ril/), 11 layout tests (host, ASan/UBSan clean).
+  `LIBSAMSUNG_IPC_FRAME_LOG=/path` appends every frame as hex: for the recording run.
+- `src/modemd` (own repo, branch main): C++20 daemon. Core (`Modem` request tracker, NV/RFS
+  service, Sim, Network, Data with P-CSCF and WWAN links rmnet<cid-1>, Sms, Calls with the
+  audio hook tools/modem/voicecall.sh), a synthetic modem on SOCK_SEQPACKET pairs, 21 tests
+  (host and qemu-aarch64), Linux front end `modemd` (socket /run/modemd.sock, `help`).
+  tools/modem/build-userspace cross-builds it into out/modem-userspace/usr/sbin/modemd.
+- Untested assumptions to check first on the phone: radio on = PWR_UP exec + PHONE_STATE
+  NORMAL (samsungipcd's), radio off = PHONE_STATE LPM (stock's, never sent by us), the IP
+  configuration flags (DNS under bit 0 per stock vs bits 1/2 per samsungipcd: the parser takes
+  any non-zero field), SMS send result arriving as a separate IPC_SMS_SEND_MSG message.
+
 ## 8a. WWAN interface (2026-11-16, on a3y17lte)
 
 Commits, in series order (old tip tagged `a3y17lte-pre-wwan`):

@@ -142,7 +142,7 @@ Not done, roughly in planned order:
   (C++ daemon core + Linux CLI, 29 host tests) on src/libsamsung-ipc (a3y17lte branch).
 - Android radio HAL (2026-11-16; the LOS build passes on the Spark, never run on the phone): shannond's AIDL V5 front
   end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to
-  /data/vendor/modem, kernel.firmware_class.path). Android kernel lineage-24.0 regenerated with
+  /data/vendor/modem, links from /vendor/firmware: S-Boot overrides firmware_class.path). Android kernel lineage-24.0 regenerated with
   the modem series (old tip tag lineage-24.0-pre-modem; new mailbox/PMU prereqs). shannond
   (hardware_samsung_shannond) and libsamsung-ipc (external_libsamsung-ipc) are org repos, in the
   local manifest and lineage.dependencies. work/notes/modem.md section 8c.

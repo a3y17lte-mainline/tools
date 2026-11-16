@@ -574,11 +574,16 @@ in the IRadioConfig stub.
   `A3_ENABLE_RADIO=true` builds it (default off: then the NoTelephony overlay keeps voice/SMS
   off). `init.a3y17lte.modem.rc` mounts EFS ro,noload (context a3_efs_file) and runs
   `modem-setup.sh` in post-fs-data: first boot copies the NV files to /data/vendor/modem/nv
-  and RADIO (37 MiB) to /data/vendor/modem/firmware/samsung/a3y17lte/modem.bin, links
-  modem-nv.bin to the working copy (it persists, unlike Alpine's RAM image).
-  bootconfig `kernel.firmware_class.path=/data/vendor/modem/firmware`: partial firmware reads
+  and RADIO (37 MiB) to /data/vendor/modem/firmware/samsung/a3y17lte/modem.bin (the NV
+  copy persists, unlike Alpine's RAM image). Partial firmware reads
   (request_partial_firmware_into_buf) never fall back to ueventd, so the kernel must find the
-  files itself. ueventd: /dev/wwan0sipc* radio:radio. Sepolicy is written for permissive; for
+  files itself: links in /vendor/firmware/samsung/a3y17lte (install_symlink modules
+  modem-firmware-link, modem-nv-link) point to the files on /data. A bootconfig
+  firmware_class.path does NOT work: S-Boot passes firmware_class.path=/vendor/firmware after
+  it on the cmdline and wins (first phone boot, 2026-11-16).
+  Same boot: the modem probe failed with -ENODEV from devfreq_get_devfreq_by_phandle (the
+  built-in exynos7870-dmc probes later on Android, and the phandle makes no device link);
+  fixed to defer (fixup! on the modem commit, Android branch regenerated). ueventd: /dev/wwan0sipc* radio:radio. Sepolicy is written for permissive; for
   enforcing, the kernel's open of a vendor data file may hit the core-domain neverallow
   (commented rule in hal_radio_default.te).
 - Android kernel (lineage-24.0, regenerated 2026-11-16 with backport-kernel, old tip tagged

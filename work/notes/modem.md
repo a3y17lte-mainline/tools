@@ -530,7 +530,7 @@ Commits, in series order (old tip tagged `a3y17lte-pre-wwan`):
 | net: wwan: exynos_modem: Add the vendor kernel's userspace interface | local; now uses `net.c`, `legacy_abi` parameter |
 
 Behaviour:
-- Ports `/dev/wwan0sipc0` (FMT channel 235) and `/dev/wwan0sipc1` (RFS 245). One message per
+- Ports `/dev/wwan0sipc0` (FMT channel 235, type SIPC) and `/dev/wwan0sipcrfs0` (RFS 245, type SIPC-RFS). One message per
   read/write, no SIPC header (the link adds it). INIT_END goes out once both are open.
 - The first open of the IPC port boots the modem (`exmodem_boot`): reset, read the TOC (partial
   firmware load, 512 bytes), SMC unlock (answer 11 on the first start after cold boot is

@@ -10,7 +10,7 @@
 #
 # On the phone afterwards:  modem-nv-setup (NV working copy + the firmware files), then
 #   insmod /lib/modem/exynos-mailbox.ko; insmod /lib/modem/exynos_modem.ko
-# for the WWAN ports (/dev/wwan0sipc0, /dev/wwan0sipc1), or ... exynos_modem.ko legacy_abi=1
+# for the WWAN ports (/dev/wwan0sipc0, /dev/wwan0sipcrfs0), or ... exynos_modem.ko legacy_abi=1
 # for the vendor interface (/dev/umts_*) that libsamsung-ipc and samsungipcd use.
 # All other modules of the build are in /lib/modules (modprobe works); amixer/aplay/arecord
 # come from Alpine's alsa-utils (fetched once into out/apk-alsa); the call audio hook

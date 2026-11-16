@@ -134,7 +134,7 @@ Not done, roughly in planned order:
   on the real EFS (wrong NV size: it overwrites nv_data.bin from the 2019 backup file).
   Start with work/notes/modem.md (status header, sections 8 and 10).
 - Modem WWAN interface (2026-11-16, on a3y17lte, untested on the phone): WWAN ports
-  wwan0sipc0/1, packet data as WWAN links, in-kernel modem start from firmware-name files
+  wwan0sipc0 + wwan0sipcrfs0, packet data as WWAN links, in-kernel modem start from firmware-name files
   (modem-nv-setup stages them). The vendor /dev/umts_* interface now needs
   exynos_modem.legacy_abi=1. work/notes/modem.md section 8a; plan
   ~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md (next: libsamsung-ipc, daemon).

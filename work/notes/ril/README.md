@@ -11,6 +11,8 @@ Files in this folder:
 - `ims-ipc.md`: hand-decoded layouts of the messages IMS needs.
 - `voice-engine.md`, `voice-engine-layouts.txt`: the modem's voice engine (group 0x16).
 - `ims-stack.md`: Samsung's IMS app and native SIP stack, class by class.
+- `ims-sequences.md`: the voice-engine message order for a call, registration and call
+  setup as Samsung does them.
 
 Inputs, all proprietary and untracked, under `work/system/extract/` (pulled from
 `work/system/SYSTEM.img` with `debugfs -R "dump ..."`):
@@ -155,8 +157,8 @@ registration (`RequestUACreation`, `RequestRegistration`, `RequestUADeletion`,
 
 ## Open
 
-- The 0x16 group layouts (the modem voice engine): from `OemIPCHandler` in `libsec-ims.so`
-  (decompile dump in `work/system/extract/decomp-secims`).
+- Byte meanings in the voice-engine channel, codec and option messages, and line-by-line
+  reads of Samsung's REGISTER and INVITE handling (ims-sequences.md, "Open").
 - RIL request numbers (Samsung's OEM requests) to manager functions: the table was not
   extracted; managers use internal event numbers.
 - The IIL peer process.

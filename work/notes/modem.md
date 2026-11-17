@@ -607,11 +607,75 @@ in the IRadioConfig stub.
 - Behaviour choices to revisit on the phone: SMS are acknowledged by the core at once (the
   framework's ack is a no-op); emergencyDial = a normal dial (stock's emergency call type in
   IpcTxCallOriginate @7 not decoded); one call at a time (hangup/reject/background = release);
-  signal = RSSI only (LTE level from RSSI, no RSRP yet); operator name = the PLMN digits (the
-  framework prefers SPN/EONS); only the serving cell in getCellInfoList; no VoPS (IMS later);
+  only the serving cell in getCellInfoList; no VoPS (IMS later);
   setInitialAttachApn sends the attach profile (the modem re-registers).
 - To build: shannond -> e.g. hardware/a3y17lte/shannond, libsamsung-ipc -> external/libsamsung-ipc
   in the local manifest once the repos are pushed (user's word), then `A3_ENABLE_RADIO=true`.
+
+### 8d. Android on the phone (2026-11-17)
+
+State: registers on LTE (O2 CZ), SIM loaded, mobile data, outgoing calls with audio on the
+earpiece; tested by the user. Not tested yet: SMS on Android, accepting a call, the modem
+waking the phone, speaker/headphone calls, the fixes of the last list below.
+
+What the first boots showed, all fixed in shannond (main) unless noted:
+- SIM application types are the modem's own numbers (USIM 0, ISIM 1, CSIM 2, SIM 3, RUIM 4;
+  stock table at 0x1e0e30, the request direction uses the inverse and 6 for "no
+  application"). Passed on raw, the framework saw APPTYPE_UNKNOWN and never loaded the SIM.
+- The per-application PIN byte is one status (0 fine, 1/2 PIN1/PUK1, 3/4 PIN2/PUK2,
+  5 blocked); pin1 of a ready card is ENABLED_VERIFIED in stock.
+- One request per message group at a time: a burst of 27 SIM file reads lost every answer
+  (about half came back, none with a known sequence number). An answer without a known
+  sequence number goes to the request its group has out. Raw sequence numbers were never
+  captured, so this is the robust fix, not a confirmed diagnosis.
+- Long RFS messages arrive as plain 2 KiB reads without the multi-frame flag: joined by
+  the header's length in userspace (FrameAssembler).
+- Registration states as stock's ConvertIpcToRegState; the `_EM` variants make Android say
+  "Emergency calls only". State 7 (and 10) = stock's "ePDG" state, unknown without it.
+- Nothing else on Android gives the data interface its address: the HAL sets the IPv4
+  address (/32) and the IPv6 link local address, and makes a new WWAN link per call.
+- The modem counts calls from 0, the framework from 1 (index 0 = "no call": the framework
+  dropped a call the modem went on to connect).
+- Operator name: the modem passes on the network's own name (IPC_NET_IDENTITY: per name a
+  flag, a length, a coding and 32 bytes; "O2.CZ" here); the PLMN digits are the fallback.
+- LTE signal: the long IPC_DISP_RSSI_INFO ([3] LTE strength, [4] RSRP, [5] RSRQ, [6..7]
+  SNR + 200, [8] CQI), as stock reads it.
+- A restarted HAL found a running modem and waited for ever (the kernel keeps the modem up
+  when the ports close; the boot messages come once). Now: no boot message after 3 s ->
+  version probe -> take over: radio off, SIM state asked for, ICCID read from the card
+  (EF 2FE2), old links removed. Not tested on the phone.
+- SIM toolkit (core/sat): proactive commands (indication: u16 length + BER-TLV) are kept
+  until the framework's service runs; terminal response = IPC_SAT_PROACTIVE_CMD GET, always
+  0x201 bytes; envelope = EXEC, 0x101 bytes, answered by a notification (sw1, sw2, length,
+  data). Session end = 90 00 or 6F 00, as stock. Stock's 0x0e0d "SIM init" event is a
+  Samsung-only framework request and is not sent. IPC_SAT_REFRESH and
+  IPC_SAT_CALL_CONTROL_RESULT are still only logged. Not tested on the phone.
+
+Cause 10 ("implicitly detached", the firmware names it): the network's answer when the
+modem moved from EDGE to LTE. Closed by the user 2026-11-17: since the SIM loads (attach
+profile sent) the modem re-attaches within a second or goes straight to LTE, and calls fall
+back to 2G and work. The SIM works in other phones. A raw IPC trace without a rebuild:
+`strace -f -tt -p <HAL pid> -e trace=read,write -xx` as root (adb root), then decode the
+frames (u16 length, mseq, aseq, group, index, type). The modem's own state line arrives as
+JSON in 0x0b0d (PLMN, TAC, cell, RgSt, EMMC, ESMC).
+
+Call audio (device tree, aidl/audio): the audio HAL has a telephony interface; mode IN_CALL
+applies the "call" paths of mixer_paths.xml on top of the output (modem downlink into the
+mixer, codec capture as uplink, "Mono Mix" Left for every output as stock's MonoMix L).
+Gains are stock's incall_nb values; the vendor driver's volume scales equal ours except
+the digital DAC/ADC volumes (one step higher there). Handset and speaker calls send main
+mic left + second mic right: the modem does the noise suppression. Two vendor properties
+go from the audio HAL to the radio HAL: `vendor.audio.call_path` (handset, speaker,
+headset, headphone -> IPC_SND_AUDIO_PATH) and `vendor.audio.call_volume` (0 to 5 ->
+IPC_SND_SPKR_VOLUME_CTRL; the mixer stays at 0 dB, as stock). The 0-5 range is from
+memory of Samsung RILs, not checked against the stock audio HAL.
+
+zram is now as large as the RAM (was 50%): Geekbench 5 (1.3 GB) was ended by lmkd with
+swap nearly full; pages compress about 3.8:1 (lz4).
+
+Backlog, in order: SMS on Android (send only with the user's go), accepting a call, the
+modem as a wake source (call/SMS must wake the phone); then cell broadcast, USSD,
+supplementary services, multi-call; IMS after those.
 
 ## 8a. WWAN interface (2026-11-16, on a3y17lte)
 

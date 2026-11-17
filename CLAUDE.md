@@ -123,7 +123,8 @@ Not done, roughly in planned order:
   BN-BQ, series-lint clean for the modem commits. Continue on Android (stock
   cbd/libsec-ril need exynos_modem.legacy_abi=1 on the cmdline since 2026-11-16; EFS read-write there). Alpine trap: the RAM image's NV working copy is recreated
   from EFS every boot, so the modem's network state never persists; after many reboots the network
-  rejected the CS part of the attach (cause 10) and incoming calls stopped. Mailbox = wake source
+  answered with cause 10 (implicit detach) and incoming calls stopped (gone on Android, where the
+  NV copy persists and the attach profile is sent: closed 2026-11-17). Mailbox = wake source
   (IRQ 84 wakes s2idle, but immediately: the CP keeps messaging; not solved).
   Userspace: tools/modem/build-userspace (src/libsamsung-ipc, samsungipcd NV service) builds into
   out/modem-userspace. U-Boot must be updated BEFORE a kernel with the modem DT is installed: it
@@ -140,7 +141,12 @@ Not done, roughly in planned order:
   exynos_modem.legacy_abi=1. work/notes/modem.md section 8a; plan
   ~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md. Open userspace (8b): src/shannond
   (C++ daemon core + Linux CLI, 29 host tests) on src/libsamsung-ipc (a3y17lte branch).
-- Android radio HAL (2026-11-16; the LOS build passes on the Spark, never run on the phone): shannond's AIDL V5 front
+- Android radio HAL on the phone (2026-11-17): LTE registration, SIM, mobile data and outgoing calls
+  with earpiece audio work (user-tested). Untested: SMS, accepting a call, the modem waking the phone,
+  speaker/headphone calls, HAL restart take-over, SIM toolkit. Call audio = the audio HAL's "call"
+  mixer paths + vendor.audio.call_path / call_volume to shannond. Findings, traps and the backlog:
+  work/notes/modem.md section 8d. Then cell broadcast, USSD, supplementary services, multi-call; IMS last.
+- Android radio HAL build (2026-11-16): shannond's AIDL V5 front
   end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to
   /data/vendor/modem, links from /vendor/firmware: S-Boot overrides firmware_class.path). Android kernel lineage-24.0 regenerated with
   the modem series (old tip tag lineage-24.0-pre-modem; new mailbox/PMU prereqs). shannond

@@ -714,14 +714,15 @@ generated from the frozen V5 API). Nothing here has run on the phone.
   call control result (0e0a) has no Android request, logged only.
 - Call volume: stock's steps are CscFeature_Audio_ConfigCallVolumeSteps (5 when unset) and
   level = (int)(volume * 5 + 0.1); the device tree's audio HAL now rounds that way.
-- Known difference left alone: stock dials national numbers with prefix byte 0x21 and keeps
-  the '+' in international ones (0x11); ours sends 0x00 and strips the '+'. Ours worked for the
-  calls made so far; check an international number before changing it.
+- Dialling as stock (user's call, 2026-11-17): the '+' stays in the number with prefix byte
+  0x11, national numbers get 0x21 (shannond sent 0x00 and stripped the '+'); every call is
+  stock's 92-byte frame. The calls that worked so far used the old bytes: re-check a national
+  and an international call.
 
 Phone checklist for this code (each network action needs the user's go): one SMS in (no
 duplicate) and one out; a status report; screen off for minutes with the HAL log quiet and
 the phone suspended (`/sys/kernel/debug/wakeup_sources`), then a call and an SMS wake it; a
-USSD balance code and a menu reply; read call waiting / forwarding in Settings, toggle call
+USSD balance code and a menu reply; a national and an international call; read call waiting / forwarding in Settings, toggle call
 waiting and back; a second call while in a call: swap, merge, split, end one; mute during a
 call; the Alpine s2idle test with the modem registered. Plus the checks still open from 8d.
 

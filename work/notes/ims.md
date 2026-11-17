@@ -104,17 +104,21 @@ Mainline config: XFRM_USER, INET_ESP, INET6_ESP as modules (tools/mkconfig-a3y17
 - `core/ims/voice_engine` (modem, group 0x16), stock order: 0x1609 engine on (mode byte = low
   byte of audio_port_start, 1234 -> 0xd2) and 0x1606 PDN (`lte_ims`, flag 1) at
   registration; per call 0x1606 again, 0x1601 create (fields 0xff) + change (addresses,
-  ports host order, RTCP = RTP + 1, stream type 1), 0x1602 codec (mask 0x21ff, packetization
-  1 octet-aligned / 2 bandwidth-efficient, bit rate = highest mode-set mode, byte @0x23 = our
-  receive payload type), 0x1605 options (RTP/RTCP timeout 20 s, RTCP on call with RS/RR),
-  0x1604 DTMF set, 0x1603 start (status 3 sendrecv, 0 held; last byte 1 for IPv6). Hold /
-  re-INVITE: only what changed, then 0x1603 modify. End: 0x1603 stop, 0x1601 delete.
-  Channels 0-7 (stock AllocateChannel). Local RTP ports from 1234, even.
-  Inferred, check on the phone: in 0x1604 set (stock `SAE_SetDTMFOptions(ch, a, b, 0, u16)`
-  -> @8 a, @9 0, @0x0a u16, @0x0c b) which payload type is the receive one and that the u16
-  is the clock rate; 0x1604 execute = channel, RFC 4733 event code, mode 0, operation 1.
-  The media event numbers (0x1605 notifications, e.g. RTP timeout) are not mapped: logged
-  as "media event N on channel C"; a call shows which one is which.
+  ports host order, RTCP = RTP + 1, stream type 1), 0x1602 codec, 0x1605 options (RTP/RTCP
+  timeout 20 s, RTCP on call with RS/RR), 0x1604 DTMF set, 0x1603 start (status 3 sendrecv,
+  0 held; last byte 1 for IPv6). Hold / re-INVITE: only what changed, then 0x1603 modify.
+  End: 0x1603 stop, 0x1601 delete. Channels 0-7 (stock AllocateChannel). Local RTP ports
+  from 1234, even.
+  Every field checked against the stock library (shannond 56267f8, libsamsung-ipc
+  f48660b; voice-engine.md "Checked 2026-11-17"): 0x1602 packetization = the fmtp's
+  octet-align value (1/0), mode set = mask of the SDP's mode-set modes (0 without one),
+  @0x23 = receive payload type, bit rate = highest mode-set mode; 0x1604 set = send
+  payload type, 0, clock rate, receive payload type; 0x1604 execute = channel, RFC 4733
+  code, mode 0, operation 1 (stock's Java side supplies these three, not read); media
+  events 1 RTP timeout, 2 RTCP timeout, 3 bit-rate change, 6 first RTP, 7/8 RTP/RTCP back,
+  9 statistics; bearer events 1 and 2 = there, 3 = released.
+  Left: stock caps the bit rate with a profile value (ImsUserProfile +0x70, a u64 constructor
+  argument, not named); we send the highest mode-set mode.
 - `core/ims/call` (ImsCalls):
   - Outgoing: INVITE (Supported 100rel, precondition, timer; P-Preferred-Service and
     Accept-Contact MMTEL; P-Early-Media; Session-Expires 3600, Min-SE 90), PRACK each reliable
@@ -143,9 +147,12 @@ Mainline config: XFRM_USER, INET_ESP, INET6_ESP as modules (tools/mkconfig-a3y17
   Security-Server, SDP): 2.5 M inputs clean (`-DSHANNOND_FUZZ=ON -DSHANNOND_SANITIZE=ON`, clang).
 - CLI: `ims dial NUMBER`, `ims calls`, `ims answer|hangup|hold|resume ID`, `ims dtmf ID DIGIT`;
   events `ims-call ID:state:in|out:number[ (end status, retry on CS)]`.
+- RTP timeout (media event 1): an active call that expects to receive ends with BYE, as
+  stock (CallSession::OnRtpRtcpTimeout: ignored while not receiving and during early media).
+  RTCP timeouts are logged only.
 - Not done: 422 (session interval too small) retry, offerless incoming INVITE, forked 2xx
-  beyond the first early dialog, SRVCC, emergency over IMS (CS), the RTP timeout (event
-  number unknown), early media gating by P-Early-Media.
+  beyond the first early dialog, SRVCC, emergency over IMS (CS), early media gating by
+  P-Early-Media.
 
 Gate 4 checklist (phone, each call needs the user's go): Android loop as above, `ims on`,
 wait for registered, then (a) `ims dial <number>`: 183/PRACK, the 0x160B bearer event in the

@@ -209,24 +209,47 @@ Errors (`MapIPCError`, result codes in the generic answer): 0x8305 engine state 
 0x8354 MVS acquire failed, 0x8355 MVS enable failed, 0x8358 TTY start failed, 0x8359 CVD
 start failed, 0x838d PDN profile number invalid, 0x838f netlib open failed. 0x8000 = ok.
 
-## Read 2026-11-17 (stage 2)
+## Checked 2026-11-17 (stage 2, against libsec-ims)
 
-- 0x1604 set (`OemIPCHandler::ImsSetDtmf`, 0x0d bytes) is filled from
-  `CpAudioEngineClient::SAE_SetDTMFOptions(phone, ch, a, b, 0, u16)` (via
-  `CPVEInterface::SetDtmfCodecInfo(phone, ch, p3, p4, p5)`): @7 channel, @8 a (= p3),
-  @9 0, @0x0a u16 (= p5), @0x0c b (= p4). Which of p3/p4 is the receive payload type and
-  that p5 is the clock rate are inferred (the caller is a vtable call from AudioSession).
+- Notification path: `onUnsol` (decomp-secims-global) decodes group 0x16 notifications and
+  maps the event byte with `OemIPCHandler::ConvertIpcEventToVE` / `MAPBearerEventtoIPCEvent`
+  / `MAPRRCConnectionEventtoIPCEvent`, then `VoIpEngineProxy::IpcCallback` calls the handler
+  `CPVEInterface::HandleMediaEvent` (or the bearer one).
+- 0x1605 notification: @7 event, @8 channel, @9 data. Events (stock VE number, consumer):
+  1 RTP timeout (0x1c, `CallSession::OnRtpRtcpTimeout`: BYE "Call End By RTP Timeout",
+  ignored when not receiving and during early media), 2 RTCP timeout (0x3d, same handler),
+  3 codec bit-rate change (0x65), 4 (0x48) and 5 (0x20) not named, 6 first RTP received
+  (0x1d, `OnFirstRtpRxReceived`), 7 RTP back (0x1f) and 8 RTCP back (0x3e)
+  (`OnRtpRtcpTimeoutClear`), 9 statistics (0x66, only printed). Subcommand 0x0a = frame time
+  (100), 0x07 = session refresh events 1/2/6.
+- 0x160B: @7 bearer id, @8 QCI, @9 event, @0x0a and @0x12 u64 bit rates; frames of 0x1b bytes
+  or more: @0x1a, @0x1b, @0x1c filter count, filters from @0x1d. Events 1, 2, 3 -> 0x6e, 0x6f,
+  0x70; `CallSession::OnDedicatedBearer` takes 1 and 2 alike ("allocated bearer id", cancels
+  the bearer timer, UpdateQos), 3 = released.
+- 0x1602 (`ImsSetCodec` from `_stSAE_CodecInfo`, filled by `CPVEInterface::SetCodecInfo`,
+  called from `AudioSession::Create`): @0x0d send payload type, @0x0e clock rate, @0x10
+  bit rate, @0x14 ptime, @0x15 max receive ptime, @0x16 channels (1), @0x17 fixed rate (0),
+  @0x18 packetization = `SdpCreator::GetOctetAlign` (the fmtp's octet-align digit, 0 if
+  absent; EVS uses 1/2 there instead), @0x19-0x1c zero for AMR, @0x1d DTX, @0x1e/@0x1f
+  redundancy level / payload type (0, 0), @0x21 mode set = `GetModeSetCombination` (OR of
+  1 << mode over mode-set; 0 if none, except for MNO 0x37 Vodacom ZA: 0xff / 0x1ff), @0x23
+  receive payload type ("rx_type"). Bit rate: the mode table at the highest mode of mode-set
+  (`GetModeSet`, default 8 AMR-WB / 7 AMR), capped by an ImsUserProfile value (+0x70, not
+  named). Log: "sndpayload rcvpayload bitrate name octet-align ptime maxptime sampleRate
+  modeSet".
+- 0x1604 set (`SAE_SetDTMFOptions`, from `AudioSession::Create`, log "DTMF sndPayload=%d
+  rcvPayload=%d bitrate=%d"): @7 channel, @8 send payload type, @9 0, @0x0a the
+  telephone-event codec's `getRate()` (clock rate), @0x0c receive payload type.
   `Channel::isDtmfReady` needs @8 and @9 >= 0.
 - 0x1604 execute (`ImsHandleDtmf`, 0x0b bytes): @7 channel and three bytes from the Java
   side (`CallSession::DoHandleDtmf` passes them through): code, mode, operation.
 - Channel numbers: `VoIpEngineProxy::AllocateChannel` takes the first free of 8 per phone,
   channel id = phone * 8 + index.
-- 0x1605 media event numbers: not found in the native library (the handler is not in the
-  decompiled set); shannond logs them.
+- MNO enum (SecImsIF.java): TELEFONICA_CZ = 119, VODACOM_SOUTHAFRICA = 55 (0x37).
 
 ## Open
 
-- The four unnamed codec bytes (0x19-0x1c) and the byte at 0x14 of the option block.
+- The byte at 0x14 of the option block; the ImsUserProfile bit-rate cap (+0x70).
 - The value set of the status byte in 0x1603 and the mode byte of 0x1609.
 - Whether the modem needs the session-refresh and signalling hints at all for a basic call.
 - How this maps onto `android.hardware.radio.ims.media.IImsMedia` (`RtpConfig`, `AmrParams`,

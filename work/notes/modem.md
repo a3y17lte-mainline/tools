@@ -728,6 +728,17 @@ USSD balance code and a menu reply; a national and an international call; read c
 waiting and back; a second call while in a call: swap, merge, split, end one; mute during a
 call; the Alpine s2idle test with the modem registered. Plus the checks still open from 8d.
 
+Phone results 2026-11-17 (Android, the 8e build): reading call settings works. Forwarding for
+all four reasons answered (not reachable active, the others not), CLIR `{0, 4}`, call waiting
+`{1, 17}` (on). Each query falls back to EDGE and back (CS supplementary services without
+VoLTE, expected). `*#06#` is the dialer's own code: the IMEI from the framework, no RIL
+request. Found on the way:
+- networkStateChanged went out on every signal report (45-55 framework polls a minute):
+  fixed in shannond 4ba5482 (only on registration/operator/radio change; signal apart).
+- `NRM-I-0 service not connected` / `SST-0 RIL returned an error where it must succeed`:
+  the framework's IWLAN network service is not in the build; the cellular one answers.
+  Device tree work (stage 3 of the IMS plan): the AOSP Iwlan package or a config without it.
+
 ## 8a. WWAN interface (2026-11-16, on a3y17lte)
 
 Commits, in series order (old tip tagged `a3y17lte-pre-wwan`):

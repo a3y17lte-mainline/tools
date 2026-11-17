@@ -252,6 +252,23 @@ start failed, 0x838d PDN profile number invalid, 0x838f netlib open failed. 0x80
   channel id = phone * 8 + index.
 - MNO enum (SecImsIF.java): TELEFONICA_CZ = 119, VODACOM_SOUTHAFRICA = 55 (0x37).
 
+## Modem firmware side (read 2026-11-17 night, RADIO backup, MAIN image)
+
+MAIN loads at 0x40010000 (TOC: file offset 0x1920, size 0x2479508). Code is Thumb-2;
+log calls take a DBT trace entry ('DBT:', fmt pointer at +0x10, line at +0x14), addressed
+as a literal-pool base plus an immediate. `llvm-objdump --triple=thumbv7r-none-eabi` on
+an objcopy'd slice reads it.
+
+- IPC_IMS_PDN SET handler (0x408bd544): flag byte (frame 0x2c) 0 = answer 0x8000 and do
+  nothing; IP type must be 1/2; then the context lookup by profile name (0x408bc0b8):
+  `lte_emergency`, `lte_ims`, `lte_internet` against 11 PDP entries, matching IP type
+  (2 IPv4 / 5 IPv6, or 6), state byte +0x383 == 1 and the kind mask +0x382 (2 IMS, 4
+  emergency, 0x10 internet); else by address (0x408bc2b4); else 0x8001.
+- The kind mask is set in one place, "Set PDP property" (0x4089c9f4), called from the
+  IPC_GPRS_PDP_CONTEXT SET handler (0x408a0d48) by its first byte: 1 -> internet,
+  3 -> IMS, 4 -> emergency. So the IMS PDN must be activated with mode 3 (stock does).
+- The modem's 0x1609 log names its second byte "DTMF profile num" (we send stock's value).
+
 ## Open
 
 - The byte at 0x14 of the option block; the ImsUserProfile bit-rate cap (+0x70).

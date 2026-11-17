@@ -4,8 +4,10 @@ Status 2026-11-17 evening: **registered with O2 CZ's IMS from the phone** (gates
 IMS PDN (IPv6, two P-CSCFs), REGISTER with USIM AKA, IPsec (algorithm not logged), 200 OK
 for 3600 s, reg event SUBSCRIBE 200 + NOTIFY, deregistration 200, the
 modem took IPC_IMS_REG_STATE. Run with the Linux daemon on Android (below). Plan: `~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md`.
-Stage 2 (calls) written 2026-11-17, host tests only (section "Calls"); next is gate 4, a test
-call from the phone, which needs the user's go.
+Stage 2 (calls) written 2026-11-17. **Gate 4, outgoing: a VoLTE call on O2 with audio**
+(2026-11-17 night, to an automated line: network-to-earpiece heard by the user; the mic
+direction untested, no person on the far end). Incoming not tested yet (needs a second
+phone). What it took: section "Gate 4 results". Next: the incoming call, then stage 3.
 Stock reference: `work/notes/ril/` (voice-engine.md, ims-ipc.md, ims-sequences.md).
 
 ## Decisions (user, 2026-11-17)
@@ -192,10 +194,13 @@ Android test loop (no Spark build; root shell, SELinux permissive):
   push to /data/local/tmp.
 - `stop vendor.radio-a3y17lte`; start the daemon with setsid and all fds redirected, under a
   host `timeout` (adb otherwise waits for it): `--nv /data/vendor/modem/nv/nv_data.bin
-  --socket /data/local/tmp/shannond.sock --audio-hook ""`. It takes the running modem over.
-- Commands: `shannond --socket ... --send "ims on" --listen N`.
+  --socket /data/local/tmp/shannond.sock --audio-hook /data/local/tmp/callaudio.sh` (with
+  tools/modem/ctl pushed next to it). It takes the running modem over.
+- Commands: `shannond --socket ... --send "ims on" --listen N`. Always with `--send`: the
+  binary given only `--socket` and `--listen` starts a second daemon, which fails on the
+  modem port and deletes the socket file on exit (the first daemon is then unreachable).
 - Routing: RA routes land in the per-interface table (ifindex + 1000) and nothing sends
-  unmarked traffic there: `ip -6 rule add oif rmnet2 lookup <ifindex+1000> pref 9000` after
+  unmarked traffic there: `ip -6 rule add oif rmnet0 lookup <ifindex+1000> pref 9000` (IMS on cid 1) after
   the PDN is up (the index changes with every new link). The Android app path (sockets on
   the IMS Network) will not need this.
 - Back: `ims off` (deregisters), kill the daemon, delete the rule, `start
@@ -203,14 +208,45 @@ Android test loop (no Spark build; root shell, SELinux permissive):
   take-over left Android without the ICCID (no data). Check the NV files' owner afterwards
   (`ls -la /data/vendor/modem/nv`: radio:radio); builds before 7074691 left them root.
 
+## Gate 4 results 2026-11-17 night (outgoing calls; shannond f8cbfd8, 9f4fdf7, ef85e0d, df25398; libsamsung-ipc 81066b5)
+
+- SIP worked on the first call: INVITE over TCP to port-s, 100, the QCI 1 dedicated bearer
+  (0x160B) before the 183, reliable 180, PRACK, 200, ACK; no UPDATE was needed (the 183/180
+  came with the resources met). The automated line hangs up after ~21 s (BYE).
+- No audio at first: every voice engine request but engine-on got 0x8001, IPC_IMS_PDN
+  first. The modem firmware's handler (main image 0x408bd544, the trace strings
+  "[SIPC_0_IMS] Rx IMS PDN SET"; code loads a base pointer to its DBT log entries and adds
+  an offset, so search literal pools for addresses just below the entry) finds the PDN by
+  name (lte_emergency / lte_ims / lte_internet) among 11 contexts: IP type v6 or v4v6,
+  state 1, and a "kind" mark (byte +0x382 of the context entry: 2 IMS, 4 emergency, 0x10
+  internet), else by IP, else 0x8001. The mark is set only by the PDP activation's first
+  byte (0x0D04 handler 0x408a0d48: 1 internet, 3 IMS, 4 emergency), which stock sets from
+  the profile type (ContextActivationDca::ActivateContext). Fix: activate the IMS context
+  with 3, on cid 1 as stock (GetCidFromApnType), after the lte_ims profile (0x0D1B, as
+  stock's SetDataProfile). Name, address and frame layout were already right (probed with
+  the new CLI `ipc set 1606 HEX`).
+- The network's requests (reg event NOTIFY, BYE) were retransmitted for ever: O2's P-CSCF
+  (Nokia SBC) sends them from its port-c with Via `UDP [pcscf]:6000` (port-s, no rport) and
+  drops answers sent to its port-c. Answers now follow the Via (RFC 3261 18.2.2 / 3581) over
+  the SA to that port (our port-uc -> port-s). Checked: the NOTIFY was answered once and not
+  repeated. This would have broken incoming calls.
+- Call audio in the Android loop: the audio HAL knows nothing of the CLI's call, so the
+  daemon runs `--audio-hook /data/local/tmp/callaudio.sh` (tools/modem/callaudio-android.sh,
+  the voicecall.sh values through tools/modem/ctl, a static ALSA control tool: Android
+  has no tinymix). The earpiece played the far end.
+- The IMS context is cid 1 now: rmnet0 in the routing rule below.
+- ESP is integrity only: `tcpdump -i rmnet0 -s 0 -w F esp` on the phone shows the SIP text
+  (strip identities before quoting it).
+
 ## Phone gates (each send needs the user's go)
 
 Development loop: the cross-built Linux daemon (`out/shannond-aarch64/shannond`) from a root
 shell on Android with the radio HAL stopped, or the Alpine RAM boot.
 1. Read only: ISIM present (`sim apps`)? VoLTE byte in the registration (`status`, log line
    "VoLTE yes/no")?
-2. `ims on` up to the PDN: address and P-CSCF list arrive on the IMS context (cid 3)?
+2. `ims on` up to the PDN: address and P-CSCF list arrive on the IMS context (cid 1 since gate 4)?
 3. REGISTER: the network's first answer decides the fixes (401 with AKA + Security-Server
    expected). Watch for: P-CSCF answering on which port, User-Agent, Contact form.
-4. Calls (after stage 2): one outgoing, one incoming, audio both ways.
+4. Calls (after stage 2): one outgoing (done, audio from the network), one incoming (open),
+   audio both ways, DTMF, hold/resume.
 5. The Android build.

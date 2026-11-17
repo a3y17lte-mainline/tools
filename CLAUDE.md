@@ -153,8 +153,10 @@ Not done, roughly in planned order:
   registration, 0x1608 to the modem, CLI `ims on`) REGISTERED WITH O2 from the phone
   (2026-11-17; Linux daemon on Android with the HAL stopped, recipe in ims.md). Stage 2
   (calls: voice engine 0x16, SDP, INVITE/PRACK/UPDATE with preconditions, hold, session
-  timer, CLI `ims dial|answer|...`) written 2026-11-17, host tests only; next: gate 4, a test
-  call (needs the user's go), then Android. work/notes/ims.md "Calls".
+  timer, CLI `ims dial|answer|...`) written 2026-11-17; an OUTGOING VoLTE CALL WITH AUDIO
+  worked on O2 (2026-11-17 night; needed IMS PDN activation mode 3 on cid 1 and Via-routed
+  answers). Next: the incoming call (needs a second phone), then Android. work/notes/ims.md
+  "Calls" and "Gate 4 results".
   shannond's AIDL front end has a host syntax check: `ninja aidl_check` (-DSHANNOND_AIDL_API=...).
 - Android radio HAL build (2026-11-16): shannond's AIDL V5 front
   end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to

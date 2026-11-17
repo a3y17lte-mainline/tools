@@ -1,7 +1,9 @@
 # IMS / VoLTE: our own stack in shannond
 
-Status 2026-11-17: **stage 1 (registration) written and host-tested, not run on the phone.**
-Nothing has been sent to the network. Plan: `~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md`.
+Status 2026-11-17 evening: **registered with O2 CZ's IMS from the phone** (gates 1-3 done):
+IMS PDN (IPv6, two P-CSCFs), REGISTER with USIM AKA, IPsec (algorithm not logged), 200 OK
+for 3600 s, reg event SUBSCRIBE 200 + NOTIFY, deregistration 200, the
+modem took IPC_IMS_REG_STATE. Run with the Linux daemon on Android (below). Calls: stage 2. Plan: `~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md`.
 Stock reference: `work/notes/ril/` (voice-engine.md, ims-ipc.md, ims-sequences.md).
 
 ## Decisions (user, 2026-11-17)
@@ -98,6 +100,39 @@ Mainline config: XFRM_USER, INET_ESP, INET6_ESP as modules (tools/mkconfig-a3y17
   0x1603 status values and the four unnamed codec bytes.
 - Stage 3: Android (private AIDL, ShannonIms app, RadioNetwork VoPS flag, srvccStateNotify,
   overlay/carrier config/sepolicy; the HAL needs CAP_WAKE_ALARM for the refresh alarm).
+
+## Phone results 2026-11-17 (user: "try the IMS bits we already have")
+
+- Gate 1: the card has only a USIM (no ISIM): identities from the IMSI. The LTE cell says
+  VoLTE yes (0x0805 byte).
+- Gate 2: `ims on`: the IMS context (cid 3, IPv6, P-CSCF request) came up on rmnet2 with two
+  IPv6 P-CSCFs; the global address from the router advertisement.
+- Gate 3, what it took (shannond d0cc109, 3bd2a57):
+  - AKA type: 0 is IMS AKA on the ISIM only; this card needs USIM AKA (2): with 0 the modem
+    answered once properly, once with a 4-byte RES and no keys within 8 ms.
+  - The protected REGISTER must repeat the Security-Client (else 400 Bad Request).
+  - After registration: the default public identity (first P-Associated-URI: a sip: and a
+    tel: URI came back) and the P-CSCF in the Route; the IMSI-derived identity got
+    `403 Forbidden - 186` on SUBSCRIBE.
+  - The P-CSCF's UDP answers and requests come from its port-c (e.g. 32773), as expected.
+  - Not seen yet: a refresh (expires 3600 s, refresh at 3000 s), a re-challenge.
+
+Android test loop (no Spark build; root shell, SELinux permissive):
+- Static build: `cmake -S src/shannond -B out/shannond-aarch64-static -G Ninja
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$PWD/src/shannond/cmake/alpine-aarch64.cmake
+  -DALPINE_SYSROOT=$PWD/out/modem-sysroot "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -static"
+  -DOPENSSL_USE_STATIC_LIBS=ON` (the sysroot got openssl-libs-static, zlib-static, zlib-dev),
+  push to /data/local/tmp.
+- `stop vendor.radio-a3y17lte`; start the daemon with setsid and all fds redirected, under a
+  host `timeout` (adb otherwise waits for it): `--nv /data/vendor/modem/nv/nv_data.bin
+  --socket /data/local/tmp/shannond.sock --audio-hook ""`. It takes the running modem over.
+- Commands: `shannond --socket ... --send "ims on" --listen N`.
+- Routing: RA routes land in the per-interface table (ifindex + 1000) and nothing sends
+  unmarked traffic there: `ip -6 rule add oif rmnet2 lookup <ifindex+1000> pref 9000` after
+  the PDN is up (the index changes with every new link). The Android app path (sockets on
+  the IMS Network) will not need this.
+- Back: `ims off` (deregisters), kill the daemon, delete the rule, `start
+  vendor.radio-a3y17lte`: the HAL took the running modem over and Android was in service.
 
 ## Phone gates (each send needs the user's go)
 

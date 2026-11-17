@@ -645,7 +645,8 @@ What the first boots showed, all fixed in shannond (main) unless noted:
 - A restarted HAL found a running modem and waited for ever (the kernel keeps the modem up
   when the ports close; the boot messages come once). Now: no boot message after 3 s ->
   version probe -> take over: radio off, SIM state asked for, ICCID read from the card
-  (EF 2FE2), old links removed. Not tested on the phone.
+  (EF 2FE2), old links removed. Worked on the phone 2026-11-17 (HAL restarted after the
+  IMS test daemon: in service again).
 - SIM toolkit (core/sat): proactive commands (indication: u16 length + BER-TLV) are kept
   until the framework's service runs; terminal response = IPC_SAT_PROACTIVE_CMD GET, always
   0x201 bytes; envelope = EXEC, 0x101 bytes, answered by a notification (sw1, sw2, length,

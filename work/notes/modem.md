@@ -558,7 +558,7 @@ Our userspace (2026-11-15), built by `tools/modem/build-userspace` into `out/mod
 ### 8c. Android radio HAL (2026-11-16; builds in the LOS tree on the Spark, not run yet)
 
 First run (needs the user's go: the modem starts with the SIM and registers): flash the
-A3_ENABLE_RADIO=true build, then check dmesg for the in-kernel modem start (TOC, NV, handshake),
+build (the radio is always built since 2026-11-18), then check dmesg for the in-kernel modem start (TOC, NV, handshake),
 /data/vendor/modem/{nv,firmware} (modem-setup.sh, logcat tag modem-setup), logcat of
 android.hardware.radio-service.a3y17lte (port open, SIM, registration), then SIM status,
 registration and data in Settings. Build fixes so far: sepolicy neverallows (a3_efs_file as
@@ -573,8 +573,8 @@ in the IRadioConfig stub.
   DB/DC answers) host-tested (29 tests total). `Android.bp` + `.rc` (user radio, NET_ADMIN)
   + VINTF fragment in the repo; libsamsung-ipc has an `Android.bp` (`libsamsung-ipc-shannon`).
 - Device tree (src/android/device/samsung/a3y17lte, commit "Radio HAL (off until tested)"):
-  `A3_ENABLE_RADIO=true` builds it (default off: then the NoTelephony overlay keeps voice/SMS
-  off). `init.a3y17lte.modem.rc` mounts EFS ro,noload (context a3_efs_file) and runs
+  Always built since 2026-11-18 (user's decision; the A3_ENABLE_RADIO switch and the
+  NoTelephony overlay are gone). `init.a3y17lte.modem.rc` mounts EFS ro,noload (context a3_efs_file) and runs
   `modem-setup.sh` in post-fs-data: first boot copies the NV files to /data/vendor/modem/nv
   and RADIO (37 MiB) to /data/vendor/modem/firmware/samsung/a3y17lte/modem.bin (the NV
   copy persists, unlike Alpine's RAM image). Partial firmware reads
@@ -609,10 +609,10 @@ in the IRadioConfig stub.
 - Behaviour choices to revisit on the phone: SMS are acknowledged by the core at once (the
   framework's ack is a no-op); emergencyDial = a normal dial (stock's emergency call type in
   IpcTxCallOriginate @7 not decoded); one call at a time (hangup/reject/background = release);
-  only the serving cell in getCellInfoList; no VoPS (IMS later);
+  only the serving cell in getCellInfoList; VoPS from the cell (since stage 3 of IMS);
   setInitialAttachApn sends the attach profile (the modem re-registers).
 - To build: shannond -> e.g. hardware/a3y17lte/shannond, libsamsung-ipc -> external/libsamsung-ipc
-  in the local manifest once the repos are pushed (user's word), then `A3_ENABLE_RADIO=true`.
+  in the local manifest (done); no build switch any more.
 
 ### 8d. Android on the phone (2026-11-17)
 

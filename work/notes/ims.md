@@ -165,10 +165,52 @@ and resume; hangup. (b) a call to the phone: `event ims-call N:incoming`, `ims a
 the log for "voice engine ... failed (0x83xx)" (MapIPCError codes in voice-engine.md) and for
 "media event" lines.
 
+## Stage 3: Android (written 2026-11-18, host-checked, not built in the Spark tree yet)
+
+Decided (user, 2026-11-18): SIP sockets and IPsec stay in the HAL (LinuxImsNetwork, as tested),
+the HAL brings up the IMS PDN itself (Android's data stack does not see it), the radio is always
+built (no A3_ENABLE_RADIO). API read from LineageOS 24.0 sources (sparse clones in src/los-ref:
+frameworks/base telephony ims, frameworks/opt/telephony imsphone + ims).
+
+- Core (shannond aebdf9e, ba46075): SRVCC as stock (IPC_CALL_SRVCC; started -> IMS call list
+  0x0206 with CS transaction ids; completed -> sessions end without BYE, `handedOver`, audio
+  held 3 s; failed -> stay). 0x1619/0x1620 are not sent by stock on this single-SIM phone. The
+  HAL's own IMS link gets a routing table (0x5300 + cid) and a rule at priority 9000 (netd's
+  rules end in unreachable): replaces the hand-made rule of the Android loop.
+- HAL (bf09a14, b236264, 1b5b8d2): Core owns ims::Ims; cids as stock (IMS 1, internet 2, others
+  3+), the HAL's own IMS context hidden from Android's data list; VoPS from the cell;
+  srvccStateNotify; timed wake lock on SIP activity (5 s) and during calls (60 s renewed); rc
+  WAKE_ALARM + BLOCK_SUSPEND, group wakelock. Private AIDL `vendor.shannond.ims`
+  (IShannonIms/default: setCallback, setEnabled, getRegistration, getCalls, dial, answer,
+  hangup, hold, resume, sendDtmf; oneway IShannonImsCallback), unfrozen: freeze V1 in the
+  Spark tree before a release build. `ninja aidl_check` covers it.
+- Mute (68fa86f, device 9fa3138): Telecom mutes via AudioManager -> audio HAL setMicMute; ours
+  ignored it (CS calls too). As stock (adev_set_mic_mute -> SecRilSetTxMute): property
+  vendor.audio.call_mute -> radio HAL -> IPC_SND_MIC_MUTE_CTRL while a call has audio and at
+  call start. Stock's IMS app's session setMute is empty; ours too.
+- App (3b0d24f, shannond app/ShannonIms, org.shannond.ims, system_ext priv-app, platform cert):
+  ImsService with static MMTEL meta-data, MmTelFeature, registration, config store, call
+  sessions. IMS on = enableIms && voice-over-LTE capability enabled. CS retry ->
+  CODE_LOCAL_CALL_CS_RETRY_REQUIRED (telephony redials silently). Emergency numbers -> CSFB.
+  SRVCC: session stays quiet (telephony moves the call itself on srvccStateNotify). Ringback:
+  local (progressing with direction inactive); P-Early-Media gating still open. Host check:
+  `ninja ims_app_check` (javac against stand-ins with the LOS 24 signatures).
+- Device tree (efb1b01, 6a42b72): radio always built; ShannonIms; android.hardware.telephony.ims
+  feature (else no IMS phone); overlays: config_device_volte_available (android),
+  config_ims_mmtel_package (com.android.phone), vendor.xml for 230/02 (carrier_volte_available
+  etc.: AOSP's carrier id 1449 config leaves VoLTE off); sepolicy: netlink_xfrm, wake_alarm,
+  wakelock_use, service hal_shannond_ims_service + platform_app binder (permissive device).
+
+Phone checklist after the Spark build (each call with the user's go): `cmd phone ims
+get-ims-service -s 0` names org.shannond.ims; VoLTE switch in SIM settings; radio log
+REGISTER 200 and the VoLTE icon; dialer call over IMS with audio both ways; mute; hold/resume
+and DTMF from the dialer; incoming call rings; mobile data on cid 2 next to IMS; HAL restart
+re-registers (the app sets the switch again).
+
 ## Not done
 
-- Stage 3: Android (private AIDL, ShannonIms app, RadioNetwork VoPS flag, srvccStateNotify,
-  overlay/carrier config/sepolicy; the HAL needs CAP_WAKE_ALARM for the refresh alarm).
+- Freezing vendor.shannond.ims V1; P-Early-Media gating of early media vs local ringback;
+  422 retry, offerless INVITE, forked 2xx; emergency over IMS (CS as stock).
 
 ## Phone results 2026-11-17 (user: "try the IMS bits we already have")
 

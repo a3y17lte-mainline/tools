@@ -155,11 +155,13 @@ Not done, roughly in planned order:
   (calls: voice engine 0x16, SDP, INVITE/PRACK/UPDATE with preconditions, hold, session
   timer, CLI `ims dial|answer|...`) written 2026-11-17; an OUTGOING VoLTE CALL WITH AUDIO
   worked on O2 (2026-11-17 night; needed IMS PDN activation mode 3 on cid 1 and Via-routed
-  answers). Next: the incoming call (needs a second phone), then Android. work/notes/ims.md
-  "Calls" and "Gate 4 results".
+  answers). Stage 3 (Android) written 2026-11-18, not built yet: SRVCC, the HAL runs the IMS
+  stack, private AIDL vendor.shannond.ims, ShannonIms ImsService app (shannond app/), device
+  overlays/carrier config/sepolicy; also call mute via the audio HAL (was missing for CS too).
+  Next: the Spark build, then the phone checklist. work/notes/ims.md "Stage 3".
   shannond's AIDL front end has a host syntax check: `ninja aidl_check` (-DSHANNOND_AIDL_API=...).
 - Android radio HAL build (2026-11-16): shannond's AIDL V5 front
-  end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to
+  end + device tree radio (always built since 2026-11-18; EFS ro mount + first-boot NV/firmware copy to
   /data/vendor/modem, links from /vendor/firmware: S-Boot overrides firmware_class.path). Android kernel lineage-24.0 regenerated with
   the modem series (old tip tag lineage-24.0-pre-modem; new mailbox/PMU prereqs). shannond
   (hardware_samsung_shannond) and libsamsung-ipc (external_libsamsung-ipc) are org repos, in the

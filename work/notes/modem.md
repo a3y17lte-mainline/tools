@@ -738,6 +738,13 @@ request. Found on the way:
 - `NRM-I-0 service not connected` / `SST-0 RIL returned an error where it must succeed`:
   the framework's IWLAN network service is not in the build; the cellular one answers.
   Device tree work (stage 3 of the IMS plan): the AOSP Iwlan package or a config without it.
+- SIM toolkit "crash": a card menu answered GET INPUT, then sent SEND SHORT MESSAGE; the
+  toolkit UI froze ("Already responded") and the card session hung. No SMS went out. On this
+  phone the AP sends toolkit SMS (stock: SmsManager sends it, `OnSendSmsDone` reports to the
+  toolkit app); AOSP does that only with `config_stk_sms_send_support` true, default false
+  (= the modem sends). Fixed in the device tree overlay (6c131df). The input text went
+  out as 8-bit (`8D 0F 04 "Teplice,Alejn "`): the card did not allow UCS2 and the non-GSM
+  character was dropped by the framework's STK app, not the RIL.
 
 ## 8a. WWAN interface (2026-11-16, on a3y17lte)
 

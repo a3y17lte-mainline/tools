@@ -645,8 +645,17 @@ What the first boots showed, all fixed in shannond (main) unless noted:
 - A restarted HAL found a running modem and waited for ever (the kernel keeps the modem up
   when the ports close; the boot messages come once). Now: no boot message after 3 s ->
   version probe -> take over: radio off, SIM state asked for, ICCID read from the card
-  (EF 2FE2), old links removed. Worked on the phone 2026-11-17 (HAL restarted after the
-  IMS test daemon: in service again).
+  (EF 2FE2), old links removed. On the phone 2026-11-17 (HAL restarted after the IMS test
+  daemon): in service, but NO DATA: the ICCID read (no application) left the card status
+  without an ICCID, Android found no subscription ("No ICCID available for phone 0"),
+  default data sub -1. Fixed in shannond 3702608 (read through the USIM, after the app
+  list); needs a build. Signal bars were missing only until the framework set the
+  indication filter with SIGNAL_STRENGTH (32 -> 127) about a minute later. Until the fix is
+  built, a reboot (normal modem start, ICCID announced) restores data.
+- The IMS test daemon ran as root and its NV writes (temp file + rename) left
+  nv_data.bin(+.md5) owned by root, 600: the HAL logged "no valid checksum" and every NV
+  write failed. Owner restored with chown (checksum verified: md5 of data +
+  "Samsung_Android_RIL" matched); shannond 7074691 keeps owner/mode on replace.
 - SIM toolkit (core/sat): proactive commands (indication: u16 length + BER-TLV) are kept
   until the framework's service runs; terminal response = IPC_SAT_PROACTIVE_CMD GET, always
   0x201 bytes; envelope = EXEC, 0x101 bytes, answered by a notification (sw1, sw2, length,

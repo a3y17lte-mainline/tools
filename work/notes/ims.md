@@ -132,7 +132,9 @@ Android test loop (no Spark build; root shell, SELinux permissive):
   the PDN is up (the index changes with every new link). The Android app path (sockets on
   the IMS Network) will not need this.
 - Back: `ims off` (deregisters), kill the daemon, delete the rule, `start
-  vendor.radio-a3y17lte`: the HAL took the running modem over and Android was in service.
+  vendor.radio-a3y17lte`, then REBOOT until shannond 3702608 is in the build: the HAL's
+  take-over left Android without the ICCID (no data). Check the NV files' owner afterwards
+  (`ls -la /data/vendor/modem/nv`: radio:radio); builds before 7074691 left them root.
 
 ## Phone gates (each send needs the user's go)
 

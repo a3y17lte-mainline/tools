@@ -25,7 +25,7 @@ and `CallSession`), taken from the natural order and from `Channel::isReady()`.
 | remote change | `UpdateChannel` | 0x1601 channel with new addresses |
 | DTMF | `HandleDtmf` | 0x1604 exec |
 | call end | `StopChannel`, `DeleteChannel` | 0x1603 stop, 0x1601 channel (close) |
-| around the call | `SetImsCallStatus`, `SendSignalingInfo` | 0x027c call status, 0x1619 / 0x0280 signalling info |
+| around the call | `SetImsCallStatus`, `SendSignalingInfo` | 0x1619 signalling info; 0x027c and 0x0280 only on Qualcomm modems, never on Shannon (voice-engine.md) |
 | in the call | `SetTimeRef`, `GetLastPlayedVoiceTime` | 0x160a frame time |
 
 A failed step deletes the channel again (every setter in `CreateChannel` is followed by a

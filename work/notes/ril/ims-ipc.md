@@ -26,7 +26,7 @@ from the start of the frame, so the payload starts at 7.
 | AKA result | 0x0509 | CP->AP | @7 auth type (0-2), @8 status, @9 length-prefixed fields: type 0 three, type 2 four, type 1 two |
 | Data profile | 0x0D1B (`IPC_GPRS_SET_APN_INFO`) | AP->CP, 3 (SET), 0xcb bytes | @7 profile id, @8 name[20] (`lte_ims`, `lte_internet`, `lte_emergency`, ...), @0x1c protocol, @0x1d APN[101], @0x82 user[32], @0xa2 password[32], @0xc2 auth, @0xc3 roaming protocol, @0xc4 flag (inverted bool), three u16 from @0xc5 |
 | IP configuration with P-CSCF | 0x0D09 (`IPC_GPRS_IP_CONFIGURATION`) | CP->AP, 3 (NOTI) | @7 cid, @8 u16 field flags; bit 0: IPv4 @0x0a, DNS @0x0e, @0x12; bit 6: IPv6 @0x2a, DNS @0x6a, @0x7a; P-CSCF: 3 IPv4 @0x1e, 3 IPv6 @0x3a; if the frame is >= 0xa5 bytes, 5 more IPv4 @0xa4 and IPv6 @0xb8; flag 0x2000: u32 @0x9f; flag 0x4000: u8 @0xa3 |
-| IMS registration state | 0x1608 | AP->CP, 3 (SET), 13 bytes | @7 status, @8 feature mask, @9 network type, @10 ECMP state, @11 RAT (5 = ePDG), @12 one more byte |
+| IMS registration state | 0x1608 | AP->CP, 3 (SET), 13 bytes | @7 status (0 not registered, 1 registered, 2 a third state, 3/4 emergency), @8 feature mask (1 voice, 2 SMS, 8 video), @9 network type (0/1, names not in the RIL), @10 ECMP state, @11 RAT (stock table from RIL radio technology: LTE 6, IWLAN/ePDG 5, UMTS family 1-4), @12 low byte of a reason field (VZW-only use). Sent by the RIL on every IMS registration change (`ImsManager::OnImsRegistrationChanged`) |
 | SRVCC state | 0x0214 | both, 3 | @7 state (0-2) |
 | IMS call list | 0x0206 (`IPC_CALL_LIST`) | AP->CP, 3 (SET) | @7 count; per call: u16 call type, id, direction (1 MO, 2 MT), state (1-6), multiparty, number length, 0x81, number |
 
@@ -50,7 +50,7 @@ synchronisation failure with AUTS: an inference), 1-3 are errors mapped through 
 | File access with AID (ISIM files) | 0x0505 | AP->CP, 2 (GET) | @7 command, @8 app type, @9 AID length, @0x0a AID[16], @0x1a u16 file id, @0x1c path length in words, @0x1d path, @0x29 P1, @0x2a P2, @0x2b P3, @0x2c data |
 | Raw APDU (logical channels) | 0x0506 | AP->CP, 2 (GET), fixed 0x10e bytes | @7 u16 APDU length (big endian), @9 APDU. Open = `00 70 00 00 01`, close = `00 70 80 <ch> 00`, transmit = CLA with the channel number in its low bits |
 | Data call status | 0x0D10 | CP->AP, 3 (NOTI) | @7 cid, @8 state (1 active, 0x0a, 0x0b = two inactive variants), @9 fail cause, @10 flag, @11 dedicated-bearer-changed flag, @12 u32 retry time, @16 one more byte in long frames |
-| Network registration | 0x0805 | CP->AP | @7 access technology, @8 domain (1-3), @9 state, @10 one byte, @0x0b u16 LAC/TAC, @0x0d u32 cell id, @0x11 reject cause, @0x12 u16, @0x14 and @0x15 flags, @0x17 u16 |
+| Network registration | 0x0805 | CP->AP | @7 access technology, @8 domain (1-3), @9 state, @10 one byte, @0x0b u16 LAC, @0x0d u32 cell id, @0x11 reject cause, @0x12 u16 TAC, @0x14 VoLTE (PS voice) support, @0x15 IMS emergency support (both: 1 yes, 2 no, else unknown; stock log "VolteSupport %d ImsEmergencySupport %d TAC %d PhysicalCellId %d"), @0x17 u16 physical cell id. `NetRegState::IsVolteAllowed` = @0x14 == 1 |
 | Access barring for IMS (SSAC) | 0x0819 | CP->AP | voice factor/time @7/@8 and video @0x0f/@0x10, repeated at @0x17.. (not checked field by field) |
 | Serving network, with SSAC | 0x0803 | CP->AP | @0x19 u8 + @0x1a u16 and @0x1c u8 + @0x1d u16 barring factor/time pairs |
 | IMS mode change | 0x1610 | CP->AP, 3 (NOTI) | @7 switch type |

@@ -1,5 +1,7 @@
 # Modem: Shannon 315 (SS315AP) on the Exynos 7870
 
+Status 2026-11-17: IMS/VoLTE work is in work/notes/ims.md (stage 1, registration, host-tested).
+
 Status 2026-11-16: **the kernel has a WWAN interface** (on a3y17lte, section 8a): two WWAN
 ports (Samsung IPC, RFS), packet data as WWAN links, and the kernel loads and starts the modem
 itself (firmware-name: the RADIO image and the NV working copy). Built, KUnit and checks clean,

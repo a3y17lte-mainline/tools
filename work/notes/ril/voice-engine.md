@@ -150,10 +150,69 @@ interface name length, @0x1c interface name (up to 16), @0x2c one byte (PDN/cid)
 `ImsEngineSet` (0x1609, set): @7, @8 two bytes (engine and state). `ImsSimInfo` (0x1620,
 set): @7 one byte.
 
+## Read 2026-11-17 (stage 0 of the IMS plan)
+
+Engine and PDN:
+- 0x1609 `ImsEngineSet`: @7 on (1) / off (0), @8 a mode byte that the IMS service passes
+  in at `CPVEInterface::Initialize` and keeps per SIM (`InitEngine(phone, on, -1)` reuses
+  it). Its value comes from the Java side (not read). Sent once per SIM at start.
+- 0x1606 `ImsSetPdnIp`: @7 family (1 IPv4, 2 IPv6), @8 address (4 or 16 bytes), @0x18 u32
+  name length, @0x1c name (up to 16), @0x2c one byte (a flag from the caller). The name is
+  `"lte_" + <pdn name>`, e.g. `lte_ims`: the modem's data profile name (as in 0x0D1B),
+  not the network interface.
+
+Codec (0x1602) values:
+- Codec ids (`convertCodecNameToIpc`): 1 PCMU, 2 PCMA, 3 G729, 4 G729A, 5 G729AB,
+  6 AMR-NB, 7 AMR-WB, 8 EVRC, 9 EVRC0, 10 EVRC1, 11 EVRCB, 12 T140, 13 EVS.
+- Bit rate (`convertBitRateToIpc`): one bit per rate. AMR 4750 0x4, 5150 0x8, 5900 0x10,
+  6700 0x20, 7400 0x40, 7950 0x80, 10200 0x100, 12200 0x200; AMR-WB 6600 0x400, 8850
+  0x800, 12650 0x1000, 14250 0x2000, 15850 0x4000, 18250 0x8000, 19850 0x10000, 23050
+  0x20000, 23850 0x40000; others: 8000 0x1, 64000 0x2, 800 0x80000, 4000 0x100000, 8550
+  0x200000, 1200 0x400000, 2400 0x800000, 4800 0x1000000, 9600 0x2000000.
+
+Option block (0x1605, set, 0x4e bytes), from `VoIpEngineProxy::SetCIQMetric` (it copies
+the channel's option fields, 0x70 bytes from channel +0x13c, plus the flag word at +0x1ac)
+and the `SAE_*` setters that fill them:
+
+| Offset | Field | Set by (flag) |
+|---|---|---|
+| 7 | channel | |
+| 8 | u16 flags: which fields are valid | |
+| 0x0a | RTCP on | `SAE_EnableRTCP` (0x1) |
+| 0x0b | RTCP during the call | `SAE_EnableRTCPOnCall` (0x2) |
+| 0x0c | u32 RTP timeout | `SAE_SetRTPTimeout` (0x4) |
+| 0x10 | u32 RTCP timeout | `SAE_SetRTCPTimeout` (0x8) |
+| 0x14 | one byte, no setter found | |
+| 0x15 | SRTP profile | `SAE_EnableSRTP` (0x20) |
+| 0x16 | SRTP direction | `SAE_EnableSRTP` |
+| 0x17 | SRTP key length (max 30) | `SAE_EnableSRTP` |
+| 0x18 | SRTP key [30] | `SAE_EnableSRTP` |
+| 0x36 | AV sync | `SAE_EnableAVSyncOnCall` (0x40) |
+| 0x37 | CIQ metrics | `SAE_SetCIQ` (0x80) |
+| 0x3a, 0x3e | u32 RTCP RS and RR bandwidth | `SAE_EnableRTCP`/`OnCall` |
+| 0x42, 0x43, 0x44 | RTCP-XR blocks, stat flags, RTT mode | `SAE_EnableXR` (0x800) |
+| 0x45..0x4b | four u16 RTCP-XR parameters | `SAE_EnableXR` |
+| 0x4d | echolocate | `SAE_EnableEcholocate` (0x2000) |
+
+Flag 0x100 (codec bit-rate notification) has no field. Every setter only records; the
+block goes out once (`SAE_SetInCallOptions`, `SetCIQMetric`), then the flags are cleared.
+
+Call status and signalling on Shannon:
+- `SetImsCallStatus` (0x027c) and the call-group signalling info (0x0280) are sent only when
+  `getModemType()` is 1, i.e. `ril.modem.board` starts with one of three Qualcomm prefixes
+  ("MSM", ...). On Shannon neither goes out. 0x1619 `ImsSignalingInfo` (@7 message type,
+  @8 state, @9 one byte) does, waiting up to 1 s for the answer.
+- 0x1620 `ImsSimInfo`: @7 one byte.
+
+Errors (`MapIPCError`, result codes in the generic answer): 0x8305 engine state invalid,
+0x8314 no free session, 0x8328 AP/CP local IP mismatch, 0x8352 codec already active,
+0x8354 MVS acquire failed, 0x8355 MVS enable failed, 0x8358 TTY start failed, 0x8359 CVD
+start failed, 0x838d PDN profile number invalid, 0x838f netlib open failed. 0x8000 = ok.
+
 ## Open
 
-- The byte order inside the option block (0x1605) and the four unnamed codec bytes.
-- The value sets of the status byte in 0x1603 and of the engine bytes in 0x1609.
+- The four unnamed codec bytes (0x19-0x1c) and the byte at 0x14 of the option block.
+- The value set of the status byte in 0x1603 and the mode byte of 0x1609.
 - Whether the modem needs the session-refresh and signalling hints at all for a basic call.
 - How this maps onto `android.hardware.radio.ims.media.IImsMedia` (`RtpConfig`, `AmrParams`,
   `DtmfParams`, `RtcpConfig`, media quality): the fields look like a direct match.

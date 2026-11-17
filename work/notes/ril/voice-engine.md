@@ -241,8 +241,13 @@ start failed, 0x838d PDN profile number invalid, 0x838f netlib open failed. 0x80
   rcvPayload=%d bitrate=%d"): @7 channel, @8 send payload type, @9 0, @0x0a the
   telephone-event codec's `getRate()` (clock rate), @0x0c receive payload type.
   `Channel::isDtmfReady` needs @8 and @9 >= 0.
-- 0x1604 execute (`ImsHandleDtmf`, 0x0b bytes): @7 channel and three bytes from the Java
-  side (`CallSession::DoHandleDtmf` passes them through): code, mode, operation.
+- 0x1604 execute (`ImsHandleDtmf`, 0x0b bytes): @7 channel, @8 code, @9 mode, @0x0a
+  operation, passed through from Java: imsservice `ImsCallSession.sendDtmf` (mode 0, op 1),
+  `startDtmf` (mode 1, op 1), `stopDtmf` (mode 1, op 2); the code from the dialled char in
+  ImsTelephonyService (`com.google.ims.ImsCallSessionImpl.convertDtmfToCode`: '0'-'9' ->
+  0-9, '*' -> 10, '#' -> 11, else -1). The framework parts are odex/vdex only: dex carved
+  from the vdex (checksum and SHA-1 recomputed) decompiles with out/tools/jadx; quickened
+  code (ims-common) does not, its bytecode reads with a small dex parser.
 - Channel numbers: `VoIpEngineProxy::AllocateChannel` takes the first free of 8 per phone,
   channel id = phone * 8 + index.
 - MNO enum (SecImsIF.java): TELEFONICA_CZ = 119, VODACOM_SOUTHAFRICA = 55 (0x37).

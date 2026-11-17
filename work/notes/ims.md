@@ -113,8 +113,10 @@ Mainline config: XFRM_USER, INET_ESP, INET6_ESP as modules (tools/mkconfig-a3y17
   f48660b; voice-engine.md "Checked 2026-11-17"): 0x1602 packetization = the fmtp's
   octet-align value (1/0), mode set = mask of the SDP's mode-set modes (0 without one),
   @0x23 = receive payload type, bit rate = highest mode-set mode; 0x1604 set = send
-  payload type, 0, clock rate, receive payload type; 0x1604 execute = channel, RFC 4733
-  code, mode 0, operation 1 (stock's Java side supplies these three, not read); media
+  payload type, 0, clock rate, receive payload type; 0x1604 execute = channel, code
+  (0-9, * = 10, # = 11, nothing else: ImsTelephonyService convertDtmfToCode), mode 0 and
+  operation 1 for one tone (start: mode 1 op 1, stop: mode 1 op 2; imsservice
+  ImsCallSession.sendDtmf/startDtmf/stopDtmf); media
   events 1 RTP timeout, 2 RTCP timeout, 3 bit-rate change, 6 first RTP, 7/8 RTP/RTCP back,
   9 statistics; bearer events 1 and 2 = there, 3 = released.
   Left: stock caps the bit rate with a profile value (ImsUserProfile +0x70, a u64 constructor

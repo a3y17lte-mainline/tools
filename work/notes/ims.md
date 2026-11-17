@@ -24,8 +24,15 @@ Stock reference: `work/notes/ril/` (voice-engine.md, ims-ipc.md, ims-sequences.m
   `sip:mmtel@conf-factory.ims.mnc002.mcc230.3gppnetwork.org`, service `mmtel` on LTE.
   Defaults: `reg_expires` 600000, UDP preferred, retry 30-1800 s. `globalsettings.json`:
   CSFB error code 403.
-- The stock User-Agent is Samsung's ("SAMSUNG IMS 6.0" style string built by the app). We
-  send `shannond`: if O2 filters on the User-Agent, gate 3 shows it.
+- User-Agent (user, 2026-11-17: send Samsung's): `buildUserAgentString` fills the profile's
+  `useragent` template; O2's profile has none, so the default
+  `[PRODUCT_MODEL]-[BUILD_VERSION] Samsung IMS 6.0`, with Build.MODEL `SM-A320FL` and, for
+  European operators, the last three characters of ro.build.PDA `A320FLXXS9CTK2`:
+  **`SM-A320FL-TK2 Samsung IMS 6.0`**. (That O2 inherits the default template is inferred:
+  the profile merge code is in a framework jar not extracted, but the builder calls
+  `.replace` on the template unconditionally.) `userAgentFor()` in profile.cc.
+- The profile's `secure_client_port` 6000 / `secure_server_port` 5000 are not what the
+  native stack offers (next section).
 
 ## Modem side (read from the stock RIL / IMS library)
 
@@ -57,9 +64,20 @@ Protocol choices worth knowing:
 - Via and Contact carry the protected server port (port_us) for UDP and TCP; the P-CSCF
   answers UDP requests from its client port to it. The endpoint reads every socket and
   matches answers by branch, so either behaviour works.
-- A re-challenged refresh sets up a new SA set on new ports (base + 2, alternating) and drops
-  the old one after the 200. Whether O2 accepts the changed Contact port is open (gate 3,
-  only after hours: O2 asks for 600000 s).
+- Ports, SPIs and re-keying as the stock stack (user, 2026-11-17: follow stock):
+  - ports from `UserAgentManager::AllocateUserIdentity`: a counter starting at 6000 that
+    steps by 100 for every user agent created (wraps at 10000 to 6100); port-s = counter,
+    port-c = counter + 1. First registration: 6100 / 6101. Kept for the user agent's life
+    (ours: one ImsRegistration::start()).
+  - SPIs new in every Security-Client (`SipMessageBuilder::GenerateSecurityClient`):
+    spi-c = rand() % 100000 + 100, spi-s = spi-c + 1. Reserved with XFRM ALLOCSPI min = max.
+  - SA sets are keyed by the client port (`RegistrationSession::CreateIPSec`); with the same
+    port it logs "Vaild SA already exsits" and creates none. So a challenged refresh goes on
+    with the existing SAs (the newly offered SPIs are never installed). Old sets are kept
+    only when the client port changed (`RegiReConnecting::Process200OkResponse` ->
+    `AddOldSaInfo`, deleted at the old registration's expiry), which within one user agent
+    does not happen. Concern for gate 3+: if O2 ever re-challenges a refresh and moves to the
+    new SPIs, this loses the protected path; stock would have the same problem.
 - PANI only on protected requests. Messages over 1300 bytes go over TCP.
 - Logs carry methods and CSeq only, never identities or keys.
 

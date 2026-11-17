@@ -144,8 +144,11 @@ Not done, roughly in planned order:
 - Android radio HAL on the phone (2026-11-17): LTE registration, SIM, mobile data and outgoing calls
   with earpiece audio work (user-tested). Untested: SMS, accepting a call, the modem waking the phone,
   speaker/headphone calls, HAL restart take-over, SIM toolkit. Call audio = the audio HAL's "call"
-  mixer paths + vendor.audio.call_path / call_volume to shannond. Findings, traps and the backlog:
-  work/notes/modem.md section 8d. Then cell broadcast, USSD, supplementary services, multi-call; IMS last.
+  mixer paths + vendor.audio.call_path / call_volume to shannond. Findings, traps: work/notes/modem.md
+  section 8d. The rest of the RIL is written (2026-11-17, code + host tests only, section 8e: SMS
+  ack/reports/SIM store, cell broadcast, screen state + kernel wake hold, USSD, supplementary
+  services, multi-call, emergency dial, mute, SIM refresh); its phone checklist is in 8e. IMS next.
+  shannond's AIDL front end has a host syntax check: `ninja aidl_check` (-DSHANNOND_AIDL_API=...).
 - Android radio HAL build (2026-11-16): shannond's AIDL V5 front
   end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to
   /data/vendor/modem, links from /vendor/firmware: S-Boot overrides firmware_class.path). Android kernel lineage-24.0 regenerated with

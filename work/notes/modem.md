@@ -675,7 +675,55 @@ swap nearly full; pages compress about 3.8:1 (lz4).
 
 Backlog, in order: SMS on Android (send only with the user's go), accepting a call, the
 modem as a wake source (call/SMS must wake the phone); then cell broadcast, USSD,
-supplementary services, multi-call; IMS after those.
+supplementary services, multi-call; IMS after those. All written as code on 2026-11-17 (8e);
+what is left is the phone session.
+
+### 8e. The rest of the RIL (2026-11-17, code only, not run on the phone)
+
+Written from the stock RIL (decompile: IpcProtocol41.c, SmsManager.c, SsManager.c,
+CallManager.c, CBFilter.c, Global.c) with host tests against the fake modem; the AIDL front
+end now gets a host syntax check (shannond `ninja aidl_check`, stand-ins for the NDK headers
+generated from the frozen V5 API). Nothing here has run on the phone.
+
+- SMS: acknowledged when the framework acknowledges, as stock (the core acks itself only
+  without a client). The delivery report's first byte is the incoming message's first byte,
+  the network (2 = GSM); before, shannond sent the message type (1 for a normal SMS). The old
+  comment said a status-report type made the network deliver again; stock sends 2 for every
+  GSM message, so that observation (from the samsungipcd days) did not have this cause.
+  Check: one SMS in, no duplicate. Status reports go up as status reports; send results by
+  stock's classes (RP causes 27/41/42/47/98/111 retry, FDN, else failure); memory status
+  (1 room, 2 full, both ways); SMSC set; SIM store write/delete.
+- Cell broadcast: stock's filter (normal channels 0-999 as a list of at most 50 or "all", the
+  warning channels 0x1100-0x18ff by flags), pages filtered by channel in the core, activation
+  follows the channels. The page format byte: 1 GSM, 2 UMTS; length one byte (stock's
+  Japanese/Korean CSC variants use two, both accepted).
+- Screen state: IPC 0x0a0f event (one byte), from the framework's indication filter (signal
+  strength wanted = screen on); signal indications held back while filtered.
+- Wake-up: the kernel holds a 500 ms wakeup event per modem message (vendor: FMT/NET 500 ms),
+  fixup on a3y17lte and on the Android kernel lineage-24.0 (with 6e8f9bb5940c, which was not
+  there yet). The mailbox node already had `wakeup-source`.
+- USSD (0c08): send/cancel, GSM 7-bit request or response (response after a network
+  question, as stock), UCS2 for other text; received strings by stock's DCS rules.
+- Supplementary services: call waiting, CLIP, CLIR (n kept, used when dialling as stock),
+  forwarding (entries merged by number as stock), barring + password, in-call notifications.
+  Errors: 0x8125/0x8126/0x0c/0x10 password, 0x8004 not during a call, else generic.
+- Multi-call (0c07): stock CallManager's operations and rules (lone call: plain release).
+  Modem call ids used as they are (stock shifts only for Intel modems); framework index = id+1.
+- Emergency dial: call type 0x0106 + category byte (92-byte frame, as stock); never dialled.
+- Mute in the modem (0902); SIM refresh from the cached REFRESH command once 0e08 reports it;
+  call control result (0e0a) has no Android request, logged only.
+- Call volume: stock's steps are CscFeature_Audio_ConfigCallVolumeSteps (5 when unset) and
+  level = (int)(volume * 5 + 0.1); the device tree's audio HAL now rounds that way.
+- Known difference left alone: stock dials national numbers with prefix byte 0x21 and keeps
+  the '+' in international ones (0x11); ours sends 0x00 and strips the '+'. Ours worked for the
+  calls made so far; check an international number before changing it.
+
+Phone checklist for this code (each network action needs the user's go): one SMS in (no
+duplicate) and one out; a status report; screen off for minutes with the HAL log quiet and
+the phone suspended (`/sys/kernel/debug/wakeup_sources`), then a call and an SMS wake it; a
+USSD balance code and a menu reply; read call waiting / forwarding in Settings, toggle call
+waiting and back; a second call while in a call: swap, merge, split, end one; mute during a
+call; the Alpine s2idle test with the modem registered. Plus the checks still open from 8d.
 
 ## 8a. WWAN interface (2026-11-16, on a3y17lte)
 

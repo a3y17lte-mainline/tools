@@ -77,13 +77,13 @@ Protocol choices worth knowing:
     (ours: one ImsRegistration::start()).
   - SPIs new in every Security-Client (`SipMessageBuilder::GenerateSecurityClient`):
     spi-c = rand() % 100000 + 100, spi-s = spi-c + 1. Reserved with XFRM ALLOCSPI min = max.
-  - SA sets are keyed by the client port (`RegistrationSession::CreateIPSec`); with the same
-    port it logs "Vaild SA already exsits" and creates none. So a challenged refresh goes on
-    with the existing SAs (the newly offered SPIs are never installed). Old sets are kept
-    only when the client port changed (`RegiReConnecting::Process200OkResponse` ->
-    `AddOldSaInfo`, deleted at the old registration's expiry), which within one user agent
-    does not happen. Concern for gate 3+: if O2 ever re-challenges a refresh and moves to the
-    new SPIs, this loses the protected path; stock would have the same problem.
+  - SA sets: stock keys them by the client port (`RegistrationSession::CreateIPSec`); with the
+    same port it logs "Vaild SA already exsits" and creates none, so its challenged refresh
+    goes on with the existing SAs. Ours does not follow stock here (user, 2026-11-17 review):
+    a challenged refresh installs a new set from the SPIs offered with it and the new
+    Security-Server (33.203 7.4), on the same ports; the old sockets and SAs go first (TCP
+    closed with a reset, so the same port pair connects again). Host-tested only: no
+    re-challenge seen on O2 yet.
 - PANI only on protected requests. Messages over 1300 bytes go over TCP.
 - Logs carry methods and CSeq only, never identities or keys.
 

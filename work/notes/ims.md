@@ -3,7 +3,9 @@
 Status 2026-11-17 evening: **registered with O2 CZ's IMS from the phone** (gates 1-3 done):
 IMS PDN (IPv6, two P-CSCFs), REGISTER with USIM AKA, IPsec (algorithm not logged), 200 OK
 for 3600 s, reg event SUBSCRIBE 200 + NOTIFY, deregistration 200, the
-modem took IPC_IMS_REG_STATE. Run with the Linux daemon on Android (below). Calls: stage 2. Plan: `~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md`.
+modem took IPC_IMS_REG_STATE. Run with the Linux daemon on Android (below). Plan: `~/.claude/plans/well-anything-s-that-cheap-piped-thunder.md`.
+Stage 2 (calls) written 2026-11-17, host tests only (section "Calls"); next is gate 4, a test
+call from the phone, which needs the user's go.
 Stock reference: `work/notes/ril/` (voice-engine.md, ims-ipc.md, ims-sequences.md).
 
 ## Decisions (user, 2026-11-17)
@@ -93,11 +95,67 @@ dropped. `ctest` runs both.
 Linux front end: `ims on|off|status` (VoLTE off until asked), `--ims-ignore-vops`.
 Mainline config: XFRM_USER, INET_ESP, INET6_ESP as modules (tools/mkconfig-a3y17lte).
 
+## Calls (stage 2, shannond 4bddb6f, 37c4bdd, a719d89, 1844070)
+
+- `core/ims/sdp`: one audio stream, AMR-WB/AMR in both packetizations + telephone-event, the
+  profile's payload types (offer order AMR-WB BE 116, OA 107, AMR BE 118, OA 96, DTMF 111/110),
+  b=AS/RS/RR, RFC 3312 precondition lines. Offer: our resources "mandatory", the far end's
+  "optional" (IR.92). The answer keeps the offer's first voice codec and its payload type.
+- `core/ims/voice_engine` (modem, group 0x16), stock order: 0x1609 engine on (mode byte = low
+  byte of audio_port_start, 1234 -> 0xd2) and 0x1606 PDN (`lte_ims`, flag 1) at
+  registration; per call 0x1606 again, 0x1601 create (fields 0xff) + change (addresses,
+  ports host order, RTCP = RTP + 1, stream type 1), 0x1602 codec (mask 0x21ff, packetization
+  1 octet-aligned / 2 bandwidth-efficient, bit rate = highest mode-set mode, byte @0x23 = our
+  receive payload type), 0x1605 options (RTP/RTCP timeout 20 s, RTCP on call with RS/RR),
+  0x1604 DTMF set, 0x1603 start (status 3 sendrecv, 0 held; last byte 1 for IPv6). Hold /
+  re-INVITE: only what changed, then 0x1603 modify. End: 0x1603 stop, 0x1601 delete.
+  Channels 0-7 (stock AllocateChannel). Local RTP ports from 1234, even.
+  Inferred, check on the phone: in 0x1604 set (stock `SAE_SetDTMFOptions(ch, a, b, 0, u16)`
+  -> @8 a, @9 0, @0x0a u16, @0x0c b) which payload type is the receive one and that the u16
+  is the clock rate; 0x1604 execute = channel, RFC 4733 event code, mode 0, operation 1.
+  The media event numbers (0x1605 notifications, e.g. RTP timeout) are not mapped: logged
+  as "media event N on channel C"; a call shows which one is which.
+- `core/ims/call` (ImsCalls):
+  - Outgoing: INVITE (Supported 100rel, precondition, timer; P-Preferred-Service and
+    Accept-Contact MMTEL; P-Early-Media; Session-Expires 3600, Min-SE 90), PRACK each reliable
+    1xx, UPDATE with our resources once a QCI 1 dedicated bearer is reported (0x160B), 180 ->
+    alerting, ringback timer 90 s (O2) then CANCEL, 200 -> ACK. Early media: the voice
+    channel opens with the SDP answer. CS fallback for the profile's codes (O2: 403) and when
+    the network never answers.
+  - Request URIs: SIP (stock `remote_uri_type` sip): `sip:+420...@<domain>;user=phone`, local
+    numbers `sip:N;phone-context=<domain>@<domain>;user=phone`.
+  - Incoming: 100, then the answer in a reliable 183 (Require 100rel, precondition; asks the
+    network to confirm its resources), 180 when both sides' resources are there (the
+    network's UPDATE, our bearer: our own UPDATE first if the bearer came later); ringing
+    timer 90 s (O2) then 480. Answer: 200 (no SDP when the 183 carried it) resent until the
+    ACK. No preconditions: 180 at once, the answer in the 200. Offerless INVITEs: 488.
+  - Hold/resume: re-INVITE sendonly/sendrecv. Remote re-INVITE/UPDATE answered (direction
+    from our hold state and the offer), 491 while ours is pending. Session timer per RFC 4028
+    (refresh by UPDATE when we are the refresher, BYE when the other side does not refresh).
+  - Audio: Calls::setImsAudio: the same modem audio path, volume and audio hook as a CS call,
+    while a call has a voice channel (outgoing from early media, incoming once answered).
+  - Endpoint: timer B stops at an INVITE's first provisional answer; incoming INVITE
+    transactions live until the final answer; retransmitted 2xx are re-ACKed; CANCEL.
+- Tests: `test_sdp` (parser, answer, round trip, voice-engine frames against the fake modem),
+  `test_call` (fake P-CSCF as the far end: outgoing with preconditions, early media, lost
+  ACK, DTMF, hold, BYE; 403 -> CS; CANCEL; incoming with preconditions; incoming without,
+  cancelled; remote hold; registration loss). 89 host tests; `fuzz/fuzz_sip.cc` (SIP, digest,
+  Security-Server, SDP): 2.5 M inputs clean (`-DSHANNOND_FUZZ=ON -DSHANNOND_SANITIZE=ON`, clang).
+- CLI: `ims dial NUMBER`, `ims calls`, `ims answer|hangup|hold|resume ID`, `ims dtmf ID DIGIT`;
+  events `ims-call ID:state:in|out:number[ (end status, retry on CS)]`.
+- Not done: 422 (session interval too small) retry, offerless incoming INVITE, forked 2xx
+  beyond the first early dialog, SRVCC, emergency over IMS (CS), the RTP timeout (event
+  number unknown), early media gating by P-Early-Media.
+
+Gate 4 checklist (phone, each call needs the user's go): Android loop as above, `ims on`,
+wait for registered, then (a) `ims dial <number>`: 183/PRACK, the 0x160B bearer event in the
+log ("dedicated bearer N qci 1 added"), UPDATE, 180, 200; audio both ways; `ims dtmf`; hold
+and resume; hangup. (b) a call to the phone: `event ims-call N:incoming`, `ims answer N`. Watch
+the log for "voice engine ... failed (0x83xx)" (MapIPCError codes in voice-engine.md) and for
+"media event" lines.
+
 ## Not done
 
-- Stage 2: calls (voice engine, SDP, INVITE with preconditions, PRACK, UPDATE, hold, session
-  timer, CS fallback). Read first: `CallUacSession`, `CallUasSession`, `SdpCreator`, the
-  0x1603 status values and the four unnamed codec bytes.
 - Stage 3: Android (private AIDL, ShannonIms app, RadioNetwork VoPS flag, srvccStateNotify,
   overlay/carrier config/sepolicy; the HAL needs CAP_WAKE_ALARM for the refresh alarm).
 

@@ -209,6 +209,21 @@ Errors (`MapIPCError`, result codes in the generic answer): 0x8305 engine state 
 0x8354 MVS acquire failed, 0x8355 MVS enable failed, 0x8358 TTY start failed, 0x8359 CVD
 start failed, 0x838d PDN profile number invalid, 0x838f netlib open failed. 0x8000 = ok.
 
+## Read 2026-11-17 (stage 2)
+
+- 0x1604 set (`OemIPCHandler::ImsSetDtmf`, 0x0d bytes) is filled from
+  `CpAudioEngineClient::SAE_SetDTMFOptions(phone, ch, a, b, 0, u16)` (via
+  `CPVEInterface::SetDtmfCodecInfo(phone, ch, p3, p4, p5)`): @7 channel, @8 a (= p3),
+  @9 0, @0x0a u16 (= p5), @0x0c b (= p4). Which of p3/p4 is the receive payload type and
+  that p5 is the clock rate are inferred (the caller is a vtable call from AudioSession).
+  `Channel::isDtmfReady` needs @8 and @9 >= 0.
+- 0x1604 execute (`ImsHandleDtmf`, 0x0b bytes): @7 channel and three bytes from the Java
+  side (`CallSession::DoHandleDtmf` passes them through): code, mode, operation.
+- Channel numbers: `VoIpEngineProxy::AllocateChannel` takes the first free of 8 per phone,
+  channel id = phone * 8 + index.
+- 0x1605 media event numbers: not found in the native library (the handler is not in the
+  decompiled set); shannond logs them.
+
 ## Open
 
 - The four unnamed codec bytes (0x19-0x1c) and the byte at 0x14 of the option block.

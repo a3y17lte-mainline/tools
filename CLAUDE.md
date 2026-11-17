@@ -151,8 +151,10 @@ Not done, roughly in planned order:
 - IMS / VoLTE (2026-11-17): own SIP stack in shannond `core/ims/` (decided: native, own code).
   Stage 1 (registration with IMS AKA + IPsec, IMS PDN with P-CSCF request, VoPS from the
   registration, 0x1608 to the modem, CLI `ims on`) REGISTERED WITH O2 from the phone
-  (2026-11-17; Linux daemon on Android with the HAL stopped, recipe in ims.md). Next: stage 2
-  (calls), then Android. work/notes/ims.md.
+  (2026-11-17; Linux daemon on Android with the HAL stopped, recipe in ims.md). Stage 2
+  (calls: voice engine 0x16, SDP, INVITE/PRACK/UPDATE with preconditions, hold, session
+  timer, CLI `ims dial|answer|...`) written 2026-11-17, host tests only; next: gate 4, a test
+  call (needs the user's go), then Android. work/notes/ims.md "Calls".
   shannond's AIDL front end has a host syntax check: `ninja aidl_check` (-DSHANNOND_AIDL_API=...).
 - Android radio HAL build (2026-11-16): shannond's AIDL V5 front
   end + device tree `A3_ENABLE_RADIO` (default off; EFS ro mount + first-boot NV/firmware copy to

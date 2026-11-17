@@ -207,10 +207,24 @@ REGISTER 200 and the VoLTE icon; dialer call over IMS with audio both ways; mute
 and DTMF from the dialer; incoming call rings; mobile data on cid 2 next to IMS; HAL restart
 re-registers (the app sets the switch again).
 
+Closed 2026-11-18 (shannond 1a02f8c, 761b3d0, freeze commit; device e9cf9de):
+- Early media as stock (CallUacSession::IsEarlyMedia): P-Early-Media when present (sendrecv,
+  sendonly, recvonly yes; inactive no; gated/supported no change), else the answer's audio
+  direction; RTP timeout during early media -> local ringback. Up to the app as
+  Call.earlyMedia: progress with direction send-receive (network ringback) or inactive
+  (telephony's own). Stock has a profile switch (ImsUserProfile +0xbe8) that skips the SDP
+  rule; its O2 value is unknown, we use the SDP rule.
+- 422: once more with the network's Min-SE (RFC 4028 7.4).
+- Offerless incoming INVITE: 180, our offer in the 200, the answer in the ACK (none: BYE).
+- 2xx of a second fork: ACK (again for retransmissions) + BYE (RFC 3261 13.2.2.4).
+- vendor.shannond.ims frozen as V1: dump in aidl --dumpapi format, .hash from the build's
+  formula (aidl_api.go aidlVerifyHashRule), the build checks dump vs sources with
+  --checkapi=equal; device_framework_matrix.xml lists the HAL for check_vintf.
+
 ## Not done
 
-- Freezing vendor.shannond.ims V1; P-Early-Media gating of early media vs local ringback;
-  422 retry, offerless INVITE, forked 2xx; emergency over IMS (CS as stock).
+- Emergency over IMS: on CS, as stock O2 (not a gap).
+- Needs the phone: the incoming call, mic direction confirmed by a person, the Android build.
 
 ## Phone results 2026-11-17 (user: "try the IMS bits we already have")
 
